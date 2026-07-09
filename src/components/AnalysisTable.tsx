@@ -22,7 +22,8 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
 
   const formatPercentage = (value: number | null): string => {
     if (value === null) return "N/A";
-    return `${(value * 100).toFixed(2)}%`;
+    const normalized = Math.abs(value) <= 1 ? value * 100 : value;
+    return `${normalized.toFixed(2)}%`;
   };
 
   return (
@@ -162,7 +163,7 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
                 </div>
               </td>
               <td className="text-right px-6 py-4 text-slate-900">
-                {formatPercentage(metrics.roic ? metrics.roic / 100 : null)}
+                {formatPercentage(metrics.roic)}
               </td>
               <td className="text-center px-6 py-4">
                 {metrics.roic ? (
@@ -232,9 +233,7 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
                 </div>
               </td>
               <td className="text-right px-6 py-4 text-slate-900">
-                {formatPercentage(
-                  metrics.netMargin ? metrics.netMargin / 100 : null,
-                )}
+                {formatPercentage(metrics.netMargin)}
               </td>
               <td className="text-center px-6 py-4">
                 {metrics.netMargin ? (

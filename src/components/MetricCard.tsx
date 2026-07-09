@@ -8,6 +8,7 @@ interface MetricCardProps {
   score: number;
   description?: string;
   icon?: string;
+  tooltip?: string;
 }
 
 export const MetricCard: React.FC<MetricCardProps> = ({
@@ -17,6 +18,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   score,
   description,
   icon,
+  tooltip,
 }) => {
   const getScoreColor = (score: number) => {
     if (score >= 85) return "bg-green-100 text-green-800 border-green-300";
@@ -32,13 +34,42 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     return "bg-red-600";
   };
 
+  const displayValue =
+    typeof value === "number" && unit === "%" && Math.abs(value) <= 1
+      ? value * 100
+      : value;
+
+  const formattedValue =
+    typeof displayValue === "number" && displayValue % 1 !== 0
+      ? displayValue.toFixed(2)
+      : displayValue;
+
   return (
     <div className="bg-white rounded-lg shadow p-6 border-l-4 border-slate-200 hover:shadow-lg transition-shadow">
       <div className="flex items-start justify-between mb-3">
         <div>
-          <h3 className="text-sm font-semibold text-slate-600 uppercase tracking-wider">
-            {title}
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-slate-600 uppercase tracking-wider">
+              {title}
+            </h3>
+            {tooltip && (
+              <span
+                title={tooltip}
+                aria-label={tooltip}
+                className="text-slate-400 hover:text-slate-600 cursor-help"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="w-4 h-4"
+                >
+                  <path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z" />
+                  <path d="M11 10h2v6h-2zm0-4h2v2h-2z" />
+                </svg>
+              </span>
+            )}
+          </div>
           {description && (
             <p className="text-xs text-slate-500 mt-1">{description}</p>
           )}
@@ -49,9 +80,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       <div className="mb-4">
         {value !== null ? (
           <p className="text-3xl font-bold text-slate-900">
-            {typeof value === "number" && value % 1 !== 0
-              ? value.toFixed(2)
-              : value}
+            {formattedValue}
             {unit && (
               <span className="text-xl text-slate-600 ml-1">{unit}</span>
             )}

@@ -151,6 +151,7 @@ function App() {
               unit="%"
               score={result.scores.revenue}
               description="5-year CAGR"
+              tooltip="How much revenue has grown on average each year over the past five years."
               icon="📊"
             />
             <MetricCard
@@ -159,6 +160,7 @@ function App() {
               unit="%"
               score={result.scores.eps}
               description="5-year CAGR"
+              tooltip="How much earnings per share have grown on average each year over the past five years."
               icon="💹"
             />
             <MetricCard
@@ -167,6 +169,7 @@ function App() {
               unit="%"
               score={result.scores.fcf}
               description="5-year CAGR"
+              tooltip="How much free cash flow has grown on average each year over the past five years."
               icon="💰"
             />
             <MetricCard
@@ -175,6 +178,7 @@ function App() {
               unit="%"
               score={result.scores.roic}
               description="Return on Invested Capital"
+              tooltip="How efficiently the company turns invested capital into profit."
               icon="🎯"
             />
             <MetricCard
@@ -182,6 +186,7 @@ function App() {
               value={result.metrics.debtToEquity}
               score={result.scores.debt}
               description="Financial leverage"
+              tooltip="How much debt the company uses compared to shareholders' equity."
               icon="⚖️"
             />
             <MetricCard
@@ -190,6 +195,7 @@ function App() {
               unit="%"
               score={result.scores.profitability}
               description="Net profit margin"
+              tooltip="How much profit the company keeps from each dollar of revenue."
               icon="📈"
             />
           </div>
