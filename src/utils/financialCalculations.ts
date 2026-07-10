@@ -112,6 +112,47 @@ export function calculateFCFGrowth(
   return calculateCAGR(fcfValues[0], fcfValues[fcfValues.length - 1], years);
 }
 
+export function calculateDividendCAGR(
+  dividends: FinancialStatement[],
+): number | null {
+  if (!dividends || dividends.length === 0) {
+    return null;
+  }
+
+  // Sum dividends by calendar year
+  const annualDividends = dividends.reduce<Record<number, number>>(
+    (acc, statement) => {
+      if (statement.dividend == null) {
+        return acc;
+      }
+
+      const year = new Date(statement.date).getFullYear();
+
+      acc[year] = (acc[year] ?? 0) + statement.dividend;
+
+      return acc;
+    },
+    {},
+  );
+
+  const years = Object.keys(annualDividends)
+    .map(Number)
+    .sort((a, b) => a - b);
+
+  if (years.length < 2) {
+    return null;
+  }
+
+  const firstDividend = annualDividends[years[0]];
+  const lastDividend = annualDividends[years[years.length - 1]];
+
+  if (firstDividend <= 0 || lastDividend <= 0) {
+    return null;
+  }
+
+  return calculateCAGR(firstDividend, lastDividend, years.length - 1);
+}
+
 /**
  * Calculate Return on Invested Capital (ROIC)
  * ROIC = NOPAT / Invested Capital
@@ -307,11 +348,11 @@ export function calculateAllMetrics(
   incomeStatements: FinancialStatement[],
   balanceSheets: FinancialStatement[],
   cashFlowStatements: FinancialStatement[],
+  dividendHistory: FinancialStatement[],
 ): FinancialMetrics {
   const sortedBalance = [...balanceSheets].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
-
   return {
     revenueCAGR: calculateRevenueCAGR(incomeStatements),
     epsGrowth: calculateEPSGrowth(incomeStatements),
@@ -321,6 +362,7 @@ export function calculateAllMetrics(
       sortedBalance[0]?.totalDebt,
       sortedBalance[0]?.totalEquity,
     ),
+    dividendCAGR: calculateDividendCAGR(dividendHistory),
     ...calculateAverageMargins(incomeStatements),
     sharesDilution: analyzeShareDilution(balanceSheets),
   };

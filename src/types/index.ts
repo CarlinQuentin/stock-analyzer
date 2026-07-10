@@ -22,6 +22,9 @@ export interface FinancialStatement {
   totalEquity?: number;
   grossProfit?: number;
   operatingIncome?: number;
+  dividend?: number;
+  dividendYield?: number;
+  dividendFrequency?: "Monthly" | "Quarterly" | "Semiannual" | "Annual";
 }
 
 export interface AnalysisResult {
@@ -42,6 +45,7 @@ export interface FinancialMetrics {
   grossMargin: number | null;
   operatingMargin: number | null;
   netMargin: number | null;
+  dividendCAGR: number | null;
   sharesDilution: string;
 }
 
@@ -52,6 +56,7 @@ export interface MetricScores {
   roic: number;
   debt: number;
   profitability: number;
+  dividends: number;
   dilution: number;
 }
 

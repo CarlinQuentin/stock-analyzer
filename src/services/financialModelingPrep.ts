@@ -140,18 +140,57 @@ class FinancialModelingPrepService {
 
   async getStatementData(ticker: string) {
     try {
-      const [incomeStatements, balanceSheets, cashFlowStatements] =
-        await Promise.all([
-          this.getIncomeStatements(ticker),
-          this.getBalanceSheets(ticker),
-          this.getCashFlowStatements(ticker),
-        ]);
+      const [
+        incomeStatements,
+        balanceSheets,
+        cashFlowStatements,
+        dividendHistory,
+      ] = await Promise.all([
+        this.getIncomeStatements(ticker),
+        this.getBalanceSheets(ticker),
+        this.getCashFlowStatements(ticker),
+        this.getDividends(ticker),
+      ]);
 
       return {
         incomeStatements,
         balanceSheets,
         cashFlowStatements,
+        dividendHistory,
       };
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async getDividends(
+    ticker: string,
+    limit: number = 5,
+  ): Promise<FinancialStatement[]> {
+    try {
+      const response = await this.client.get("/dividends", {
+        params: {
+          ...this.getParams(),
+          symbol: ticker.toUpperCase(),
+          limit,
+        },
+      });
+
+      if (!response.data) {
+        throw new Error(`No dividend data found for ${ticker}`);
+      }
+
+      return response.data
+        .map((dividend: any) => ({
+          date: dividend.date,
+          dividend: dividend.dividend,
+          dividendYield: dividend.yield,
+          dividendFrequency: dividend.frequency,
+        }))
+        .sort(
+          (a: { date: string }, b: { date: string }) =>
+            new Date(a.date).getTime() - new Date(b.date).getTime(),
+        );
     } catch (error) {
       throw this.handleError(error);
     }

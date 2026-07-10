@@ -7,6 +7,7 @@ export const SCORE_WEIGHTS = {
   roic: 0.15, // 15%
   debt: 0.1, // 10%
   profitability: 0.1, // 10%
+  dividends: 0.0, // 10%
   dilution: 0.1, // 10%
 };
 
@@ -28,15 +29,15 @@ export function scoreRevenueGrowth(cagr: number | null): number {
     return 0;
   }
 
-  if (cagr > 0.15) {
-    return 90;
-  } else if (cagr >= 0.08) {
-    return 70;
-  } else if (cagr >= 0) {
-    return 40;
-  } else {
-    return 20;
+  if (cagr <= -0.1) {
+    return 0;
   }
+
+  if (cagr >= 0.2) {
+    return 100;
+  }
+
+  return Math.round(100 * Math.pow((cagr + 0.1) / 0.3, 0.8));
 }
 
 /**
@@ -45,20 +46,17 @@ export function scoreRevenueGrowth(cagr: number | null): number {
  * Good: 5-15%
  * Poor: negative growth
  */
-export function scoreEPSGrowth(growth: number | null): number {
-  if (growth === null) {
+export function scoreEPSGrowth(cagr: number | null): number {
+  if (cagr === null) {
     return 0;
   }
 
-  if (growth > 0.15) {
-    return 90;
-  } else if (growth >= 0.05) {
-    return 70;
-  } else if (growth >= 0) {
-    return 40;
-  } else {
-    return 20;
-  }
+  const minGrowth = -0.1; // -10% EPS CAGR = 0
+  const maxGrowth = 0.25; // 25% EPS CAGR = 100
+
+  const score = ((cagr - minGrowth) / (maxGrowth - minGrowth)) * 100;
+
+  return Math.max(0, Math.min(100, Math.round(score)));
 }
 
 /**
@@ -67,20 +65,17 @@ export function scoreEPSGrowth(growth: number | null): number {
  * Good: 5-10%
  * Poor: negative
  */
-export function scoreFCFGrowth(growth: number | null): number {
-  if (growth === null) {
+export function scoreFCFGrowth(cagr: number | null): number {
+  if (cagr === null) {
     return 0;
   }
 
-  if (growth > 0.1) {
-    return 90;
-  } else if (growth >= 0.05) {
-    return 70;
-  } else if (growth >= 0) {
-    return 40;
-  } else {
-    return 20;
-  }
+  const minGrowth = -0.1; // -10% CAGR = 0
+  const maxGrowth = 0.2; // 20% CAGR = 100
+
+  const score = ((cagr - minGrowth) / (maxGrowth - minGrowth)) * 100;
+
+  return Math.max(0, Math.min(100, Math.round(score)));
 }
 
 /**
@@ -94,15 +89,12 @@ export function scoreROIC(roic: number | null): number {
     return 0;
   }
 
-  if (roic > 15) {
-    return 90;
-  } else if (roic >= 10) {
-    return 70;
-  } else if (roic > 0) {
-    return 40;
-  } else {
-    return 20;
-  }
+  const minROIC = 0;
+  const maxROIC = 25;
+
+  const score = ((roic - minROIC) / (maxROIC - minROIC)) * 100;
+
+  return Math.max(0, Math.min(100, Math.round(score)));
 }
 
 /**
@@ -113,50 +105,75 @@ export function scoreROIC(roic: number | null): number {
  */
 export function scoreDebtToEquity(debtToEquity: number | null): number {
   if (debtToEquity === null) {
-    return 50; // Neutral if data not available
+    return 50; // Neutral if unavailable
   }
 
-  if (debtToEquity < 0.5) {
-    return 90;
-  } else if (debtToEquity <= 1) {
-    return 70;
-  } else if (debtToEquity <= 2) {
-    return 40;
-  } else {
-    return 20;
+  if (debtToEquity < 0) {
+    return 0; // Negative equity is usually a red flag
   }
+
+  const maxDebt = 2.5;
+
+  const score = 100 - (debtToEquity / maxDebt) * 100;
+
+  return Math.max(0, Math.min(100, Math.round(score)));
 }
 
 /**
  * Score profitability based on margins (0-100)
  * Looks at net, operating, and gross margins
  */
+function scoreMargin(
+  margin: number | null,
+  poor: number,
+  excellent: number,
+): number {
+  if (margin === null) {
+    return 0;
+  }
+
+  const score = ((margin - poor) / (excellent - poor)) * 100;
+
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
 export function scoreProfitability(
   netMargin: number | null,
   operatingMargin: number | null,
   grossMargin: number | null,
 ): number {
-  const margins = [];
+  const scores = [];
 
-  if (netMargin !== null) margins.push(netMargin);
-  if (operatingMargin !== null) margins.push(operatingMargin);
-  if (grossMargin !== null) margins.push(grossMargin);
+  if (netMargin !== null) {
+    scores.push(scoreMargin(netMargin, 0, 25));
+  }
 
-  if (margins.length === 0) {
+  if (operatingMargin !== null) {
+    scores.push(scoreMargin(operatingMargin, 0, 30));
+  }
+
+  if (grossMargin !== null) {
+    scores.push(scoreMargin(grossMargin, 0, 60));
+  }
+
+  if (scores.length === 0) {
     return 0;
   }
 
-  const avgMargin = margins.reduce((a, b) => a + b, 0) / margins.length;
+  return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+}
 
-  if (avgMargin >= 20) {
-    return 90;
-  } else if (avgMargin >= 10) {
-    return 70;
-  } else if (avgMargin >= 0) {
-    return 40;
-  } else {
-    return 20;
+export function scoreDividendCAGR(cagr: number | null): number {
+  if (cagr === null) {
+    return 0;
   }
+
+  const minGrowth = -0.05; // -5% CAGR = 0
+  const maxGrowth = 0.12; // 12% CAGR = 100
+
+  const score = ((cagr - minGrowth) / (maxGrowth - minGrowth)) * 100;
+
+  return Math.max(0, Math.min(100, Math.round(score)));
 }
 
 /**
@@ -187,6 +204,7 @@ export function calculateMetricScores(metrics: FinancialMetrics): MetricScores {
       metrics.operatingMargin,
       metrics.grossMargin,
     ),
+    dividends: scoreDividendCAGR(metrics.dividendCAGR),
     dilution: scoreDilution(metrics.sharesDilution),
   };
 }
@@ -202,6 +220,7 @@ export function calculateOverallScore(scores: MetricScores): number {
     scores.roic * SCORE_WEIGHTS.roic +
     scores.debt * SCORE_WEIGHTS.debt +
     scores.profitability * SCORE_WEIGHTS.profitability +
+    scores.dividends * SCORE_WEIGHTS.dividends +
     scores.dilution * SCORE_WEIGHTS.dilution;
 
   return Math.round(total);

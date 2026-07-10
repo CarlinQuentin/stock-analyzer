@@ -31,13 +31,18 @@ function App() {
       const profile = await fmpService.getCompanyProfile(ticker);
 
       try {
-        const { incomeStatements, balanceSheets, cashFlowStatements } =
-          await fmpService.getStatementData(ticker);
+        const {
+          incomeStatements,
+          balanceSheets,
+          cashFlowStatements,
+          dividendHistory,
+        } = await fmpService.getStatementData(ticker);
 
         const metrics = calculateAllMetrics(
           incomeStatements,
           balanceSheets,
           cashFlowStatements,
+          dividendHistory,
         );
         const scores = calculateMetricScores(metrics);
         const overallScore = calculateOverallScore(scores);
@@ -197,6 +202,15 @@ function App() {
               description="Net profit margin"
               tooltip="How much profit the company keeps from each dollar of revenue."
               icon="📈"
+            />
+            <MetricCard
+              title="Dividends"
+              value={result.metrics.dividendCAGR}
+              unit="%"
+              score={result.scores.dividends}
+              description="5-year CAGR"
+              tooltip="How much the company's dividends have grown on average each year over the past five years."
+              icon="💵"
             />
           </div>
         </div>
