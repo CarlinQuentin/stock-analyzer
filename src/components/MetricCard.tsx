@@ -5,7 +5,7 @@ interface MetricCardProps {
   title: string;
   value: number | null;
   unit?: string;
-  score: number;
+  score: number | null;
   description?: string;
   icon?: string;
   tooltip?: string;
@@ -20,14 +20,16 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   icon,
   tooltip,
 }) => {
-  const getScoreColor = (score: number) => {
+  const getScoreColor = (score: number | null) => {
+    if (score === null) return "bg-slate-100 text-slate-500 border-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
     if (score >= 85) return "bg-green-100 text-green-800 border-green-300 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800/50";
     if (score >= 70) return "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/50";
     if (score >= 50) return "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/50";
     return "bg-red-100 text-red-800 border-red-300 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/50";
   };
 
-  const getScoreBg = (score: number) => {
+  const getScoreBg = (score: number | null) => {
+    if (score === null) return "bg-slate-400 dark:bg-slate-500";
     if (score >= 85) return "bg-green-600 dark:bg-green-500";
     if (score >= 70) return "bg-blue-600 dark:bg-blue-500";
     if (score >= 50) return "bg-amber-600 dark:bg-amber-500";
@@ -105,7 +107,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
         <div
           className={`px-3 py-1 rounded-full text-sm font-bold border ${getScoreColor(score)}`}
         >
-          {score}
+          {score !== null ? score : "N/A"}
         </div>
       </div>
 
@@ -113,7 +115,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       <div className="mt-4 w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
         <div
           className={`h-full transition-all duration-500 ${getScoreBg(score)}`}
-          style={{ width: `${Math.min(score, 100)}%` }}
+          style={{ width: `${score !== null ? Math.min(score, 100) : 0}%` }}
         ></div>
       </div>
     </div>

@@ -7,8 +7,8 @@ export const SCORE_WEIGHTS = {
   roic: 0.15, // 15%
   debt: 0.1, // 10%
   profitability: 0.1, // 10%
-  dividends: 0.1, // 5%
-  dilution: 0.0, // 5%
+  dividends: 0.1, // 10%
+  dilution: 0.0, // 0%
 };
 
 export const SCORE_RANGES = {
@@ -24,9 +24,9 @@ export const SCORE_RANGES = {
  * Good: 8-15%
  * Poor: < 8%
  */
-export function scoreRevenueGrowth(cagr: number | null): number {
+export function scoreRevenueGrowth(cagr: number | null): number | null {
   if (cagr === null) {
-    return 0;
+    return null;
   }
 
   if (cagr <= -0.1) {
@@ -46,9 +46,9 @@ export function scoreRevenueGrowth(cagr: number | null): number {
  * Good: 5-15%
  * Poor: negative growth
  */
-export function scoreEPSGrowth(cagr: number | null): number {
+export function scoreEPSGrowth(cagr: number | null): number | null {
   if (cagr === null) {
-    return 0;
+    return null;
   }
 
   const minGrowth = -0.1; // -10% EPS CAGR = 0
@@ -65,9 +65,9 @@ export function scoreEPSGrowth(cagr: number | null): number {
  * Good: 5-10%
  * Poor: negative
  */
-export function scoreFCFGrowth(cagr: number | null): number {
+export function scoreFCFGrowth(cagr: number | null): number | null {
   if (cagr === null) {
-    return 0;
+    return null;
   }
 
   const minGrowth = -0.1; // -10% CAGR = 0
@@ -84,9 +84,9 @@ export function scoreFCFGrowth(cagr: number | null): number {
  * Good: 10-15%
  * Poor: < 10%
  */
-export function scoreROIC(roic: number | null): number {
+export function scoreROIC(roic: number | null): number | null {
   if (roic === null) {
-    return 0;
+    return null;
   }
 
   const minROIC = 0;
@@ -103,9 +103,9 @@ export function scoreROIC(roic: number | null): number {
  * Good: 0.5-1
  * Poor: > 1
  */
-export function scoreDebtToEquity(debtToEquity: number | null): number {
+export function scoreDebtToEquity(debtToEquity: number | null): number | null {
   if (debtToEquity === null) {
-    return 50; // Neutral if unavailable
+    return null;
   }
 
   if (debtToEquity < 0) {
@@ -127,9 +127,9 @@ function scoreMargin(
   margin: number | null,
   poor: number,
   excellent: number,
-): number {
+): number | null {
   if (margin === null) {
-    return 0;
+    return null;
   }
 
   const score = ((margin - poor) / (excellent - poor)) * 100;
@@ -141,23 +141,26 @@ export function scoreProfitability(
   netMargin: number | null,
   operatingMargin: number | null,
   grossMargin: number | null,
-): number {
+): number | null {
   const scores = [];
 
-  if (netMargin !== null) {
-    scores.push(scoreMargin(netMargin, 0, 25));
+  const net = scoreMargin(netMargin, 0, 25);
+  if (net !== null) {
+    scores.push(net);
   }
 
-  if (operatingMargin !== null) {
-    scores.push(scoreMargin(operatingMargin, 0, 30));
+  const op = scoreMargin(operatingMargin, 0, 30);
+  if (op !== null) {
+    scores.push(op);
   }
 
-  if (grossMargin !== null) {
-    scores.push(scoreMargin(grossMargin, 0, 60));
+  const gross = scoreMargin(grossMargin, 0, 60);
+  if (gross !== null) {
+    scores.push(gross);
   }
 
   if (scores.length === 0) {
-    return 0;
+    return null;
   }
 
   return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
@@ -166,16 +169,31 @@ export function scoreProfitability(
 export function scoreDividendQuality(
   dividendYield: number | null,
   dividendPayoutRatio: number | null,
-): number {
-  const yieldScore = scoreDividendYield(dividendYield);
-  const payoutScore = scoreDividendPayoutRatio(dividendPayoutRatio);
+): number | null {
+  const scores = [];
 
-  return Number((yieldScore * 0.5 + payoutScore * 0.5).toFixed(0));
+  const yieldScore = scoreDividendYield(dividendYield);
+  if (yieldScore !== null) {
+    scores.push(yieldScore);
+  }
+
+  const payoutScore = scoreDividendPayoutRatio(dividendPayoutRatio);
+  if (payoutScore !== null) {
+    scores.push(payoutScore);
+  }
+
+  if (scores.length === 0) {
+    return null;
+  }
+
+  return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
 }
 
-export function scoreDividendYield(dividendYield: number | null): number {
+export function scoreDividendYield(
+  dividendYield: number | null,
+): number | null {
   if (dividendYield == null) {
-    return 0;
+    return null;
   }
 
   const percentage = dividendYield * 100;
@@ -183,12 +201,19 @@ export function scoreDividendYield(dividendYield: number | null): number {
   return Math.min(100, Math.max(0, (percentage / 4) * 100));
 }
 
-export function scoreDividendPayoutRatio(payoutRatio: number | null): number {
+export function scoreDividendPayoutRatio(
+  payoutRatio: number | null,
+): number | null {
   if (payoutRatio == null) {
-    return 0;
+    return null;
   }
 
   const percentage = payoutRatio * 100;
+
+  // Company has negative earnings
+  if (percentage < 0) {
+    return 0;
+  }
 
   if (percentage >= 30 && percentage <= 60) {
     return 100;
@@ -208,7 +233,14 @@ export function scoreDividendPayoutRatio(payoutRatio: number | null): number {
 /**
  * Score shareholder dilution (0-100)
  */
-export function scoreDilution(analysis: string): number {
+export function scoreDilution(analysis: string): number | null {
+  if (
+    !analysis ||
+    analysis === "Insufficient data" ||
+    analysis === "Data not available"
+  ) {
+    return null;
+  }
   if (analysis.includes("buyback") || analysis.includes("Stable")) {
     return 80;
   } else if (analysis.includes("dilution")) {
@@ -243,19 +275,82 @@ export function calculateMetricScores(metrics: FinancialMetrics): MetricScores {
 
 /**
  * Calculate weighted overall score (0-100)
+ * Only includes available metrics in calculation
  */
 export function calculateOverallScore(scores: MetricScores): number {
-  const total =
-    scores.revenue * SCORE_WEIGHTS.revenue +
-    scores.eps * SCORE_WEIGHTS.eps +
-    scores.fcf * SCORE_WEIGHTS.fcf +
-    scores.roic * SCORE_WEIGHTS.roic +
-    scores.debt * SCORE_WEIGHTS.debt +
-    scores.profitability * SCORE_WEIGHTS.profitability +
-    scores.dividends * SCORE_WEIGHTS.dividends +
-    scores.dilution * SCORE_WEIGHTS.dilution;
+  let weightedSum = 0;
+  let weightSum = 0;
 
-  return Math.round(total);
+  const keys: (keyof MetricScores)[] = [
+    "revenue",
+    "eps",
+    "fcf",
+    "roic",
+    "debt",
+    "profitability",
+    "dividends",
+    "dilution",
+  ];
+
+  for (const key of keys) {
+    const score = scores[key];
+    if (score !== null) {
+      weightedSum += score * SCORE_WEIGHTS[key];
+      weightSum += SCORE_WEIGHTS[key];
+    }
+  }
+
+  if (weightSum === 0) {
+    return 0;
+  }
+
+  return Math.round(weightedSum / weightSum);
+}
+
+/**
+ * Get list of names of unavailable metrics
+ */
+export function getUnavailableMetrics(scores: MetricScores): string[] {
+  const mapping: Record<keyof MetricScores, string> = {
+    revenue: "Revenue Growth",
+    eps: "EPS Growth",
+    fcf: "FCF Growth",
+    roic: "ROIC",
+    debt: "Debt-to-Equity",
+    profitability: "Profitability",
+    dividends: "Dividends",
+    dilution: "Share Dilution",
+  };
+
+  const unavailable: string[] = [];
+  (Object.keys(mapping) as (keyof MetricScores)[]).forEach((key) => {
+    if (scores[key] === null) {
+      unavailable.push(mapping[key]);
+    }
+  });
+
+  return unavailable;
+}
+
+/**
+ * Calculate data confidence score based on available metrics
+ */
+export function calculateDataConfidenceScore(scores: MetricScores): number {
+  const keys: (keyof MetricScores)[] = [
+    "revenue",
+    "eps",
+    "fcf",
+    "roic",
+    "debt",
+    "profitability",
+    "dividends",
+    "dilution",
+  ];
+
+  const total = keys.length;
+  const valid = keys.filter((key) => scores[key] !== null).length;
+
+  return Math.round((valid / total) * 100);
 }
 
 /**
@@ -313,7 +408,10 @@ export function getScoreBgColorClass(score: number): string {
 /**
  * Get metric performance analysis
  */
-export function getMetricAnalysis(score: number): string {
+export function getMetricAnalysis(score: number | null): string {
+  if (score === null) {
+    return "N/A";
+  }
   if (score >= 85) {
     return "Strong";
   } else if (score >= 70) {

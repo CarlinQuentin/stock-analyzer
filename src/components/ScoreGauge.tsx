@@ -2,9 +2,11 @@ import { getScoreCategory } from "../utils/scoring";
 
 interface ScoreGaugeProps {
   score: number;
+  confidence?: number;
+  unavailable?: string[];
 }
 
-export const ScoreGauge = ({ score }: ScoreGaugeProps) => {
+export const ScoreGauge = ({ score, confidence, unavailable }: ScoreGaugeProps) => {
   const category = getScoreCategory(score);
   const colorMap: { [key: string]: string } = {
     green: "from-green-500 to-emerald-600",
@@ -77,7 +79,7 @@ export const ScoreGauge = ({ score }: ScoreGaugeProps) => {
         </div>
 
         {/* Description */}
-        <div className="text-center max-w-md">
+        <div className="text-center max-w-md mb-2">
           <p className="text-slate-600 dark:text-slate-300 text-sm mb-3">
             {score >= 85
               ? "This company demonstrates excellent fundamentals with strong growth, profitability, and financial health."
@@ -88,6 +90,35 @@ export const ScoreGauge = ({ score }: ScoreGaugeProps) => {
                   : "This company shows weak fundamentals with concerns across key metrics."}
           </p>
         </div>
+
+        {/* Data Confidence Indicator */}
+        {confidence !== undefined && (
+          <div className="flex flex-col items-center mt-2 mb-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl px-4 py-3 border border-slate-100 dark:border-slate-800 text-center max-w-md w-full transition-all">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Data Confidence
+              </span>
+              <span className={`text-sm font-bold ${
+                confidence >= 80 ? "text-green-600 dark:text-green-400" :
+                confidence >= 50 ? "text-amber-600 dark:text-amber-400" :
+                "text-red-600 dark:text-red-400"
+              }`}>
+                {confidence}%
+              </span>
+            </div>
+
+            {unavailable && unavailable.length > 0 ? (
+              <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                <span className="font-semibold text-slate-700 dark:text-slate-300">Unavailable metrics: </span>
+                <span className="italic">{unavailable.join(", ")}</span>
+              </div>
+            ) : (
+              <div className="mt-1 text-xs text-green-650 dark:text-green-400 font-medium">
+                ✓ All expected financial metrics present
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Scale reference */}

@@ -42,6 +42,8 @@ export interface AnalysisResult {
   scores: MetricScores;
   overallScore: number;
   analysis: string;
+  dataConfidenceScore: number;
+  unavailableMetrics: string[];
 }
 
 export interface FinancialMetrics {
@@ -59,14 +61,14 @@ export interface FinancialMetrics {
 }
 
 export interface MetricScores {
-  revenue: number;
-  eps: number;
-  fcf: number;
-  roic: number;
-  debt: number;
-  profitability: number;
-  dividends: number;
-  dilution: number;
+  revenue: number | null;
+  eps: number | null;
+  fcf: number | null;
+  roic: number | null;
+  debt: number | null;
+  profitability: number | null;
+  dividends: number | null;
+  dilution: number | null;
 }
 
 export interface ApiError {

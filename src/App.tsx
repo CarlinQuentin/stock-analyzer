@@ -10,7 +10,7 @@ import { ErrorMessage } from "./components/ErrorMessage";
 import { ProfileOnlyPage } from "./components/ProfileOnlyPage";
 import { fmpService } from "./services/financialModelingPrep";
 import { calculateAllMetrics } from "./utils/financialCalculations";
-import { calculateMetricScores, calculateOverallScore } from "./utils/scoring";
+import { calculateMetricScores, calculateOverallScore, calculateDataConfidenceScore, getUnavailableMetrics } from "./utils/scoring";
 import { AnalysisResult } from "./types";
 
 function App() {
@@ -47,6 +47,8 @@ function App() {
         );
         const scores = calculateMetricScores(metrics);
         const overallScore = calculateOverallScore(scores);
+        const dataConfidenceScore = calculateDataConfidenceScore(scores);
+        const unavailableMetrics = getUnavailableMetrics(scores);
 
         setResult({
           ticker,
@@ -55,6 +57,8 @@ function App() {
           scores,
           overallScore,
           analysis: `${profile.companyName} has a quality score of ${overallScore}/100`,
+          dataConfidenceScore,
+          unavailableMetrics,
         });
         setProfileOnly(null);
       } catch (statementError: any) {
@@ -160,7 +164,11 @@ function App() {
         <CompanyHeader profile={result.companyProfile} />
 
         {/* Overall Score */}
-        <ScoreGauge score={result.overallScore} />
+        <ScoreGauge
+          score={result.overallScore}
+          confidence={result.dataConfidenceScore}
+          unavailable={result.unavailableMetrics}
+        />
 
         {/* Detailed Metrics */}
         <div className="mb-8">
