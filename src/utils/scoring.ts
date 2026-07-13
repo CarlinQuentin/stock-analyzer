@@ -7,8 +7,8 @@ export const SCORE_WEIGHTS = {
   roic: 0.15, // 15%
   debt: 0.1, // 10%
   profitability: 0.1, // 10%
-  dividends: 0.0, // 10%
-  dilution: 0.1, // 10%
+  dividends: 0.1, // 5%
+  dilution: 0.0, // 5%
 };
 
 export const SCORE_RANGES = {
@@ -163,17 +163,46 @@ export function scoreProfitability(
   return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
 }
 
-export function scoreDividendCAGR(cagr: number | null): number {
-  if (cagr === null) {
+export function scoreDividendQuality(
+  dividendYield: number | null,
+  dividendPayoutRatio: number | null,
+): number {
+  const yieldScore = scoreDividendYield(dividendYield);
+  const payoutScore = scoreDividendPayoutRatio(dividendPayoutRatio);
+
+  return Number((yieldScore * 0.5 + payoutScore * 0.5).toFixed(0));
+}
+
+export function scoreDividendYield(dividendYield: number | null): number {
+  if (dividendYield == null) {
     return 0;
   }
 
-  const minGrowth = -0.05; // -5% CAGR = 0
-  const maxGrowth = 0.12; // 12% CAGR = 100
+  const percentage = dividendYield * 100;
 
-  const score = ((cagr - minGrowth) / (maxGrowth - minGrowth)) * 100;
+  return Math.min(100, Math.max(0, (percentage / 4) * 100));
+}
 
-  return Math.max(0, Math.min(100, Math.round(score)));
+export function scoreDividendPayoutRatio(payoutRatio: number | null): number {
+  if (payoutRatio == null) {
+    return 0;
+  }
+
+  const percentage = payoutRatio * 100;
+
+  if (percentage >= 30 && percentage <= 60) {
+    return 100;
+  }
+
+  if (percentage < 30) {
+    return (percentage / 30) * 100;
+  }
+
+  if (percentage <= 100) {
+    return 100 - ((percentage - 60) / 40) * 100;
+  }
+
+  return 0;
 }
 
 /**
@@ -204,7 +233,10 @@ export function calculateMetricScores(metrics: FinancialMetrics): MetricScores {
       metrics.operatingMargin,
       metrics.grossMargin,
     ),
-    dividends: scoreDividendCAGR(metrics.dividendCAGR),
+    dividends: scoreDividendQuality(
+      metrics.dividendYield,
+      metrics.dividendPayoutRatio,
+    ),
     dilution: scoreDilution(metrics.sharesDilution),
   };
 }

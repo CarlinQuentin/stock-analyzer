@@ -24,7 +24,15 @@ export interface FinancialStatement {
   operatingIncome?: number;
   dividend?: number;
   dividendYield?: number;
+  dividendPerShare?: number;
+  dividendPayoutRatio?: number;
   dividendFrequency?: "Monthly" | "Quarterly" | "Semiannual" | "Annual";
+}
+
+export interface DividendMetrics {
+  dividendYield: number | null;
+  dividendPerShare: number | null;
+  dividendPayoutRatio: number | null;
 }
 
 export interface AnalysisResult {
@@ -42,10 +50,11 @@ export interface FinancialMetrics {
   fcfGrowth: number | null;
   roic: number | null;
   debtToEquity: number | null;
+  dividendYield: number | null;
+  dividendPayoutRatio: number | null;
   grossMargin: number | null;
   operatingMargin: number | null;
   netMargin: number | null;
-  dividendCAGR: number | null;
   sharesDilution: string;
 }
 

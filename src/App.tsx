@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { StockSearch } from "./components/StockSearch";
+import { ThemeToggle } from "./components/ThemeToggle";
 import { CompanyHeader } from "./components/CompanyHeader";
 import { ScoreGauge } from "./components/ScoreGauge";
 import { MetricCard } from "./components/MetricCard";
@@ -35,14 +36,14 @@ function App() {
           incomeStatements,
           balanceSheets,
           cashFlowStatements,
-          dividendHistory,
+          dividendMetrics,
         } = await fmpService.getStatementData(ticker);
 
         const metrics = calculateAllMetrics(
           incomeStatements,
           balanceSheets,
           cashFlowStatements,
-          dividendHistory,
+          dividendMetrics,
         );
         const scores = calculateMetricScores(metrics);
         const overallScore = calculateOverallScore(scores);
@@ -80,33 +81,49 @@ function App() {
   }, []);
 
   if (isLoading) {
-    return <LoadingSpinner message="Analyzing company fundamentals..." />;
+    return (
+      <>
+        <ThemeToggle />
+        <LoadingSpinner message="Analyzing company fundamentals..." />
+      </>
+    );
   }
 
   if (error) {
     return (
-      <ErrorMessage
-        title="Analysis Failed"
-        message={error}
-        onRetry={handleRetry}
-      />
+      <>
+        <ThemeToggle />
+        <ErrorMessage
+          title="Analysis Failed"
+          message={error}
+          onRetry={handleRetry}
+        />
+      </>
     );
   }
 
   if (!result && !profileOnly) {
-    return <StockSearch onSearch={handleSearch} isLoading={isLoading} />;
+    return (
+      <>
+        <ThemeToggle />
+        <StockSearch onSearch={handleSearch} isLoading={isLoading} />
+      </>
+    );
   }
 
   if (profileOnly) {
     return (
-      <ProfileOnlyPage
-        profile={profileOnly.profile}
-        message={profileOnly.message}
-        onBack={() => {
-          setProfileOnly(null);
-          setResult(null);
-        }}
-      />
+      <>
+        <ThemeToggle />
+        <ProfileOnlyPage
+          profile={profileOnly.profile}
+          message={profileOnly.message}
+          onBack={() => {
+            setProfileOnly(null);
+            setResult(null);
+          }}
+        />
+      </>
     );
   }
 
@@ -115,12 +132,13 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 py-8 px-4 transition-colors duration-300">
+      <ThemeToggle />
       <div className="max-w-7xl mx-auto">
         {/* Back button */}
         <button
           onClick={() => setResult(null)}
-          className="mb-6 inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium transition-colors"
+          className="mb-6 inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
         >
           <svg
             className="w-5 h-5"
@@ -146,7 +164,7 @@ function App() {
 
         {/* Detailed Metrics */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-slate-900 mb-6">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
             Fundamental Metrics
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -156,7 +174,7 @@ function App() {
               unit="%"
               score={result.scores.revenue}
               description="5-year CAGR"
-              tooltip="How much revenue has grown on average each year over the past five years."
+              tooltip="The average yearly growth rate of the company's sales over the past five years. Consistent revenue growth can indicate increasing demand and a growing business."
               icon="📊"
             />
             <MetricCard
@@ -165,7 +183,7 @@ function App() {
               unit="%"
               score={result.scores.eps}
               description="5-year CAGR"
-              tooltip="How much earnings per share have grown on average each year over the past five years."
+              tooltip="The average yearly growth rate of the company's earnings per share over the past five years. Consistent EPS growth can indicate a company's ability to generate increasing profits."
               icon="💹"
             />
             <MetricCard
@@ -174,7 +192,7 @@ function App() {
               unit="%"
               score={result.scores.fcf}
               description="5-year CAGR"
-              tooltip="How much free cash flow has grown on average each year over the past five years."
+              tooltip="The average yearly growth rate of the company's free cash flow over the past five years. Free cash flow shows how much cash the business generates after paying for expenses and investments needed to keep growing."
               icon="💰"
             />
             <MetricCard
@@ -183,7 +201,7 @@ function App() {
               unit="%"
               score={result.scores.roic}
               description="Return on Invested Capital"
-              tooltip="How efficiently the company turns invested capital into profit."
+              tooltip="Measures the return a company earns on the capital invested in its business. Companies with consistently high ROIC often have strong competitive advantages and effective management."
               icon="🎯"
             />
             <MetricCard
@@ -191,7 +209,7 @@ function App() {
               value={result.metrics.debtToEquity}
               score={result.scores.debt}
               description="Financial leverage"
-              tooltip="How much debt the company uses compared to shareholders' equity."
+              tooltip="Shows how much the company relies on debt compared to its own money to fund the business. Lower debt levels generally indicate a more financially stable company"
               icon="⚖️"
             />
             <MetricCard
@@ -200,16 +218,16 @@ function App() {
               unit="%"
               score={result.scores.profitability}
               description="Net profit margin"
-              tooltip="How much profit the company keeps from each dollar of revenue."
+              tooltip="Shows how much profit the company keeps from each dollar of revenue after all expenses are paid. Higher margins often indicate a more efficient and profitable business."
               icon="📈"
             />
             <MetricCard
               title="Dividends"
-              value={result.metrics.dividendCAGR}
+              value={result.metrics.dividendYield}
               unit="%"
               score={result.scores.dividends}
-              description="5-year CAGR"
-              tooltip="How much the company's dividends have grown on average each year over the past five years."
+              description="Dividend yield"
+              tooltip="The company's annual dividend payment as a percentage of its current stock price. Higher yields indicate more shareholder income, but sustainability depends on payout ratio."
               icon="💵"
             />
           </div>
@@ -217,18 +235,18 @@ function App() {
 
         {/* Detailed Analysis Table */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-slate-900 mb-6">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
             Detailed Financial Analysis
           </h2>
           <AnalysisTable metrics={result.metrics} scores={result.scores} />
         </div>
 
         {/* Key Insights */}
-        <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
-          <h2 className="text-2xl font-bold text-slate-900 mb-4">
+        <div className="bg-white dark:bg-slate-800 border border-transparent dark:border-slate-700/50 rounded-lg shadow-lg p-8 mb-8 transition-colors duration-300">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">
             Key Insights
           </h2>
-          <div className="space-y-4 text-slate-600">
+          <div className="space-y-4 text-slate-600 dark:text-slate-300">
             {result.metrics.revenueCAGR !== null && (
               <p>
                 <strong>Revenue Trend:</strong> The company's revenue has grown
@@ -280,7 +298,7 @@ function App() {
         </div>
 
         {/* Footer */}
-        <div className="text-center text-slate-600 text-sm mb-8">
+        <div className="text-center text-slate-600 dark:text-slate-400 text-sm mb-8">
           <p>
             This analysis is based on financial data from Financial Modeling
             Prep API and is intended for educational purposes. It does not
@@ -289,7 +307,7 @@ function App() {
           <p className="mt-2">
             <button
               onClick={() => setResult(null)}
-              className="text-blue-600 hover:underline"
+              className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
             >
               Analyze another stock
             </button>

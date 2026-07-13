@@ -1,5 +1,10 @@
 import axios, { AxiosInstance } from "axios";
-import { CompanyProfile, FinancialStatement, ApiError } from "../types";
+import {
+  CompanyProfile,
+  FinancialStatement,
+  DividendMetrics,
+  ApiError,
+} from "../types";
 
 const BASE_URL = "https://financialmodelingprep.com/stable";
 const API_KEY = import.meta.env.VITE_FMP_API_KEY;
@@ -138,31 +143,6 @@ class FinancialModelingPrepService {
     }
   }
 
-  async getStatementData(ticker: string) {
-    try {
-      const [
-        incomeStatements,
-        balanceSheets,
-        cashFlowStatements,
-        dividendHistory,
-      ] = await Promise.all([
-        this.getIncomeStatements(ticker),
-        this.getBalanceSheets(ticker),
-        this.getCashFlowStatements(ticker),
-        this.getDividends(ticker),
-      ]);
-
-      return {
-        incomeStatements,
-        balanceSheets,
-        cashFlowStatements,
-        dividendHistory,
-      };
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
   async getDividends(
     ticker: string,
     limit: number = 5,
@@ -191,6 +171,59 @@ class FinancialModelingPrepService {
           (a: { date: string }, b: { date: string }) =>
             new Date(a.date).getTime() - new Date(b.date).getTime(),
         );
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async getDividendMetrics(ticker: string): Promise<DividendMetrics> {
+    try {
+      const response = await this.client.get("/ratios-ttm", {
+        params: {
+          ...this.getParams(),
+          symbol: ticker.toUpperCase(),
+        },
+      });
+
+      if (!response.data?.length) {
+        throw new Error(`No dividend metrics found for ${ticker}`);
+      }
+
+      const ratios = response.data[0];
+
+      return {
+        dividendYield: ratios.dividendYieldTTM,
+        dividendPerShare: ratios.dividendPerShareTTM,
+        dividendPayoutRatio: ratios.dividendPayoutRatioTTM,
+      };
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async getStatementData(ticker: string) {
+    try {
+      const [
+        incomeStatements,
+        balanceSheets,
+        cashFlowStatements,
+        dividendHistory,
+        dividendMetrics,
+      ] = await Promise.all([
+        this.getIncomeStatements(ticker),
+        this.getBalanceSheets(ticker),
+        this.getCashFlowStatements(ticker),
+        this.getDividends(ticker),
+        this.getDividendMetrics(ticker),
+      ]);
+
+      return {
+        incomeStatements,
+        balanceSheets,
+        cashFlowStatements,
+        dividendHistory,
+        dividendMetrics,
+      };
     } catch (error) {
       throw this.handleError(error);
     }

@@ -1,4 +1,8 @@
-import { FinancialStatement, FinancialMetrics } from "../types";
+import {
+  FinancialStatement,
+  FinancialMetrics,
+  DividendMetrics,
+} from "../types";
 
 /**
  * Calculate Compound Annual Growth Rate (CAGR)
@@ -348,7 +352,7 @@ export function calculateAllMetrics(
   incomeStatements: FinancialStatement[],
   balanceSheets: FinancialStatement[],
   cashFlowStatements: FinancialStatement[],
-  dividendHistory: FinancialStatement[],
+  dividendMetrics: DividendMetrics,
 ): FinancialMetrics {
   const sortedBalance = [...balanceSheets].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
@@ -362,7 +366,8 @@ export function calculateAllMetrics(
       sortedBalance[0]?.totalDebt,
       sortedBalance[0]?.totalEquity,
     ),
-    dividendCAGR: calculateDividendCAGR(dividendHistory),
+    dividendYield: dividendMetrics.dividendYield,
+    dividendPayoutRatio: dividendMetrics.dividendPayoutRatio,
     ...calculateAverageMargins(incomeStatements),
     sharesDilution: analyzeShareDilution(balanceSheets),
   };

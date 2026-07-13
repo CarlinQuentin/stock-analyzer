@@ -16,8 +16,8 @@ export const ScoreGauge = ({ score }: ScoreGaugeProps) => {
   const gradientClass = colorMap[category.color] || "from-gray-500 to-gray-600";
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-8 mb-6">
-      <h2 className="text-xl font-bold text-slate-900 mb-6 text-center">
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-8 mb-6 border border-transparent dark:border-slate-700/50 transition-colors duration-300">
+      <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 text-center">
         Overall Quality Score
       </h2>
 
@@ -29,7 +29,8 @@ export const ScoreGauge = ({ score }: ScoreGaugeProps) => {
             <path
               d="M 20 100 A 80 80 0 0 1 180 100"
               fill="none"
-              stroke="#e5e7eb"
+              stroke="currentColor"
+              className="text-slate-200 dark:text-slate-700"
               strokeWidth="8"
               strokeLinecap="round"
             />
@@ -63,8 +64,8 @@ export const ScoreGauge = ({ score }: ScoreGaugeProps) => {
 
           {/* Center text */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <div className="text-5xl font-bold text-slate-900">{score}</div>
-            <div className="text-lg text-slate-600">/100</div>
+            <div className="text-5xl font-bold text-slate-900 dark:text-white">{score}</div>
+            <div className="text-lg text-slate-600 dark:text-slate-400">/100</div>
           </div>
         </div>
 
@@ -77,7 +78,7 @@ export const ScoreGauge = ({ score }: ScoreGaugeProps) => {
 
         {/* Description */}
         <div className="text-center max-w-md">
-          <p className="text-slate-600 text-sm mb-3">
+          <p className="text-slate-600 dark:text-slate-300 text-sm mb-3">
             {score >= 85
               ? "This company demonstrates excellent fundamentals with strong growth, profitability, and financial health."
               : score >= 70
@@ -90,23 +91,23 @@ export const ScoreGauge = ({ score }: ScoreGaugeProps) => {
       </div>
 
       {/* Scale reference */}
-      <div className="mt-8 pt-6 border-t border-slate-200">
+      <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
         <div className="grid grid-cols-4 gap-2 text-xs font-semibold text-center">
           <div>
-            <div className="text-red-600">Poor</div>
-            <div className="text-slate-400">0-50</div>
+            <div className="text-red-600 dark:text-red-400">Poor</div>
+            <div className="text-slate-400 dark:text-slate-500">0-50</div>
           </div>
           <div>
-            <div className="text-amber-600">Average</div>
-            <div className="text-slate-400">50-70</div>
+            <div className="text-amber-600 dark:text-amber-400">Average</div>
+            <div className="text-slate-400 dark:text-slate-500">50-70</div>
           </div>
           <div>
-            <div className="text-blue-600">Good</div>
-            <div className="text-slate-400">70-85</div>
+            <div className="text-blue-600 dark:text-blue-400">Good</div>
+            <div className="text-slate-400 dark:text-slate-500">70-85</div>
           </div>
           <div>
-            <div className="text-green-600">Excellent</div>
-            <div className="text-slate-400">85-100</div>
+            <div className="text-green-600 dark:text-green-400">Excellent</div>
+            <div className="text-slate-400 dark:text-slate-500">85-100</div>
           </div>
         </div>
       </div>

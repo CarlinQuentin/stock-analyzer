@@ -14,11 +14,11 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({
   onRetry,
 }) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
-        <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 flex items-center justify-center p-4 transition-colors duration-300">
+      <div className="max-w-md w-full bg-white dark:bg-slate-800 rounded-lg shadow-lg p-8 border border-transparent dark:border-slate-700/50 transition-colors duration-300">
+        <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 dark:bg-red-950/30 rounded-full">
           <svg
-            className="w-6 h-6 text-red-600"
+            className="w-6 h-6 text-red-600 dark:text-red-400"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -31,12 +31,12 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({
             />
           </svg>
         </div>
-        <h2 className="text-xl font-bold text-center text-slate-900 mb-2">
+        <h2 className="text-xl font-bold text-center text-slate-900 dark:text-white mb-2">
           {title}
         </h2>
-        <p className="text-slate-600 text-center mb-4">{message}</p>
+        <p className="text-slate-600 dark:text-slate-350 text-center mb-4">{message}</p>
         {details && (
-          <p className="text-sm text-slate-500 text-center mb-6 bg-slate-50 p-3 rounded font-mono">
+          <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-6 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800/80 p-3 rounded font-mono">
             {details}
           </p>
         )}
