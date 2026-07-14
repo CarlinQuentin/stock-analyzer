@@ -7,6 +7,7 @@ export interface CompanyProfile {
   description?: string;
   image?: string;
   mktCap?: number;
+  price?: number;
 }
 
 export interface FinancialStatement {
@@ -27,12 +28,33 @@ export interface FinancialStatement {
   dividendPerShare?: number;
   dividendPayoutRatio?: number;
   dividendFrequency?: "Monthly" | "Quarterly" | "Semiannual" | "Annual";
+  cashAndCashEquivalents?: number;
 }
 
 export interface DividendMetrics {
   dividendYield: number | null;
   dividendPerShare: number | null;
   dividendPayoutRatio: number | null;
+}
+
+export interface ValuationMetrics {
+  peRatio: number | null;
+  priceToSalesRatio: number | null;
+  evToSales: number | null;
+  priceToFreeCashFlowsRatio: number | null;
+  historicalPeAverage: number | null;
+  historicalPsAverage: number | null;
+  historicalEvsAverage: number | null;
+  historicalPfcfAverage: number | null;
+  averagePremium: number | null;
+}
+
+export interface ValuationScores {
+  pe: number | null;
+  ps: number | null;
+  evs: number | null;
+  pfcf: number | null;
+  historical: number | null;
 }
 
 export interface AnalysisResult {
@@ -44,6 +66,13 @@ export interface AnalysisResult {
   analysis: string;
   dataConfidenceScore: number;
   unavailableMetrics: string[];
+  
+  // Valuation fields
+  valuationMetrics: ValuationMetrics;
+  valuationScores: ValuationScores;
+  overallValuationScore: number;
+  valuationConfidenceScore: number;
+  unavailableValuationMetrics: string[];
 }
 
 export interface FinancialMetrics {

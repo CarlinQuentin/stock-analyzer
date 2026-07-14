@@ -4,9 +4,11 @@ interface ScoreGaugeProps {
   score: number;
   confidence?: number;
   unavailable?: string[];
+  title?: string;
+  description?: string;
 }
 
-export const ScoreGauge = ({ score, confidence, unavailable }: ScoreGaugeProps) => {
+export const ScoreGauge = ({ score, confidence, unavailable, title = "Overall Quality Score", description }: ScoreGaugeProps) => {
   const category = getScoreCategory(score);
   const colorMap: { [key: string]: string } = {
     green: "from-green-500 to-emerald-600",
@@ -20,7 +22,7 @@ export const ScoreGauge = ({ score, confidence, unavailable }: ScoreGaugeProps) 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-8 mb-6 border border-transparent dark:border-slate-700/50 transition-colors duration-300">
       <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 text-center">
-        Overall Quality Score
+        {title}
       </h2>
 
       <div className="flex flex-col items-center">
@@ -81,13 +83,15 @@ export const ScoreGauge = ({ score, confidence, unavailable }: ScoreGaugeProps) 
         {/* Description */}
         <div className="text-center max-w-md mb-2">
           <p className="text-slate-600 dark:text-slate-300 text-sm mb-3">
-            {score >= 85
-              ? "This company demonstrates excellent fundamentals with strong growth, profitability, and financial health."
-              : score >= 70
-                ? "This company shows good fundamentals with solid growth and reasonable debt levels."
-                : score >= 50
-                  ? "This company shows average fundamentals with mixed metrics across categories."
-                  : "This company shows weak fundamentals with concerns across key metrics."}
+            {description ? description : (
+              score >= 85
+                ? "This company demonstrates excellent fundamentals with strong growth, profitability, and financial health."
+                : score >= 70
+                  ? "This company shows good fundamentals with solid growth and reasonable debt levels."
+                  : score >= 50
+                    ? "This company shows average fundamentals with mixed metrics across categories."
+                    : "This company shows weak fundamentals with concerns across key metrics."
+            )}
           </p>
         </div>
 

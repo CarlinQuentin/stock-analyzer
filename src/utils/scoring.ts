@@ -6,8 +6,8 @@ export const SCORE_WEIGHTS = {
   fcf: 0.15, // 15%
   roic: 0.15, // 15%
   debt: 0.1, // 10%
-  profitability: 0.1, // 10%
-  dividends: 0.1, // 10%
+  profitability: 0.15, // 15%
+  dividends: 0.05, // 5%
   dilution: 0.0, // 0%
 };
 

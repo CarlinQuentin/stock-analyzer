@@ -46,7 +46,8 @@ class FinancialModelingPrepService {
         website: data.website,
         description: data.description,
         image: data.image,
-        mktCap: data.mktCap,
+        mktCap: data.marketCap,
+        price: data.price,
       };
     } catch (error) {
       throw this.handleError(error);
@@ -98,6 +99,7 @@ class FinancialModelingPrepService {
         totalDebt: statement.totalDebt,
         totalEquity: statement.totalEquity,
         shares: statement.commonStockSharesIssued,
+        cashAndCashEquivalents: statement.cashAndCashEquivalents || 0,
       }));
     } catch (error) {
       throw this.handleError(error);
@@ -201,6 +203,25 @@ class FinancialModelingPrepService {
     }
   }
 
+  async getKeyMetrics(
+    ticker: string,
+    limit: number = 5,
+  ): Promise<any[]> {
+    try {
+      const response = await this.client.get("/key-metrics", {
+        params: { ...this.getParams(), symbol: ticker.toUpperCase(), limit },
+      });
+
+      if (!response.data) {
+        throw new Error(`No key metrics found for ${ticker}`);
+      }
+
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
   async getStatementData(ticker: string) {
     try {
       const [
@@ -217,12 +238,28 @@ class FinancialModelingPrepService {
         this.getDividendMetrics(ticker),
       ]);
 
+      let keyMetrics: any[] = [];
+      try {
+        keyMetrics = await this.getKeyMetrics(ticker);
+      } catch (err) {
+        console.warn("Failed to fetch key metrics, falling back to manual calculations:", err);
+      }
+
+      let financialRatios: any[] = [];
+      try {
+        financialRatios = await this.getFinancialRatios(ticker);
+      } catch (err) {
+        console.warn("Failed to fetch financial ratios, falling back to manual calculations:", err);
+      }
+
       return {
         incomeStatements,
         balanceSheets,
         cashFlowStatements,
         dividendHistory,
         dividendMetrics,
+        keyMetrics,
+        financialRatios,
       };
     } catch (error) {
       throw this.handleError(error);
