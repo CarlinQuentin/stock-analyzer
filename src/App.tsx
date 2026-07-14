@@ -32,12 +32,14 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"fundamentals" | "valuation">("fundamentals");
+  const [showAllCharts, setShowAllCharts] = useState(false);
 
   const handleSearch = useCallback(async (ticker: string) => {
     setIsLoading(true);
     setError(null);
     setResult(null);
     setActiveTab("fundamentals");
+    setShowAllCharts(false);
 
     try {
       const profile = await fmpService.getCompanyProfile(ticker);
@@ -76,6 +78,64 @@ function App() {
         const valuationConfidenceScore = calculateValuationConfidenceScore(valuationScores);
         const unavailableValuationMetrics = getUnavailableValuationMetrics(valuationScores);
 
+        const fcfHistory = [...cashFlowStatements]
+          .reverse()
+          .map(s => {
+            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+            const fcf = (s.operatingCashFlow || 0) - Math.abs(s.capitalExpenditure || 0);
+            return { label: year, value: fcf };
+          });
+
+        const revenueHistory = [...incomeStatements]
+          .reverse()
+          .map(s => {
+            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+            return { label: year, value: s.revenue || 0 };
+          });
+
+        const epsHistory = [...incomeStatements]
+          .reverse()
+          .map(s => {
+            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+            return { label: year, value: s.eps || 0 };
+          });
+
+        const roicHistory = [...incomeStatements]
+          .reverse()
+          .map(s => {
+            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+            const matchBalance = balanceSheets.find(b => b.date && new Date(b.date).getFullYear().toString() === year);
+            let roicVal = 0;
+            if (matchBalance && s.operatingIncome && matchBalance.totalEquity && matchBalance.totalDebt) {
+              const investedCapital = matchBalance.totalEquity + matchBalance.totalDebt;
+              let taxRate = 0.25;
+              if (s.netIncome && s.operatingIncome > 0) {
+                taxRate = Math.max(0, 1 - s.netIncome / s.operatingIncome);
+                taxRate = Math.min(1, taxRate);
+              }
+              const nopat = s.operatingIncome * (1 - taxRate);
+              roicVal = (nopat / investedCapital) * 100;
+            }
+            return { label: year, value: roicVal };
+          })
+          .filter(item => item.value !== 0);
+
+        const debtEquityHistory = [...balanceSheets]
+          .reverse()
+          .map(s => {
+            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+            const debtToEquity = s.totalEquity ? (s.totalDebt || 0) / s.totalEquity : 0;
+            return { label: year, value: debtToEquity };
+          });
+
+        const profitabilityHistory = [...incomeStatements]
+          .reverse()
+          .map(s => {
+            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+            const netMargin = s.revenue ? ((s.netIncome || 0) / s.revenue) * 100 : 0;
+            return { label: year, value: netMargin };
+          });
+
         setResult({
           ticker,
           companyProfile: profile,
@@ -85,6 +145,12 @@ function App() {
           analysis: `${profile.companyName} has a quality score of ${overallScore}/100`,
           dataConfidenceScore,
           unavailableMetrics,
+          fcfHistory,
+          revenueHistory,
+          epsHistory,
+          roicHistory,
+          debtEquityHistory,
+          profitabilityHistory,
           
           valuationMetrics,
           valuationScores,
@@ -268,9 +334,29 @@ function App() {
           <>
             {/* Detailed Metrics */}
             <div className="mb-8">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
-                Fundamental Metrics
-              </h2>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                  Fundamental Metrics
+                </h2>
+                {result.fcfHistory && result.fcfHistory.length > 0 && (
+                  <button
+                    onClick={() => setShowAllCharts(!showAllCharts)}
+                    className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-950/60 border border-blue-100 dark:border-blue-800/40 rounded-lg shadow-sm transition-all duration-200"
+                  >
+                    <span>{showAllCharts ? "Hide All Trend Charts" : "Show All Trend Charts"}</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={2.5}
+                      stroke="currentColor"
+                      className={`w-3 h-3 transition-transform duration-200 ${showAllCharts ? "rotate-180" : ""}`}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                    </svg>
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <MetricCard
                   title="Revenue Growth"
@@ -280,6 +366,9 @@ function App() {
                   description="5-year CAGR"
                   tooltip="The average yearly growth rate of the company's sales over the past five years. Consistent revenue growth can indicate increasing demand and a growing business."
                   icon="📊"
+                  chartData={result.revenueHistory}
+                  chartValueType="currency"
+                  isExpanded={showAllCharts}
                 />
                 <MetricCard
                   title="EPS Growth"
@@ -289,6 +378,9 @@ function App() {
                   description="5-year CAGR"
                   tooltip="The average yearly growth rate of the company's earnings per share over the past five years. Consistent EPS growth can indicate a company's ability to generate increasing profits."
                   icon="💹"
+                  chartData={result.epsHistory}
+                  chartValueType="currency"
+                  isExpanded={showAllCharts}
                 />
                 <MetricCard
                   title="FCF Growth"
@@ -298,6 +390,9 @@ function App() {
                   description="5-year CAGR"
                   tooltip="The average yearly growth rate of the company's free cash flow over the past five years. Free cash flow shows how much cash the business generates after paying for expenses and investments needed to keep growing."
                   icon="💰"
+                  chartData={result.fcfHistory}
+                  chartValueType="currency"
+                  isExpanded={showAllCharts}
                 />
                 <MetricCard
                   title="ROIC"
@@ -307,6 +402,9 @@ function App() {
                   description="Return on Invested Capital"
                   tooltip="Measures the return a company earns on the capital invested in its business. Companies with consistently high ROIC often have strong competitive advantages and effective management."
                   icon="🎯"
+                  chartData={result.roicHistory}
+                  chartValueType="percent"
+                  isExpanded={showAllCharts}
                 />
                 <MetricCard
                   title="Debt-to-Equity"
@@ -315,6 +413,9 @@ function App() {
                   description="Financial leverage"
                   tooltip="Shows how much the company relies on debt compared to its own money to fund the business. Lower debt levels generally indicate a more financially stable company"
                   icon="⚖️"
+                  chartData={result.debtEquityHistory}
+                  chartValueType="number"
+                  isExpanded={showAllCharts}
                 />
                 <MetricCard
                   title="Profitability"
@@ -324,8 +425,10 @@ function App() {
                   description="Net profit margin"
                   tooltip="Shows how much profit the company keeps from each dollar of revenue after all expenses are paid. Higher margins often indicate a more efficient and profitable business."
                   icon="📈"
+                  chartData={result.profitabilityHistory}
+                  chartValueType="percent"
+                  isExpanded={showAllCharts}
                 />
-
               </div>
             </div>
 

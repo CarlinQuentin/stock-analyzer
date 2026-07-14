@@ -66,6 +66,12 @@ export interface AnalysisResult {
   analysis: string;
   dataConfidenceScore: number;
   unavailableMetrics: string[];
+  fcfHistory?: { label: string; value: number }[];
+  revenueHistory?: { label: string; value: number }[];
+  epsHistory?: { label: string; value: number }[];
+  roicHistory?: { label: string; value: number }[];
+  debtEquityHistory?: { label: string; value: number }[];
+  profitabilityHistory?: { label: string; value: number }[];
   
   // Valuation fields
   valuationMetrics: ValuationMetrics;
