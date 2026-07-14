@@ -6,9 +6,7 @@ export const SCORE_WEIGHTS = {
   fcf: 0.15, // 15%
   roic: 0.15, // 15%
   debt: 0.1, // 10%
-  profitability: 0.15, // 15%
-  dividends: 0.05, // 5%
-  dilution: 0.0, // 0%
+  profitability: 0.2, // 20%
 };
 
 export const SCORE_RANGES = {
@@ -166,90 +164,6 @@ export function scoreProfitability(
   return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
 }
 
-export function scoreDividendQuality(
-  dividendYield: number | null,
-  dividendPayoutRatio: number | null,
-): number | null {
-  const scores = [];
-
-  const yieldScore = scoreDividendYield(dividendYield);
-  if (yieldScore !== null) {
-    scores.push(yieldScore);
-  }
-
-  const payoutScore = scoreDividendPayoutRatio(dividendPayoutRatio);
-  if (payoutScore !== null) {
-    scores.push(payoutScore);
-  }
-
-  if (scores.length === 0) {
-    return null;
-  }
-
-  return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-}
-
-export function scoreDividendYield(
-  dividendYield: number | null,
-): number | null {
-  if (dividendYield == null) {
-    return null;
-  }
-
-  const percentage = dividendYield * 100;
-
-  return Math.min(100, Math.max(0, (percentage / 4) * 100));
-}
-
-export function scoreDividendPayoutRatio(
-  payoutRatio: number | null,
-): number | null {
-  if (payoutRatio == null) {
-    return null;
-  }
-
-  const percentage = payoutRatio * 100;
-
-  // Company has negative earnings
-  if (percentage < 0) {
-    return 0;
-  }
-
-  if (percentage >= 30 && percentage <= 60) {
-    return 100;
-  }
-
-  if (percentage < 30) {
-    return (percentage / 30) * 100;
-  }
-
-  if (percentage <= 100) {
-    return 100 - ((percentage - 60) / 40) * 100;
-  }
-
-  return 0;
-}
-
-/**
- * Score shareholder dilution (0-100)
- */
-export function scoreDilution(analysis: string): number | null {
-  if (
-    !analysis ||
-    analysis === "Insufficient data" ||
-    analysis === "Data not available"
-  ) {
-    return null;
-  }
-  if (analysis.includes("buyback") || analysis.includes("Stable")) {
-    return 80;
-  } else if (analysis.includes("dilution")) {
-    return 40;
-  } else {
-    return 50;
-  }
-}
-
 /**
  * Calculate all metric scores
  */
@@ -265,11 +179,6 @@ export function calculateMetricScores(metrics: FinancialMetrics): MetricScores {
       metrics.operatingMargin,
       metrics.grossMargin,
     ),
-    dividends: scoreDividendQuality(
-      metrics.dividendYield,
-      metrics.dividendPayoutRatio,
-    ),
-    dilution: scoreDilution(metrics.sharesDilution),
   };
 }
 
@@ -288,8 +197,6 @@ export function calculateOverallScore(scores: MetricScores): number {
     "roic",
     "debt",
     "profitability",
-    "dividends",
-    "dilution",
   ];
 
   for (const key of keys) {
@@ -318,8 +225,6 @@ export function getUnavailableMetrics(scores: MetricScores): string[] {
     roic: "ROIC",
     debt: "Debt-to-Equity",
     profitability: "Profitability",
-    dividends: "Dividends",
-    dilution: "Share Dilution",
   };
 
   const unavailable: string[] = [];
@@ -343,8 +248,6 @@ export function calculateDataConfidenceScore(scores: MetricScores): number {
     "roic",
     "debt",
     "profitability",
-    "dividends",
-    "dilution",
   ];
 
   const total = keys.length;

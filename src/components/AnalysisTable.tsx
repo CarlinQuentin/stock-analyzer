@@ -202,7 +202,7 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
               </td>
             </tr>
 
-            <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+            <tr className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
               <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
                 <div>Net Profit Margin</div>
                 <div className="text-sm text-slate-500 dark:text-slate-400">
@@ -222,26 +222,6 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
               <td className="text-right px-6 py-4">
                 <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.profitability)}`}>
                   {scores.profitability !== null ? scores.profitability : "N/A"}
-                </span>
-              </td>
-            </tr>
-
-            <tr className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-              <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
-                <div>Share Dilution</div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">
-                  Shareholder value impact
-                </div>
-              </td>
-              <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200">
-                {metrics.sharesDilution}
-              </td>
-              <td className="text-center px-6 py-4">
-                {renderPerformanceBadge(scores.dilution)}
-              </td>
-              <td className="text-right px-6 py-4">
-                <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.dilution)}`}>
-                  {scores.dilution !== null ? scores.dilution : "N/A"}
                 </span>
               </td>
             </tr>

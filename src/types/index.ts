@@ -86,7 +86,6 @@ export interface FinancialMetrics {
   grossMargin: number | null;
   operatingMargin: number | null;
   netMargin: number | null;
-  sharesDilution: string;
 }
 
 export interface MetricScores {
@@ -96,8 +95,6 @@ export interface MetricScores {
   roic: number | null;
   debt: number | null;
   profitability: number | null;
-  dividends: number | null;
-  dilution: number | null;
 }
 
 export interface ApiError {

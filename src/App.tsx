@@ -37,6 +37,7 @@ function App() {
     setIsLoading(true);
     setError(null);
     setResult(null);
+    setActiveTab("fundamentals");
 
     try {
       const profile = await fmpService.getCompanyProfile(ticker);
@@ -324,15 +325,7 @@ function App() {
                   tooltip="Shows how much profit the company keeps from each dollar of revenue after all expenses are paid. Higher margins often indicate a more efficient and profitable business."
                   icon="📈"
                 />
-                <MetricCard
-                  title="Dividends"
-                  value={result.metrics.dividendYield}
-                  unit="%"
-                  score={result.scores.dividends}
-                  description="Dividend yield"
-                  tooltip="The company's annual dividend payment as a percentage of its current stock price. Higher yields indicate more shareholder income, but sustainability depends on payout ratio."
-                  icon="💵"
-                />
+
               </div>
             </div>
 

@@ -314,38 +314,6 @@ export function calculateAverageMargins(statements: FinancialStatement[]): {
 }
 
 /**
- * Analyze shareholder dilution from shares outstanding
- */
-export function analyzeShareDilution(
-  balanceSheets: FinancialStatement[],
-): string {
-  if (!balanceSheets || balanceSheets.length < 2) {
-    return "Insufficient data";
-  }
-
-  const sortedByDate = [...balanceSheets].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-  );
-
-  const firstShares = sortedByDate[0].shares;
-  const lastShares = sortedByDate[sortedByDate.length - 1].shares;
-
-  if (!firstShares || !lastShares) {
-    return "Data not available";
-  }
-
-  const change = ((lastShares - firstShares) / firstShares) * 100;
-
-  if (change < -2) {
-    return "Share buyback - positive";
-  } else if (change < 2) {
-    return "Stable shares - neutral";
-  } else {
-    return "Share dilution - negative";
-  }
-}
-
-/**
  * Calculate all financial metrics
  */
 export function calculateAllMetrics(
@@ -369,6 +337,5 @@ export function calculateAllMetrics(
     dividendYield: dividendMetrics.dividendYield,
     dividendPayoutRatio: dividendMetrics.dividendPayoutRatio,
     ...calculateAverageMargins(incomeStatements),
-    sharesDilution: analyzeShareDilution(balanceSheets),
   };
 }
