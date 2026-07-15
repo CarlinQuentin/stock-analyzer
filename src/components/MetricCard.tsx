@@ -175,7 +175,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
               x={p.x} 
               y={p.y - 7} 
               textAnchor="middle" 
-              className="text-[9px] font-bold fill-slate-700 dark:fill-slate-350"
+              className="text-[9px] font-bold fill-slate-700 dark:fill-slate-200"
             >
               {formatChartValue(p.value)}
             </text>
@@ -194,7 +194,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
               x={p.x} 
               y={height - 4} 
               textAnchor="middle" 
-              className="text-[9px] font-semibold fill-slate-400 dark:fill-slate-500"
+              className="text-[9px] font-semibold fill-slate-400 dark:fill-slate-400"
             >
               {p.label}
             </text>
@@ -238,7 +238,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
                   </span>
                   
                   {/* Premium Custom Tooltip */}
-                  <div className="absolute bottom-full left-0 md:left-1/2 md:-translate-x-1/2 mb-2 w-64 p-3 rounded-lg bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-sm text-xs text-slate-200 dark:text-slate-350 shadow-xl border border-slate-850/80 dark:border-slate-800/50 pointer-events-none opacity-0 scale-95 group-hover/tooltip:opacity-100 group-hover/tooltip:scale-100 transition-all duration-200 origin-bottom z-30 font-normal normal-case tracking-normal text-left">
+                  <div className="absolute bottom-full left-0 md:left-1/2 md:-translate-x-1/2 mb-2 w-64 p-3 rounded-lg bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-sm text-xs text-slate-200 dark:text-slate-200 shadow-xl border border-slate-800/80 dark:border-slate-800/50 pointer-events-none opacity-0 scale-95 group-hover/tooltip:opacity-100 group-hover/tooltip:scale-100 transition-all duration-200 origin-bottom z-30 font-normal normal-case tracking-normal text-left">
                     <p className="leading-relaxed">{tooltip}</p>
                     {/* Caret */}
                     <div className="absolute top-full left-3 md:left-1/2 md:-translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900/95 dark:border-t-slate-950/95"></div>

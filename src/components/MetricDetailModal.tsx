@@ -28,6 +28,15 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalStyle;
+    };
+  }, []);
+
   // Extract config based on metric key
   const getConfig = () => {
     const defaultData = {
@@ -356,7 +365,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       yellow: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/40",
       red: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-800/40",
     };
-    return maps[color] || "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900 dark:text-slate-350 dark:border-slate-800";
+    return maps[color] || "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:border-slate-800";
   };
 
   const getHexColor = (color: string) => {
@@ -374,12 +383,12 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
   const renderBigChart = () => {
     if (config.chartData.length === 0) return <div className="text-slate-400 italic text-sm text-center py-10">Data not available</div>;
 
-    const width = 500;
-    const height = 180;
-    const paddingLeft = 30;
-    const paddingRight = 30;
-    const paddingTop = 25;
-    const paddingBottom = 25;
+    const width = 600;
+    const height = 240;
+    const paddingLeft = 35;
+    const paddingRight = 35;
+    const paddingTop = 30;
+    const paddingBottom = 30;
 
     const values = config.chartData.map(d => d.value);
     const minVal = Math.min(...values);
@@ -457,7 +466,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
               x={p.x} 
               y={p.y - 8} 
               textAnchor="middle" 
-              className="text-[10px] font-bold fill-slate-700 dark:fill-slate-350"
+              className="text-[10px] font-bold fill-slate-700 dark:fill-slate-200"
             >
               {formatChartValue(p.value, config.chartValueType)}
             </text>
@@ -476,7 +485,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
               x={p.x} 
               y={height - 6} 
               textAnchor="middle" 
-              className="text-[10px] font-semibold fill-slate-400 dark:fill-slate-500"
+              className="text-[10px] font-semibold fill-slate-400 dark:fill-slate-400"
             >
               {p.label}
             </text>
@@ -491,12 +500,12 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
   const activeColorHex = getHexColor(scoreColor);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 dark:bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-slate-950/60 dark:bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150">
       {/* Outer Click Dismiss */}
       <div className="absolute inset-0 cursor-default" onClick={onClose}></div>
 
       {/* Modal Box */}
-      <div className="relative w-full max-w-4xl max-h-[90vh] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-y-auto flex flex-col md:flex-row animate-in fade-in zoom-in-95 duration-200 z-10">
+      <div className="relative w-[90vw] max-w-7xl max-h-[85vh] md:max-h-[90vh] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-y-auto flex flex-col md:flex-row animate-in fade-in zoom-in-95 duration-200 z-10">
         
         {/* Left Panel: Charts and Table */}
         <div className="w-full md:w-1/2 p-6 md:border-r border-slate-100 dark:border-slate-800/80">
@@ -509,7 +518,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           </div>
 
           {/* SVG Trend Chart */}
-          <div className="w-full h-48 bg-slate-50/50 dark:bg-slate-900/40 rounded-xl p-3 border border-slate-100/70 dark:border-slate-800/50 flex items-center justify-center mb-6">
+          <div className="w-full h-64 sm:h-72 lg:h-80 bg-slate-50/50 dark:bg-slate-900/40 rounded-xl p-4 border border-slate-100/70 dark:border-slate-800/50 flex items-center justify-center mb-6">
             <div className="w-full h-full">
               {renderBigChart()}
             </div>
@@ -599,7 +608,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
               </div>
               <div className="space-y-1.5">
                 {config.mathExplanation.map((step, idx) => (
-                  <p key={idx} className="text-xs text-slate-600 dark:text-slate-350 leading-relaxed font-medium">
+                  <p key={idx} className="text-xs text-slate-600 dark:text-slate-200 leading-relaxed font-medium">
                     {step}
                   </p>
                 ))}
@@ -611,7 +620,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
               <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">
                 Why This Metric Matters
               </h4>
-              <p className="text-xs text-slate-650 dark:text-slate-300 leading-relaxed">
+              <p className="text-xs text-slate-600 dark:text-slate-200 leading-relaxed">
                 {config.whyItMatters}
               </p>
             </div>
@@ -639,7 +648,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
             </h4>
             <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100/60 dark:border-blue-900/30 p-3 rounded-lg flex items-start gap-2.5">
               <span className="text-lg">💡</span>
-              <p className="text-xs text-slate-700 dark:text-slate-350 leading-relaxed font-medium">
+              <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-medium">
                 {config.getInsights()}
               </p>
             </div>

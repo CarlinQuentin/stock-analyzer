@@ -40,7 +40,7 @@ export function ProfileOnlyPage({
               Profile access only
             </div>
             <h1 className="text-3xl font-bold">{profile.companyName}</h1>
-            <p className="mt-3 text-slate-350 dark:text-slate-400 max-w-3xl">{message}</p>
+            <p className="mt-3 text-slate-300 dark:text-slate-400 max-w-3xl">{message}</p>
           </div>
 
           <div className="p-8">

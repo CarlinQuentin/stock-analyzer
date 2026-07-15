@@ -34,7 +34,7 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({
         <h2 className="text-xl font-bold text-center text-slate-900 dark:text-white mb-2">
           {title}
         </h2>
-        <p className="text-slate-600 dark:text-slate-350 text-center mb-4">{message}</p>
+        <p className="text-slate-650 dark:text-slate-300 text-center mb-4">{message}</p>
         {details && (
           <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-6 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800/80 p-3 rounded font-mono">
             {details}
