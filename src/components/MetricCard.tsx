@@ -18,6 +18,7 @@ interface MetricCardProps {
   chartValueType?: "currency" | "percent" | "number";
   isExpanded?: boolean;
   onClick?: () => void;
+  directionStrategy?: "higherIsBetter" | "lowerIsBetter";
 }
 
 export const MetricCard: React.FC<MetricCardProps> = ({
@@ -32,6 +33,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   chartValueType = "currency",
   isExpanded = false,
   onClick,
+  directionStrategy,
 }) => {
   const getScoreColor = (score: number | null) => {
     if (score === null) return "bg-slate-100 text-slate-500 border-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
@@ -114,7 +116,25 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       return { x, y, label: item.label, value: item.value };
     });
 
-    const colorHex = getScoreHexColor(score);
+    const getTrendColorHex = (
+      data: ChartDataPoint[],
+      strategy: "higherIsBetter" | "lowerIsBetter",
+      defaultHex: string
+    ): string => {
+      if (data.length < 2) return defaultHex;
+      const firstVal = data[0].value;
+      const lastVal = data[data.length - 1].value;
+      if (lastVal === firstVal) return "#94a3b8"; // Neutral slate
+      const isImprovement = strategy === "lowerIsBetter" 
+        ? lastVal < firstVal 
+        : lastVal > firstVal;
+      return isImprovement ? "#10b981" : "#ef4444"; // Green vs Red
+    };
+
+    const defaultColorHex = getScoreHexColor(score);
+    const colorHex = directionStrategy && chartData
+      ? getTrendColorHex(chartData, directionStrategy, defaultColorHex)
+      : defaultColorHex;
     const gradId = `chart-grad-${title.replace(/\s+/g, "")}`;
 
     let linePath = "";
@@ -292,9 +312,9 @@ export const MetricCard: React.FC<MetricCardProps> = ({
             <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
               Annual Trend
             </span>
-            {chartData.length < 5 && (
+            {chartData.length < 10 && (
               <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-50 dark:bg-amber-950/20 px-2 py-0.5 rounded">
-                Fewer than 5 years available
+                Fewer than 10 years available
               </span>
             )}
           </div>

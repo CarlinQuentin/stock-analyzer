@@ -86,7 +86,7 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
           <tbody>
             <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
               <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
-                <div>5-Year Revenue CAGR</div>
+                <div>10-Year Revenue CAGR</div>
                 <div className="text-sm text-slate-500 dark:text-slate-400">
                   Compound annual growth rate
                 </div>
@@ -110,7 +110,7 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
 
             <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
               <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
-                <div>5-Year EPS Growth</div>
+                <div>10-Year EPS Growth</div>
                 <div className="text-sm text-slate-500 dark:text-slate-400">
                   Earnings per share growth
                 </div>
@@ -134,7 +134,7 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
 
             <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
               <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
-                <div>5-Year FCF Growth</div>
+                <div>10-Year FCF Growth</div>
                 <div className="text-sm text-slate-500 dark:text-slate-400">
                   Free cash flow growth
                 </div>

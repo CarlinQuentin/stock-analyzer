@@ -56,7 +56,7 @@ class FinancialModelingPrepService {
 
   async getIncomeStatements(
     ticker: string,
-    limit: number = 5,
+    limit: number = 10,
   ): Promise<FinancialStatement[]> {
     try {
       const response = await this.client.get("/income-statement", {
@@ -82,7 +82,7 @@ class FinancialModelingPrepService {
 
   async getBalanceSheets(
     ticker: string,
-    limit: number = 5,
+    limit: number = 10,
   ): Promise<FinancialStatement[]> {
     try {
       const response = await this.client.get("/balance-sheet-statement", {
@@ -108,7 +108,7 @@ class FinancialModelingPrepService {
 
   async getCashFlowStatements(
     ticker: string,
-    limit: number = 5,
+    limit: number = 10,
   ): Promise<FinancialStatement[]> {
     try {
       const response = await this.client.get("/cash-flow-statement", {
@@ -129,7 +129,7 @@ class FinancialModelingPrepService {
     }
   }
 
-  async getFinancialRatios(ticker: string, limit: number = 5): Promise<any> {
+  async getFinancialRatios(ticker: string, limit: number = 10): Promise<any> {
     try {
       const response = await this.client.get("/ratios", {
         params: { ...this.getParams(), symbol: ticker.toUpperCase(), limit },
@@ -147,7 +147,7 @@ class FinancialModelingPrepService {
 
   async getDividends(
     ticker: string,
-    limit: number = 5,
+    limit: number = 10,
   ): Promise<FinancialStatement[]> {
     try {
       const response = await this.client.get("/dividends", {
@@ -205,7 +205,7 @@ class FinancialModelingPrepService {
 
   async getKeyMetrics(
     ticker: string,
-    limit: number = 5,
+    limit: number = 10,
   ): Promise<any[]> {
     try {
       const response = await this.client.get("/key-metrics", {

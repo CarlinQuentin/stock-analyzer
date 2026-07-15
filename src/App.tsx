@@ -366,39 +366,42 @@ function App() {
                   value={result.metrics.revenueCAGR}
                   unit="%"
                   score={result.scores.revenue}
-                  description="5-year CAGR"
-                  tooltip="The average yearly growth rate of the company's sales over the past five years. Consistent revenue growth can indicate increasing demand and a growing business."
+                  description="10-year CAGR"
+                  tooltip="The average yearly growth rate of the company's sales over the past ten years. Consistent revenue growth can indicate increasing demand and a growing business."
                   icon="📊"
                   chartData={result.revenueHistory}
                   chartValueType="currency"
                   isExpanded={showAllCharts}
                   onClick={() => setSelectedMetric("revenue")}
+                  directionStrategy="higherIsBetter"
                 />
                 <MetricCard
                   title="EPS Growth"
                   value={result.metrics.epsGrowth}
                   unit="%"
                   score={result.scores.eps}
-                  description="5-year CAGR"
-                  tooltip="The average yearly growth rate of the company's earnings per share over the past five years. Consistent EPS growth can indicate a company's ability to generate increasing profits."
+                  description="10-year CAGR"
+                  tooltip="The average yearly growth rate of the company's earnings per share over the past ten years. Consistent EPS growth can indicate a company's ability to generate increasing profits."
                   icon="💹"
                   chartData={result.epsHistory}
                   chartValueType="currency"
                   isExpanded={showAllCharts}
                   onClick={() => setSelectedMetric("eps")}
+                  directionStrategy="higherIsBetter"
                 />
                 <MetricCard
                   title="FCF Growth"
                   value={result.metrics.fcfGrowth}
                   unit="%"
                   score={result.scores.fcf}
-                  description="5-year CAGR"
-                  tooltip="The average yearly growth rate of the company's free cash flow over the past five years. Free cash flow shows how much cash the business generates after paying for expenses and investments needed to keep growing."
+                  description="10-year CAGR"
+                  tooltip="The average yearly growth rate of the company's free cash flow over the past ten years. Free cash flow shows how much cash the business generates after paying for expenses and investments needed to keep growing."
                   icon="💰"
                   chartData={result.fcfHistory}
                   chartValueType="currency"
                   isExpanded={showAllCharts}
                   onClick={() => setSelectedMetric("fcf")}
+                  directionStrategy="higherIsBetter"
                 />
                 <MetricCard
                   title="ROIC"
@@ -412,6 +415,7 @@ function App() {
                   chartValueType="percent"
                   isExpanded={showAllCharts}
                   onClick={() => setSelectedMetric("roic")}
+                  directionStrategy="higherIsBetter"
                 />
                 <MetricCard
                   title="Debt-to-Equity"
@@ -424,6 +428,7 @@ function App() {
                   chartValueType="number"
                   isExpanded={showAllCharts}
                   onClick={() => setSelectedMetric("debt")}
+                  directionStrategy="lowerIsBetter"
                 />
                 <MetricCard
                   title="Profitability"
@@ -437,6 +442,7 @@ function App() {
                   chartValueType="percent"
                   isExpanded={showAllCharts}
                   onClick={() => setSelectedMetric("profitability")}
+                  directionStrategy="higherIsBetter"
                 />
               </div>
             </div>
@@ -459,7 +465,7 @@ function App() {
                   <p>
                     <strong>Revenue Trend:</strong> The company's revenue has grown
                     at a CAGR of {(result.metrics.revenueCAGR * 100).toFixed(2)}%
-                    over the past 5 years.{" "}
+                    over the past 10 years.{" "}
                     {result.metrics.revenueCAGR > 0.15
                       ? "This demonstrates excellent revenue growth."
                       : result.metrics.revenueCAGR > 0.08
@@ -553,8 +559,8 @@ function App() {
                   value={result.valuationMetrics.averagePremium !== null ? result.valuationMetrics.averagePremium * 100 : null}
                   unit="%"
                   score={result.valuationScores.historical}
-                  description="Vs. 5-Year Average"
-                  tooltip="Measures the average premium or discount of the current valuation multiples compared to their 5-year historical averages."
+                  description="Vs. 10-Year Average"
+                  tooltip="Measures the average premium or discount of the current valuation multiples compared to their 10-year historical averages."
                   icon="⏳"
                 />
               </div>
@@ -606,7 +612,7 @@ function App() {
                       {result.valuationMetrics.averagePremium >= 0 ? "premium of " : "discount of "}
                       {Math.abs(result.valuationMetrics.averagePremium * 100).toFixed(1)}%
                     </strong>{" "}
-                    against its 5-year historical multiples.
+                    against its 10-year historical multiples.
                   </p>
                 )}
               </div>

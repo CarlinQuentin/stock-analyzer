@@ -183,7 +183,7 @@ export const ValuationTable: React.FC<ValuationTableProps> = ({
               <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
                 <div>Historical Valuation Premium/Discount</div>
                 <div className="text-sm text-slate-500 dark:text-slate-400">
-                  Avg. valuation premium/discount vs. 5-year averages
+                  Avg. valuation premium/discount vs. 10-year averages
                 </div>
               </td>
               <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200 font-semibold" colSpan={2}>

@@ -47,6 +47,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       unit: "",
       chartData: [] as { label: string; value: number }[],
       chartValueType: "currency" as "currency" | "percent" | "number",
+      directionStrategy: "higherIsBetter" as "higherIsBetter" | "lowerIsBetter",
       description: "",
       formula: "",
       mathExplanation: [] as string[],
@@ -66,7 +67,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           unit: "%",
           chartData: result.revenueHistory || [],
           chartValueType: "currency" as const,
-          description: "5-Year Compound Annual Growth Rate (CAGR) of top-line revenue.",
+          description: "10-Year Compound Annual Growth Rate (CAGR) of top-line revenue.",
           formula: "CAGR = (Ending Revenue / Beginning Revenue) ^ (1 / n) - 1",
           mathExplanation: getMathCAGRExplanation(result.revenueHistory || [], "currency"),
           whyItMatters: "Revenue growth (the 'top-line') measures the expansion of a company's business. It shows customer demand, market share expansion, and pricing power. Without revenue growth, profit growth is limited and must come from cost-cutting, which is unsustainable long-term.",
@@ -88,7 +89,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           unit: "%",
           chartData: result.epsHistory || [],
           chartValueType: "currency" as const,
-          description: "5-Year Compound Annual Growth Rate (CAGR) of Earnings Per Share (EPS).",
+          description: "10-Year Compound Annual Growth Rate (CAGR) of Earnings Per Share (EPS).",
           formula: "CAGR = (Ending EPS / Beginning EPS) ^ (1 / n) - 1",
           mathExplanation: getMathCAGRExplanation(result.epsHistory || [], "currency"),
           whyItMatters: "Earnings Per Share (EPS) growth shows how efficiently a company translates top-line growth into bottom-line profits for shareholders. EPS growth can be driven by expanding profit margins or by share repurchases (buybacks) reducing the share count.",
@@ -110,7 +111,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           unit: "%",
           chartData: result.fcfHistory || [],
           chartValueType: "currency" as const,
-          description: "5-Year Compound Annual Growth Rate (CAGR) of Free Cash Flow (FCF).",
+          description: "10-Year Compound Annual Growth Rate (CAGR) of Free Cash Flow (FCF).",
           formula: "CAGR = (Ending FCF / Beginning FCF) ^ (1 / n) - 1",
           mathExplanation: getMathCAGRExplanation(result.fcfHistory || [], "currency"),
           whyItMatters: "Free Cash Flow represents the actual cash a company generates after accounting for cash outflows to support operations and maintain capital assets. Consistent FCF growth gives a company the flexibility to pay dividends, buy back shares, reduce debt, or reinvest in growth.",
@@ -154,6 +155,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           unit: "",
           chartData: result.debtEquityHistory || [],
           chartValueType: "number" as const,
+          directionStrategy: "lowerIsBetter" as const,
           description: "Calculates the proportion of debt compared to shareholders' equity.",
           formula: "Debt-to-Equity = Total Debt / Total Shareholders' Equity",
           mathExplanation: getLatestMathExplanation(result.debtEquityHistory || [], "Debt-to-Equity", ""),
@@ -286,7 +288,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
 
     let text = "";
     if (allPositive) {
-      text = `The company has shown consistent year-over-year expansions in ${metricLabel} across the entire 5-year timeline. `;
+      text = `The company has shown consistent year-over-year expansions in ${metricLabel} across the entire ${data.length}-year timeline. `;
       if (isAccelerating) {
         text += "Importantly, this growth is accelerating (growth rates are climbing year-over-year), showing strong momentum.";
       } else if (isSlowing) {
@@ -309,7 +311,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     const latest = data[data.length - 1].value;
     const average = data.reduce((acc, curr) => acc + curr.value, 0) / data.length;
     
-    let text = `The company's latest ${name} is ${latest.toFixed(1)}%, with a 5-year average of ${average.toFixed(1)}%. `;
+    let text = `The company's latest ${name} is ${latest.toFixed(1)}%, with a ${data.length}-year average of ${average.toFixed(1)}%. `;
 
     if (average >= threshold) {
       text += `This indicates a highly efficient business that easily exceeds typical capital costs (usually ~8-10%), suggesting the presence of a wide economic moat. `;
@@ -324,7 +326,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       } else if (latest < first - 2) {
         text += "Of concern, efficiency returns are contracting, showing that profit margins or asset turn ratios are degrading over time.";
       } else {
-        text += "Returns have remained stable and consistent over the last 5 years.";
+        text += `Returns have remained stable and consistent over the last ${data.length} years.`;
       }
     }
 
@@ -497,7 +499,41 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
 
   const config = getConfig();
   const { label: scoreLabel, color: scoreColor } = getScoreCategory(config.score || 0);
-  const activeColorHex = getHexColor(scoreColor);
+
+  const getTrendColorHex = (
+    data: { value: number }[],
+    strategy: "higherIsBetter" | "lowerIsBetter",
+    defaultHex: string
+  ): string => {
+    if (data.length < 2) return defaultHex;
+    const firstVal = data[0].value;
+    const lastVal = data[data.length - 1].value;
+    if (lastVal === firstVal) return "#94a3b8"; // Neutral slate
+    const isImprovement = strategy === "lowerIsBetter" 
+      ? lastVal < firstVal 
+      : lastVal > firstVal;
+    return isImprovement ? "#10b981" : "#ef4444"; // Green vs Red
+  };
+
+  const defaultColorHex = getHexColor(scoreColor);
+  const activeColorHex = config.directionStrategy && config.chartData.length > 0
+    ? getTrendColorHex(config.chartData, config.directionStrategy, defaultColorHex)
+    : defaultColorHex;
+
+  const getYoYColorClass = (growthText: string, strategy: "higherIsBetter" | "lowerIsBetter") => {
+    if (growthText === "—" || growthText === "—%") return "text-slate-400 dark:text-slate-500";
+    const isPositive = growthText.startsWith("+");
+    const isNegative = growthText.startsWith("-");
+    
+    if (strategy === "lowerIsBetter") {
+      if (isPositive) return "text-red-600 dark:text-red-400";
+      if (isNegative) return "text-green-600 dark:text-green-400";
+    } else {
+      if (isPositive) return "text-green-600 dark:text-green-400";
+      if (isNegative) return "text-red-600 dark:text-red-400";
+    }
+    return "text-slate-400 dark:text-slate-500";
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-slate-950/60 dark:bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150">
@@ -545,13 +581,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                       <td className="px-4 py-2.5 text-right font-semibold text-slate-900 dark:text-white">
                         {formatChartValue(item.value, config.chartValueType)}
                       </td>
-                      <td className={`px-4 py-2.5 text-right font-bold ${
-                        getYoYGrowth(idx, config.chartData).startsWith("+") 
-                          ? "text-green-600 dark:text-green-400" 
-                          : getYoYGrowth(idx, config.chartData).startsWith("-")
-                            ? "text-red-600 dark:text-red-400"
-                            : "text-slate-400 dark:text-slate-500"
-                      }`}>
+                      <td className={`px-4 py-2.5 text-right font-bold ${getYoYColorClass(getYoYGrowth(idx, config.chartData), config.directionStrategy)}`}>
                         {getYoYGrowth(idx, config.chartData)}
                       </td>
                     </tr>
@@ -559,9 +589,9 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                 </tbody>
               </table>
             </div>
-            {config.chartData.length < 5 && (
+            {config.chartData.length < 10 && (
               <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium mt-2 italic">
-                * Note: Fewer than 5 years of historical data are currently available for this stock.
+                * Note: Fewer than 10 years of historical data are currently available for this stock.
               </p>
             )}
           </div>
