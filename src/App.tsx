@@ -8,6 +8,7 @@ import { AnalysisTable } from "./components/AnalysisTable";
 import { ValuationTable } from "./components/ValuationTable";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import { ErrorMessage } from "./components/ErrorMessage";
+import { MetricDetailModal } from "./components/MetricDetailModal";
 import { ProfileOnlyPage } from "./components/ProfileOnlyPage";
 import { fmpService } from "./services/financialModelingPrep";
 import { calculateAllMetrics } from "./utils/financialCalculations";
@@ -33,6 +34,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"fundamentals" | "valuation">("fundamentals");
   const [showAllCharts, setShowAllCharts] = useState(false);
+  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
   const handleSearch = useCallback(async (ticker: string) => {
     setIsLoading(true);
@@ -40,6 +42,7 @@ function App() {
     setResult(null);
     setActiveTab("fundamentals");
     setShowAllCharts(false);
+    setSelectedMetric(null);
 
     try {
       const profile = await fmpService.getCompanyProfile(ticker);
@@ -369,6 +372,7 @@ function App() {
                   chartData={result.revenueHistory}
                   chartValueType="currency"
                   isExpanded={showAllCharts}
+                  onClick={() => setSelectedMetric("revenue")}
                 />
                 <MetricCard
                   title="EPS Growth"
@@ -381,6 +385,7 @@ function App() {
                   chartData={result.epsHistory}
                   chartValueType="currency"
                   isExpanded={showAllCharts}
+                  onClick={() => setSelectedMetric("eps")}
                 />
                 <MetricCard
                   title="FCF Growth"
@@ -393,6 +398,7 @@ function App() {
                   chartData={result.fcfHistory}
                   chartValueType="currency"
                   isExpanded={showAllCharts}
+                  onClick={() => setSelectedMetric("fcf")}
                 />
                 <MetricCard
                   title="ROIC"
@@ -405,6 +411,7 @@ function App() {
                   chartData={result.roicHistory}
                   chartValueType="percent"
                   isExpanded={showAllCharts}
+                  onClick={() => setSelectedMetric("roic")}
                 />
                 <MetricCard
                   title="Debt-to-Equity"
@@ -416,6 +423,7 @@ function App() {
                   chartData={result.debtEquityHistory}
                   chartValueType="number"
                   isExpanded={showAllCharts}
+                  onClick={() => setSelectedMetric("debt")}
                 />
                 <MetricCard
                   title="Profitability"
@@ -428,6 +436,7 @@ function App() {
                   chartData={result.profitabilityHistory}
                   chartValueType="percent"
                   isExpanded={showAllCharts}
+                  onClick={() => setSelectedMetric("profitability")}
                 />
               </div>
             </div>
@@ -621,6 +630,15 @@ function App() {
             </button>
           </p>
         </div>
+
+        {/* Metric Detail Modal */}
+        {selectedMetric && result && (
+          <MetricDetailModal
+            metricKey={selectedMetric}
+            result={result}
+            onClose={() => setSelectedMetric(null)}
+          />
+        )}
       </div>
     </div>
   );

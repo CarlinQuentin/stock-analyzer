@@ -17,6 +17,7 @@ interface MetricCardProps {
   chartData?: ChartDataPoint[];
   chartValueType?: "currency" | "percent" | "number";
   isExpanded?: boolean;
+  onClick?: () => void;
 }
 
 export const MetricCard: React.FC<MetricCardProps> = ({
@@ -30,6 +31,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   chartData,
   chartValueType = "currency",
   isExpanded = false,
+  onClick,
 }) => {
   const getScoreColor = (score: number | null) => {
     if (score === null) return "bg-slate-100 text-slate-500 border-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
@@ -203,7 +205,14 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 border-l-4 border-slate-200 dark:border-slate-700 hover:shadow-lg transition-all duration-300 flex flex-col justify-between">
+    <div 
+      onClick={onClick}
+      className={`bg-white dark:bg-slate-800 rounded-lg shadow p-6 border-l-4 border-slate-200 dark:border-slate-700 hover:shadow-lg flex flex-col justify-between ${
+        onClick 
+          ? "cursor-pointer hover:border-blue-500/80 dark:hover:border-blue-500/80 active:scale-[0.99] transition-all duration-200" 
+          : "transition-all duration-300"
+      }`}
+    >
       <div>
         <div className="flex items-start justify-between mb-3">
           <div>
