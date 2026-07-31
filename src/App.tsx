@@ -447,6 +447,7 @@ function App() {
             score={result.overallScore}
             confidence={result.dataConfidenceScore}
             unavailable={result.unavailableMetrics}
+            scores={result.scores}
             title="Business Quality Score"
             description={
               result.overallScore >= 85
@@ -462,6 +463,7 @@ function App() {
             score={result.overallValuationScore}
             confidence={result.valuationConfidenceScore}
             unavailable={result.unavailableValuationMetrics}
+            valuationScores={result.valuationScores}
             title="Stock Valuation Score"
             description={
               result.overallValuationScore >= 80

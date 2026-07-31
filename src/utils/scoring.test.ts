@@ -95,6 +95,21 @@ describe("calculateMetricScores & calculateOverallScore", () => {
     expect(overall).toBeGreaterThanOrEqual(80);
   });
 
+  it("calculateOverallScore should calculate exact weighted Business Quality Score equation for all considerations", () => {
+    const scores: MetricScores = {
+      revenue: 80,       // 80 * 0.20 = 16.0
+      eps: 90,           // 90 * 0.20 = 18.0
+      fcf: 70,           // 70 * 0.15 = 10.5
+      roic: 100,         // 100 * 0.15 = 15.0
+      debt: 100,         // 100 * 0.10 = 10.0
+      profitability: 85, // 85 * 0.20 = 17.0
+    };
+    // Sum = 16 + 18 + 10.5 + 15 + 10 + 17 = 86.5
+    // Weight sum = 1.00
+    // Round(86.5 / 1.00) = 87
+    expect(calculateOverallScore(scores)).toBe(87);
+  });
+
   it("calculateOverallScore should return 0 if all scores are null", () => {
     const emptyScores: MetricScores = {
       revenue: null,
