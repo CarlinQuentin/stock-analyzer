@@ -1,0 +1,162 @@
+import { describe, it, expect } from "vitest";
+import {
+  scoreRevenueGrowth,
+  scoreEPSGrowth,
+  scoreFCFGrowth,
+  scoreROIC,
+  scoreDebtToEquity,
+  scoreProfitability,
+  calculateMetricScores,
+  calculateOverallScore,
+  getUnavailableMetrics,
+  calculateDataConfidenceScore,
+  getScoreCategory,
+  getScoreColorClass,
+  getScoreBgColorClass,
+  getMetricAnalysis,
+} from "./scoring";
+import { FinancialMetrics, MetricScores } from "../types";
+
+describe("Scoring Utilities - Individual Metric Scores", () => {
+  it("scoreRevenueGrowth should score revenue growth tiers correctly", () => {
+    expect(scoreRevenueGrowth(null)).toBeNull();
+    expect(scoreRevenueGrowth(0.20)).toBeGreaterThanOrEqual(85); // Excellent
+    expect(scoreRevenueGrowth(0.10)).toBeGreaterThanOrEqual(70); // Good
+    expect(scoreRevenueGrowth(0.06)).toBeGreaterThanOrEqual(50); // Average
+    expect(scoreRevenueGrowth(0.02)).toBeLessThan(50); // Poor
+  });
+
+  it("scoreEPSGrowth should score EPS growth tiers correctly", () => {
+    expect(scoreEPSGrowth(null)).toBeNull();
+    expect(scoreEPSGrowth(0.18)).toBeGreaterThanOrEqual(85);
+    expect(scoreEPSGrowth(0.09)).toBeGreaterThanOrEqual(70);
+    expect(scoreEPSGrowth(0.05)).toBe(49);
+    expect(scoreEPSGrowth(-0.05)).toBeLessThan(30);
+  });
+
+  it("scoreFCFGrowth should score FCF growth tiers correctly", () => {
+    expect(scoreFCFGrowth(null)).toBeNull();
+    expect(scoreFCFGrowth(0.20)).toBeGreaterThanOrEqual(85);
+    expect(scoreFCFGrowth(0.10)).toBeGreaterThanOrEqual(70);
+  });
+
+  it("scoreROIC should score ROIC tiers correctly", () => {
+    expect(scoreROIC(null)).toBeNull();
+    expect(scoreROIC(20)).toBeGreaterThanOrEqual(85);
+    expect(scoreROIC(12)).toBeGreaterThanOrEqual(70);
+    expect(scoreROIC(8)).toBeGreaterThanOrEqual(50);
+    expect(scoreROIC(3)).toBeLessThan(50);
+  });
+
+  it("scoreDebtToEquity should score debt-to-equity ratio correctly (lower is better)", () => {
+    expect(scoreDebtToEquity(null)).toBe(0);
+    expect(scoreDebtToEquity(-1)).toBe(0);
+    expect(scoreDebtToEquity(0.2)).toBeGreaterThanOrEqual(85); // Excellent
+    expect(scoreDebtToEquity(1.0)).toBeGreaterThanOrEqual(70); // Good
+    expect(scoreDebtToEquity(2.0)).toBeGreaterThanOrEqual(50); // Average
+    expect(scoreDebtToEquity(6.0)).toBe(0); // Poor
+  });
+
+  it("scoreProfitability should return average score across net, operating, and gross margins", () => {
+    expect(scoreProfitability(null, null, null)).toBeNull();
+    // High margins (Net 20%, Op 25%, Gross 50%) -> Excellent score >= 85
+    const highScore = scoreProfitability(20, 25, 50);
+    expect(highScore).toBeGreaterThanOrEqual(85);
+  });
+});
+
+describe("calculateMetricScores & calculateOverallScore", () => {
+  const sampleMetrics: FinancialMetrics = {
+    revenueCAGR: 0.15,
+    epsGrowth: 0.12,
+    fcfGrowth: 0.10,
+    roic: 16,
+    debtToEquity: 0.4,
+    dividendYield: 0.02,
+    dividendPayoutRatio: 0.3,
+    grossMargin: 45,
+    operatingMargin: 20,
+    netMargin: 15,
+  };
+
+  it("calculateMetricScores should generate all metric scores", () => {
+    const scores = calculateMetricScores(sampleMetrics);
+    expect(scores.revenue).not.toBeNull();
+    expect(scores.eps).not.toBeNull();
+    expect(scores.fcf).not.toBeNull();
+    expect(scores.roic).not.toBeNull();
+    expect(scores.debt).not.toBeNull();
+    expect(scores.profitability).not.toBeNull();
+  });
+
+  it("calculateOverallScore should calculate weighted overall score", () => {
+    const scores = calculateMetricScores(sampleMetrics);
+    const overall = calculateOverallScore(scores);
+    expect(overall).toBeGreaterThanOrEqual(80);
+  });
+
+  it("calculateOverallScore should return 0 if all scores are null", () => {
+    const emptyScores: MetricScores = {
+      revenue: null,
+      eps: null,
+      fcf: null,
+      roic: null,
+      debt: null,
+      profitability: null,
+    };
+    expect(calculateOverallScore(emptyScores)).toBe(0);
+  });
+});
+
+describe("Data Confidence & Unavailable Metrics", () => {
+  it("calculateDataConfidenceScore should return 100% when all metrics are available", () => {
+    const fullScores: MetricScores = {
+      revenue: 80,
+      eps: 80,
+      fcf: 80,
+      roic: 80,
+      debt: 80,
+      profitability: 80,
+    };
+    expect(calculateDataConfidenceScore(fullScores)).toBe(100);
+    expect(getUnavailableMetrics(fullScores)).toHaveLength(0);
+  });
+
+  it("calculateDataConfidenceScore should calculate percentage for partial data", () => {
+    const partialScores: MetricScores = {
+      revenue: 80,
+      eps: 80,
+      fcf: null,
+      roic: null,
+      debt: 80,
+      profitability: 80,
+    };
+    // 4 out of 6 valid = ~67%
+    expect(calculateDataConfidenceScore(partialScores)).toBe(67);
+    const unavailable = getUnavailableMetrics(partialScores);
+    expect(unavailable).toContain("FCF Growth");
+    expect(unavailable).toContain("ROIC");
+  });
+});
+
+describe("Category & Label Formatting Helpers", () => {
+  it("getScoreCategory should classify score tiers", () => {
+    expect(getScoreCategory(90).label).toBe("Excellent");
+    expect(getScoreCategory(75).label).toBe("Good");
+    expect(getScoreCategory(60).label).toBe("Average");
+    expect(getScoreCategory(30).label).toBe("Poor");
+  });
+
+  it("getScoreColorClass & getScoreBgColorClass should return class strings", () => {
+    expect(getScoreColorClass(90)).toBe("text-excellent");
+    expect(getScoreBgColorClass(90)).toBe("bg-excellent");
+  });
+
+  it("getMetricAnalysis should classify performance", () => {
+    expect(getMetricAnalysis(null)).toBe("N/A");
+    expect(getMetricAnalysis(90)).toBe("Strong");
+    expect(getMetricAnalysis(75)).toBe("Good");
+    expect(getMetricAnalysis(60)).toBe("Fair");
+    expect(getMetricAnalysis(30)).toBe("Weak");
+  });
+});
