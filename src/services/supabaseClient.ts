@@ -39,3 +39,26 @@ export const supabase: SupabaseClient = createClient(
   isSupabaseConfigured ? supabaseUrl : dummyUrl,
   isSupabaseConfigured ? supabaseAnonKey : dummyKey
 );
+
+/**
+ * Automatically initializes an anonymous Supabase Auth session for new visitors
+ */
+export const initAnonymousAuth = async () => {
+  if (!isSupabaseConfigured) return null;
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData?.session) {
+      return sessionData.session;
+    }
+    // Automatically sign in anonymously for new visitors
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error) {
+      console.warn("Supabase anonymous sign-in warning:", error.message);
+      return null;
+    }
+    return data.session;
+  } catch (err) {
+    console.warn("Failed to initialize anonymous auth:", err);
+    return null;
+  }
+};

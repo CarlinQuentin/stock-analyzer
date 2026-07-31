@@ -16,41 +16,71 @@ const LOCAL_DEMO_KEY = "stock_analyzer_demo_user";
 
 class AuthService {
   async register(name: string, email: string, password: string): Promise<AuthResponse> {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+
     if (!isSupabaseConfigured) {
       // Local fallback mode when Supabase credentials are not configured in .env.local
       const user: UserProfile = {
         id: "local-" + Date.now(),
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
+        name: cleanName,
+        email: cleanEmail,
         created_at: new Date().toISOString(),
       };
       localStorage.setItem(LOCAL_DEMO_KEY, JSON.stringify(user));
       return { message: "Registered successfully (Local mode)", user };
     }
 
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
-      password,
-      options: {
-        data: {
-          name: name.trim(),
-        },
-      },
-    });
+    // Check if there is an active anonymous session to convert/link
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentSession = sessionData?.session;
+    const isAnonymousUser = Boolean(
+      currentSession?.user &&
+        (currentSession.user.is_anonymous || !currentSession.user.email)
+    );
 
-    if (error) {
-      throw new Error(error.message);
+    let resUser: any = null;
+
+    if (isAnonymousUser) {
+      // Convert/link anonymous user to permanent account, preserving user.id & user_analyses records
+      const { data, error } = await supabase.auth.updateUser({
+        email: cleanEmail,
+        password,
+        data: { name: cleanName },
+      });
+
+      if (error) {
+        // Fallback to standard signup if link fails
+        const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password,
+          options: { data: { name: cleanName } },
+        });
+        if (signUpErr) throw new Error(signUpErr.message);
+        resUser = signUpData.user;
+      } else {
+        resUser = data.user;
+      }
+    } else {
+      // Standard sign up
+      const { data, error } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password,
+        options: { data: { name: cleanName } },
+      });
+      if (error) throw new Error(error.message);
+      resUser = data.user;
     }
 
-    if (!data.user) {
+    if (!resUser) {
       throw new Error("Registration failed. Please try again.");
     }
 
     const user: UserProfile = {
-      id: data.user.id,
-      name: data.user.user_metadata?.name || name,
-      email: data.user.email || email,
-      created_at: data.user.created_at,
+      id: resUser.id,
+      name: resUser.user_metadata?.name || cleanName,
+      email: resUser.email || cleanEmail,
+      created_at: resUser.created_at,
     };
 
     return { message: "Registered successfully", user };

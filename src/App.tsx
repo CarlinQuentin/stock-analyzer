@@ -28,9 +28,15 @@ import {
 } from "./utils/valuationScoring";
 import { AnalysisResult } from "./types";
 
+import { initAnonymousAuth } from "./services/supabaseClient";
+import { stockAnalysisService } from "./services/stockAnalysisService";
+
 function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authPromptMessage, setAuthPromptMessage] = useState<string | null>(null);
+  const [pendingTicker, setPendingTicker] = useState<string | null>(null);
 
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [profileOnly, setProfileOnly] = useState<{
@@ -45,6 +51,8 @@ function App() {
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
   useEffect(() => {
+    // Automatically initialize anonymous Supabase auth session for new visitors
+    initAnonymousAuth();
     authService.getMe().then((userProfile) => {
       setUser(userProfile);
       setIsCheckingAuth(false);
@@ -67,6 +75,9 @@ function App() {
     setSelectedMetric(null);
 
     try {
+      // 1. Enforce quota server-side via Supabase RPC / Edge Function (limit = 2 for anonymous users)
+      await stockAnalysisService.checkQuotaAndTrack(ticker);
+
       const [profile, historicalPrices] = await Promise.all([
         fmpService.getCompanyProfile(ticker),
         fmpService.getHistoricalPrices(ticker),
@@ -293,12 +304,29 @@ function App() {
         setResult(null);
       }
     } catch (err: any) {
-      const errMsg = typeof err === "string" ? err : (typeof err?.message === "string" ? err.message : (err?.message ? JSON.stringify(err.message) : "An error occurred while analyzing the stock"));
-      setError(errMsg);
+      if (err?.code === "LOGIN_REQUIRED" || err?.message?.includes("LOGIN_REQUIRED") || err?.message?.includes("limit of 2")) {
+        setPendingTicker(ticker);
+        setAuthPromptMessage(err.message || "You have reached your limit of 2 free anonymous stock analyses. Please sign up or log in to continue.");
+        setShowAuthModal(true);
+      } else {
+        const errMsg = typeof err === "string" ? err : (typeof err?.message === "string" ? err.message : (err?.message ? JSON.stringify(err.message) : "An error occurred while analyzing the stock"));
+        setError(errMsg);
+      }
     } finally {
       setIsLoading(false);
     }
   }, []);
+
+  const handleAuthSuccess = useCallback((userProfile: UserProfile) => {
+    setUser(userProfile);
+    setShowAuthModal(false);
+    setAuthPromptMessage(null);
+    if (pendingTicker) {
+      const tickerToRetry = pendingTicker;
+      setPendingTicker(null);
+      handleSearch(tickerToRetry);
+    }
+  }, [pendingTicker, handleSearch]);
 
   const handleRetry = useCallback(() => {
     setError(null);
@@ -315,23 +343,24 @@ function App() {
     );
   }
 
-  if (!user) {
-    return (
-      <>
-        <ThemeToggle />
-        <AuthModal onLoginSuccess={(u) => setUser(u)} />
-      </>
-    );
-  }
-
   if (isLoading) {
     return (
       <>
         <div className="fixed top-4 left-4 z-40">
-          <UserHeader user={user} onLogout={handleLogout} />
+          <UserHeader user={user} onLogout={handleLogout} onLoginRequest={() => setShowAuthModal(true)} />
         </div>
         <ThemeToggle />
         <LoadingSpinner message="Analyzing company fundamentals..." />
+        {showAuthModal && (
+          <AuthModal
+            onLoginSuccess={handleAuthSuccess}
+            onClose={() => {
+              setShowAuthModal(false);
+              setAuthPromptMessage(null);
+            }}
+            customPrompt={authPromptMessage}
+          />
+        )}
       </>
     );
   }
@@ -340,7 +369,7 @@ function App() {
     return (
       <>
         <div className="fixed top-4 left-4 z-40">
-          <UserHeader user={user} onLogout={handleLogout} />
+          <UserHeader user={user} onLogout={handleLogout} onLoginRequest={() => setShowAuthModal(true)} />
         </div>
         <ThemeToggle />
         <ErrorMessage
@@ -348,6 +377,16 @@ function App() {
           message={error}
           onRetry={handleRetry}
         />
+        {showAuthModal && (
+          <AuthModal
+            onLoginSuccess={handleAuthSuccess}
+            onClose={() => {
+              setShowAuthModal(false);
+              setAuthPromptMessage(null);
+            }}
+            customPrompt={authPromptMessage}
+          />
+        )}
       </>
     );
   }
@@ -356,10 +395,20 @@ function App() {
     return (
       <>
         <div className="fixed top-4 left-4 z-40">
-          <UserHeader user={user} onLogout={handleLogout} />
+          <UserHeader user={user} onLogout={handleLogout} onLoginRequest={() => setShowAuthModal(true)} />
         </div>
         <ThemeToggle />
         <StockSearch onSearch={handleSearch} isLoading={isLoading} />
+        {showAuthModal && (
+          <AuthModal
+            onLoginSuccess={handleAuthSuccess}
+            onClose={() => {
+              setShowAuthModal(false);
+              setAuthPromptMessage(null);
+            }}
+            customPrompt={authPromptMessage}
+          />
+        )}
       </>
     );
   }
@@ -368,7 +417,7 @@ function App() {
     return (
       <>
         <div className="fixed top-4 left-4 z-40">
-          <UserHeader user={user} onLogout={handleLogout} />
+          <UserHeader user={user} onLogout={handleLogout} onLoginRequest={() => setShowAuthModal(true)} />
         </div>
         <ThemeToggle />
         <ProfileOnlyPage
@@ -379,6 +428,16 @@ function App() {
             setResult(null);
           }}
         />
+        {showAuthModal && (
+          <AuthModal
+            onLoginSuccess={handleAuthSuccess}
+            onClose={() => {
+              setShowAuthModal(false);
+              setAuthPromptMessage(null);
+            }}
+            customPrompt={authPromptMessage}
+          />
+        )}
       </>
     );
   }
@@ -390,7 +449,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 py-8 px-4 transition-colors duration-300">
       <div className="fixed top-4 left-4 z-40">
-        <UserHeader user={user} onLogout={handleLogout} />
+        <UserHeader user={user} onLogout={handleLogout} onLoginRequest={() => setShowAuthModal(true)} />
       </div>
       <ThemeToggle />
       <div className="max-w-7xl mx-auto">
@@ -863,6 +922,18 @@ function App() {
             metricKey={selectedMetric}
             result={result}
             onClose={() => setSelectedMetric(null)}
+          />
+        )}
+
+        {/* Auth Modal for Quota Limits or Manual Login */}
+        {showAuthModal && (
+          <AuthModal
+            onLoginSuccess={handleAuthSuccess}
+            onClose={() => {
+              setShowAuthModal(false);
+              setAuthPromptMessage(null);
+            }}
+            customPrompt={authPromptMessage}
           />
         )}
       </div>

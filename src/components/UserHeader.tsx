@@ -2,12 +2,25 @@ import React, { useState } from "react";
 import { UserProfile } from "../services/authService";
 
 interface UserHeaderProps {
-  user: UserProfile;
+  user: UserProfile | null;
   onLogout: () => void;
+  onLoginRequest?: () => void;
 }
 
-export const UserHeader: React.FC<UserHeaderProps> = ({ user, onLogout }) => {
+export const UserHeader: React.FC<UserHeaderProps> = ({ user, onLogout, onLoginRequest }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  if (!user) {
+    return (
+      <button
+        onClick={onLoginRequest}
+        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-bold text-xs rounded-full shadow-lg shadow-blue-500/20 transition-all transform hover:scale-105 active:scale-95"
+      >
+        <span>👤</span>
+        <span>Sign In / Create Account</span>
+      </button>
+    );
+  }
 
   return (
     <div
