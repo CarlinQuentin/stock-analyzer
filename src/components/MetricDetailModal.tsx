@@ -756,15 +756,19 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
         {/* Right Panel: Scoring, Math, Education & Observations */}
         <div className="w-full md:w-1/2 p-6 flex flex-col justify-between bg-slate-50/20 dark:bg-slate-900/10">
           <div>
-            {/* Close Button */}
-            <button 
-              onClick={onClose}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            {/* Close Button positioned above the Metric Value Card */}
+            <div className="flex justify-end mb-3">
+              <button 
+                onClick={onClose}
+                className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-white bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-full transition-all hover:scale-105 active:scale-95 border border-slate-200/60 dark:border-slate-700/50 shadow-sm"
+                aria-label="Close modal"
+                title="Close (Esc)"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
 
             {/* Metric Value & Score Summary Block */}
             <div className="flex flex-wrap items-center justify-between gap-4 mb-6 bg-white dark:bg-slate-800/80 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
@@ -785,6 +789,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                   )}
                 </div>
               </div>
+
               <div className="text-right">
                 <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-widest block mb-0.5">
                   Quality Score
