@@ -1,6 +1,31 @@
 import { CompanyProfile, FinancialStatement, ValuationMetrics, ValuationScores } from "../types";
 
 /**
+ * Calculate Premium % for a valuation metric vs historical average:
+ * Premium % = (Current Multiple - Historical Average Multiple) / Historical Average Multiple
+ *
+ * Example:
+ * Current P/FCF = 20x, Historical Avg P/FCF = 15x -> (20 - 15) / 15 = +0.3333 (+33.3%)
+ * Current P/E = 12x, Historical Avg P/E = 15x -> (12 - 15) / 15 = -0.20 (-20.0%)
+ * Current P/S = 15x, Historical Avg P/S = 15x -> (15 - 15) / 15 = 0.0 (0.0%)
+ */
+export function calculateValuationPremium(
+  currentMultiple: number | null,
+  historicalAverageMultiple: number | null
+): number | null {
+  if (
+    currentMultiple === null ||
+    currentMultiple <= 0 ||
+    historicalAverageMultiple === null ||
+    historicalAverageMultiple <= 0
+  ) {
+    return null;
+  }
+
+  return (currentMultiple - historicalAverageMultiple) / historicalAverageMultiple;
+}
+
+/**
  * Calculate Valuation Metrics
  */
 export function calculateValuationMetrics(
@@ -64,7 +89,7 @@ export function calculateValuationMetrics(
     if (latestMetric.evToSales && latestMetric.evToSales > 0) evToSales = latestMetric.evToSales;
   }
 
-  // 5. Historical averages
+  // 5. Historical average multiples
   let historicalPeAverage: number | null = null;
   let historicalPsAverage: number | null = null;
   let historicalEvsAverage: number | null = null;
@@ -86,12 +111,20 @@ export function calculateValuationMetrics(
     if (validEvss.length > 0) historicalEvsAverage = validEvss.reduce((a, b) => a + b, 0) / validEvss.length;
   }
 
-  // Calculate premium/discount compared to history
+  // Calculate premium/discount percentage for each valuation metric (P/E, P/S, EV/Sales, P/FCF)
   const premiums: number[] = [];
-  if (peRatio && historicalPeAverage) premiums.push((peRatio - historicalPeAverage) / historicalPeAverage);
-  if (priceToSalesRatio && historicalPsAverage) premiums.push((priceToSalesRatio - historicalPsAverage) / historicalPsAverage);
-  if (evToSales && historicalEvsAverage) premiums.push((evToSales - historicalEvsAverage) / historicalEvsAverage);
-  if (priceToFreeCashFlowsRatio && historicalPfcfAverage) premiums.push((priceToFreeCashFlowsRatio - historicalPfcfAverage) / historicalPfcfAverage);
+
+  const pePremium = calculateValuationPremium(peRatio, historicalPeAverage);
+  if (pePremium !== null) premiums.push(pePremium);
+
+  const psPremium = calculateValuationPremium(priceToSalesRatio, historicalPsAverage);
+  if (psPremium !== null) premiums.push(psPremium);
+
+  const evsPremium = calculateValuationPremium(evToSales, historicalEvsAverage);
+  if (evsPremium !== null) premiums.push(evsPremium);
+
+  const pfcfPremium = calculateValuationPremium(priceToFreeCashFlowsRatio, historicalPfcfAverage);
+  if (pfcfPremium !== null) premiums.push(pfcfPremium);
 
   if (premiums.length > 0) {
     averagePremium = premiums.reduce((a, b) => a + b, 0) / premiums.length;

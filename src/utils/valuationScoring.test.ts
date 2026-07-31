@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   calculateValuationMetrics,
+  calculateValuationPremium,
   scorePERatio,
   scorePSRatio,
   scoreEVSales,
@@ -13,6 +14,38 @@ import {
   getValuationAnalysis,
 } from "./valuationScoring";
 import { CompanyProfile, FinancialStatement, ValuationScores } from "../types";
+
+describe("calculateValuationPremium", () => {
+  it("should calculate premium when Current Multiple is greater than Historical Average Multiple", () => {
+    // Current P/FCF = 20x, Historical Avg P/FCF = 15x -> (20 - 15) / 15 = +33.33%
+    const premium = calculateValuationPremium(20, 15);
+    expect(premium).not.toBeNull();
+    expect(premium!).toBeCloseTo(0.333333, 4);
+  });
+
+  it("should calculate discount when Current Multiple is less than Historical Average Multiple", () => {
+    // Current P/E = 12x, Historical Avg P/E = 15x -> (12 - 15) / 15 = -20%
+    const discount = calculateValuationPremium(12, 15);
+    expect(discount).not.toBeNull();
+    expect(discount!).toBeCloseTo(-0.2, 4);
+  });
+
+  it("should calculate zero premium/discount when Current Multiple equals Historical Average Multiple", () => {
+    // Current P/S = 15x, Historical Avg P/S = 15x -> (15 - 15) / 15 = 0%
+    const equal = calculateValuationPremium(15, 15);
+    expect(equal).not.toBeNull();
+    expect(equal!).toBe(0);
+  });
+
+  it("should return null if any input is null, zero, or negative", () => {
+    expect(calculateValuationPremium(null, 15)).toBeNull();
+    expect(calculateValuationPremium(20, null)).toBeNull();
+    expect(calculateValuationPremium(0, 15)).toBeNull();
+    expect(calculateValuationPremium(20, 0)).toBeNull();
+    expect(calculateValuationPremium(-10, 15)).toBeNull();
+    expect(calculateValuationPremium(20, -15)).toBeNull();
+  });
+});
 
 describe("Individual Valuation Multiplier Scoring", () => {
   it("scorePERatio should score P/E ratio (lower is better)", () => {
