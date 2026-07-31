@@ -425,6 +425,12 @@ function App() {
           </div>
         </div>
 
+        {/* Stock Price History Chart */}
+        <StockPriceChart
+          priceHistory={result.priceHistory || []}
+          profile={result.companyProfile}
+        />
+
         {/* Info Banner explaining Valuation vs Business Quality */}
         <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40 rounded-xl p-4 mb-6 transition-all duration-300">
           <p className="text-sm text-blue-800 dark:text-blue-300 flex items-start gap-2.5">
@@ -434,12 +440,6 @@ function App() {
             </span>
           </p>
         </div>
-
-        {/* Stock Price History Chart */}
-        <StockPriceChart
-          priceHistory={result.priceHistory || []}
-          profile={result.companyProfile}
-        />
 
         {/* Gauges Side by Side */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
