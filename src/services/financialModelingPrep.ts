@@ -4,6 +4,7 @@ import {
   FinancialStatement,
   DividendMetrics,
   HistoricalPricePoint,
+  MarketMover,
   ApiError,
 } from "../types";
 
@@ -215,6 +216,50 @@ class FinancialModelingPrepService {
         );
     } catch (error) {
       console.warn("Failed to fetch historical prices:", error);
+      return [];
+    }
+  }
+
+  async getTopGainers(limit: number = 10): Promise<MarketMover[]> {
+    try {
+      const response = await this.client.get("/biggest-gainers", {
+        params: this.getParams(),
+      });
+      if (!response.data || !Array.isArray(response.data)) return [];
+      return response.data
+        .map((item: any) => ({
+          symbol: item.symbol,
+          name: item.name || item.symbol,
+          price: typeof item.price === "number" ? item.price : parseFloat(item.price) || 0,
+          change: typeof item.change === "number" ? item.change : parseFloat(item.change) || 0,
+          changesPercentage: typeof item.changesPercentage === "number" ? item.changesPercentage : parseFloat(item.changesPercentage) || 0,
+          exchange: item.exchange,
+        }))
+        .slice(0, limit);
+    } catch (error) {
+      console.warn("Failed to fetch top gainers:", error);
+      return [];
+    }
+  }
+
+  async getTopLosers(limit: number = 10): Promise<MarketMover[]> {
+    try {
+      const response = await this.client.get("/biggest-losers", {
+        params: this.getParams(),
+      });
+      if (!response.data || !Array.isArray(response.data)) return [];
+      return response.data
+        .map((item: any) => ({
+          symbol: item.symbol,
+          name: item.name || item.symbol,
+          price: typeof item.price === "number" ? item.price : parseFloat(item.price) || 0,
+          change: typeof item.change === "number" ? item.change : parseFloat(item.change) || 0,
+          changesPercentage: typeof item.changesPercentage === "number" ? item.changesPercentage : parseFloat(item.changesPercentage) || 0,
+          exchange: item.exchange,
+        }))
+        .slice(0, limit);
+    } catch (error) {
+      console.warn("Failed to fetch top losers:", error);
       return [];
     }
   }

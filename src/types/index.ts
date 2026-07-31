@@ -125,3 +125,12 @@ export interface ApiError {
   code?: string;
   details?: string;
 }
+
+export interface MarketMover {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  changesPercentage: number;
+  exchange?: string;
+}
