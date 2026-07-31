@@ -19,32 +19,28 @@ class StockAnalysisService {
     if (isSupabaseConfigured) {
       // 1. Automatically initialize anonymous auth session for new visitors
       const session = await initAnonymousAuth();
-      if (!session) {
-        throw new Error("Unable to initialize session. Please check your internet connection.");
-      }
-
-      // 2. Execute atomic Postgres RPC server-side for quota enforcement (limit = 2)
-      const { data: quotaData, error: rpcError } = await supabase.rpc(
-        "check_and_increment_analysis_limit",
-        { p_ticker: cleanTicker, p_max_anonymous_limit: 2 }
-      );
-
-      if (rpcError) {
-        console.error("Supabase RPC Quota Error:", rpcError);
-        throw new Error(rpcError.message);
-      }
-
-      // 3. Enforce 2-analysis limit for anonymous users
-      if (quotaData?.status === "LIMIT_EXCEEDED" || quotaData?.code === "LOGIN_REQUIRED") {
-        const err: any = new Error(
-          quotaData.message ||
-            "You have reached your limit of 2 free anonymous stock analyses. Please sign up or log in to continue."
+      if (session) {
+        // 2. Execute atomic Postgres RPC server-side for quota enforcement (limit = 2)
+        const { data: quotaData, error: rpcError } = await supabase.rpc(
+          "check_and_increment_analysis_limit",
+          { p_ticker: cleanTicker, p_max_anonymous_limit: 2 }
         );
-        err.code = "LOGIN_REQUIRED";
-        throw err;
-      }
 
-      return { allowed: true };
+        if (!rpcError && quotaData) {
+          // 3. Enforce 2-analysis limit for anonymous users
+          if (quotaData.status === "LIMIT_EXCEEDED" || quotaData.code === "LOGIN_REQUIRED") {
+            const err: any = new Error(
+              quotaData.message ||
+                "You have reached your limit of 2 free anonymous stock analyses. Please sign up or log in to continue."
+            );
+            err.code = "LOGIN_REQUIRED";
+            throw err;
+          }
+
+          return { allowed: true };
+        }
+      }
+      // If anonymous auth is disabled in Supabase Cloud dashboard, fallback to local storage quota tracking
     }
 
     // Local Fallback Mode when Supabase credentials are not configured
