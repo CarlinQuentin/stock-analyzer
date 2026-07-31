@@ -20,18 +20,23 @@ class StockAnalysisService {
       // 1. Automatically initialize anonymous auth session for new visitors
       const session = await initAnonymousAuth();
       if (session) {
-        // 2. Execute atomic Postgres RPC server-side for quota enforcement (limit = 2)
+        // 2. Execute atomic Postgres RPC server-side for dual quota & IP abuse enforcement
         const { data: quotaData, error: rpcError } = await supabase.rpc(
           "check_and_increment_analysis_limit",
-          { p_ticker: cleanTicker, p_max_anonymous_limit: 2 }
+          {
+            p_ticker: cleanTicker,
+            p_max_anonymous_limit: 2,
+            p_max_ip_limit: 10,
+            p_ip_window_hours: 24,
+          }
         );
 
         if (!rpcError && quotaData) {
-          // 3. Enforce 2-analysis limit for anonymous users
+          // 3. Enforce limit exceeded (user limit or IP abuse limit)
           if (quotaData.status === "LIMIT_EXCEEDED" || quotaData.code === "LOGIN_REQUIRED") {
             const err: any = new Error(
               quotaData.message ||
-                "You have reached your limit of 2 free anonymous stock analyses. Please sign up or log in to continue."
+                "You have reached your limit of free stock analyses. Please sign up or log in to continue."
             );
             err.code = "LOGIN_REQUIRED";
             throw err;
