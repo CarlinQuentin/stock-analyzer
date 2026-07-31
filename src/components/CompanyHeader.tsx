@@ -7,7 +7,7 @@ interface CompanyHeaderProps {
 
 export const CompanyHeader: React.FC<CompanyHeaderProps> = ({ profile }) => {
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 mb-6 border border-transparent dark:border-slate-700/50 transition-colors duration-300">
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 h-full flex flex-col justify-between border border-transparent dark:border-slate-700/50 transition-colors duration-300">
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">

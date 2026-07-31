@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { StockSearch } from "./components/StockSearch";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { CompanyHeader } from "./components/CompanyHeader";
+import { StockNews } from "./components/StockNews";
 import { ScoreGauge } from "./components/ScoreGauge";
 import { StockPriceChart } from "./components/StockPriceChart";
 import { MetricCard } from "./components/MetricCard";
@@ -414,8 +415,15 @@ function App() {
           Back to Search
         </button>
 
-        {/* Company Header */}
-        <CompanyHeader profile={result.companyProfile} />
+        {/* Stock Overview Card & Latest News Side-by-Side */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6 items-stretch">
+          <div className="lg:col-span-7">
+            <CompanyHeader profile={result.companyProfile} />
+          </div>
+          <div className="lg:col-span-5">
+            <StockNews ticker={result.ticker} companyName={result.companyProfile.companyName} />
+          </div>
+        </div>
 
         {/* Info Banner explaining Valuation vs Business Quality */}
         <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40 rounded-xl p-4 mb-6 transition-all duration-300">
