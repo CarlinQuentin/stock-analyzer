@@ -79,6 +79,11 @@ export interface AnalysisResult {
   overallValuationScore: number;
   valuationConfidenceScore: number;
   unavailableValuationMetrics: string[];
+  peHistory?: { label: string; value: number }[];
+  psHistory?: { label: string; value: number }[];
+  evsHistory?: { label: string; value: number }[];
+  pfcfHistory?: { label: string; value: number }[];
+  valuationPremiumHistory?: { label: string; value: number }[];
 }
 
 export interface FinancialMetrics {

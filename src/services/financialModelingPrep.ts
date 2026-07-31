@@ -284,33 +284,56 @@ class FinancialModelingPrepService {
 
   private handleError(error: any): ApiError {
     if (axios.isAxiosError(error)) {
+      const rawData = error.response?.data;
+      let extractedMsg = "";
+      if (typeof rawData === "string") {
+        extractedMsg = rawData;
+      } else if (rawData && typeof rawData === "object") {
+        extractedMsg =
+          rawData["Error Message"] ||
+          rawData.message ||
+          rawData.error ||
+          JSON.stringify(rawData);
+      }
+
       if (error.response?.status === 401 || error.response?.status === 403) {
-        const details = error.response?.data?.message || error.response?.data;
         return {
           message:
-            details ||
+            extractedMsg ||
             "Invalid API key. Please check your VITE_FMP_API_KEY environment variable.",
           code: "AUTH_ERROR",
-          details,
+          details: extractedMsg,
         };
       }
       if (error.response?.status === 404) {
         return {
-          message: "Company not found. Please check the ticker symbol.",
+          message: extractedMsg || "Company not found. Please check the ticker symbol.",
           code: "NOT_FOUND",
         };
       }
       if (error.response?.status === 429) {
         return {
-          message: "API rate limit exceeded. Please try again later.",
+          message: extractedMsg || "API rate limit exceeded. Please try again later.",
           code: "RATE_LIMIT",
         };
       }
       return {
-        message: error.message,
+        message: extractedMsg || error.message || "An API error occurred",
         code: "API_ERROR",
-        details: error.response?.data?.message,
+        details: extractedMsg,
       };
+    }
+
+    if (error && typeof error === "object") {
+      const msg = error.message;
+      if (typeof msg === "string") {
+        return { message: msg, code: "ERROR" };
+      } else if (msg && typeof msg === "object") {
+        return {
+          message: msg["Error Message"] || msg.message || JSON.stringify(msg),
+          code: "ERROR",
+        };
+      }
     }
 
     if (error instanceof Error) {
@@ -321,7 +344,7 @@ class FinancialModelingPrepService {
     }
 
     return {
-      message: "An unknown error occurred",
+      message: typeof error === "string" ? error : "An unknown error occurred",
       code: "UNKNOWN_ERROR",
     };
   }

@@ -57,7 +57,8 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     };
 
     switch (metricKey) {
-      case "revenue":
+      case "revenue": {
+        const revYears = (result.revenueHistory || []).length > 1 ? (result.revenueHistory || []).length - 1 : 0;
         return {
           ...defaultData,
           title: "Revenue Growth",
@@ -67,9 +68,11 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           unit: "%",
           chartData: result.revenueHistory || [],
           chartValueType: "currency" as const,
-          description: "10-Year Compound Annual Growth Rate (CAGR) of top-line revenue.",
+          description: revYears > 0 
+            ? `${revYears}-Year Compound Annual Growth Rate (CAGR) of top-line revenue.`
+            : "Compound Annual Growth Rate (CAGR) of top-line revenue.",
           formula: "CAGR = (Ending Revenue / Beginning Revenue) ^ (1 / n) - 1",
-          mathExplanation: getMathCAGRExplanation(result.revenueHistory || [], "currency"),
+          mathExplanation: getMathCAGRExplanation(result.revenueHistory || [], "currency", result.metrics.revenueCAGR),
           whyItMatters: "Revenue growth (the 'top-line') measures the expansion of a company's business. It shows customer demand, market share expansion, and pricing power. Without revenue growth, profit growth is limited and must come from cost-cutting, which is unsustainable long-term.",
           tiers: [
             { label: "Excellent", range: "> 15%", color: "text-green-500" },
@@ -79,7 +82,9 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           ],
           getInsights: () => analyzeGrowthHistory(result.revenueHistory || [], "revenue"),
         };
-      case "eps":
+      }
+      case "eps": {
+        const epsYears = (result.epsHistory || []).length > 1 ? (result.epsHistory || []).length - 1 : 0;
         return {
           ...defaultData,
           title: "EPS Growth",
@@ -89,9 +94,11 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           unit: "%",
           chartData: result.epsHistory || [],
           chartValueType: "currency" as const,
-          description: "10-Year Compound Annual Growth Rate (CAGR) of Earnings Per Share (EPS).",
+          description: epsYears > 0 
+            ? `${epsYears}-Year Compound Annual Growth Rate (CAGR) of Earnings Per Share (EPS).`
+            : "Compound Annual Growth Rate (CAGR) of Earnings Per Share (EPS).",
           formula: "CAGR = (Ending EPS / Beginning EPS) ^ (1 / n) - 1",
-          mathExplanation: getMathCAGRExplanation(result.epsHistory || [], "currency"),
+          mathExplanation: getMathCAGRExplanation(result.epsHistory || [], "currency", result.metrics.epsGrowth),
           whyItMatters: "Earnings Per Share (EPS) growth shows how efficiently a company translates top-line growth into bottom-line profits for shareholders. EPS growth can be driven by expanding profit margins or by share repurchases (buybacks) reducing the share count.",
           tiers: [
             { label: "Excellent", range: "> 15%", color: "text-green-500" },
@@ -101,7 +108,9 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           ],
           getInsights: () => analyzeGrowthHistory(result.epsHistory || [], "earnings per share"),
         };
-      case "fcf":
+      }
+      case "fcf": {
+        const fcfYears = (result.fcfHistory || []).length > 1 ? (result.fcfHistory || []).length - 1 : 0;
         return {
           ...defaultData,
           title: "FCF Growth",
@@ -111,9 +120,11 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           unit: "%",
           chartData: result.fcfHistory || [],
           chartValueType: "currency" as const,
-          description: "10-Year Compound Annual Growth Rate (CAGR) of Free Cash Flow (FCF).",
+          description: fcfYears > 0 
+            ? `${fcfYears}-Year Compound Annual Growth Rate (CAGR) of Free Cash Flow (FCF).`
+            : "Compound Annual Growth Rate (CAGR) of Free Cash Flow (FCF).",
           formula: "CAGR = (Ending FCF / Beginning FCF) ^ (1 / n) - 1",
-          mathExplanation: getMathCAGRExplanation(result.fcfHistory || [], "currency"),
+          mathExplanation: getMathCAGRExplanation(result.fcfHistory || [], "currency", result.metrics.fcfGrowth),
           whyItMatters: "Free Cash Flow represents the actual cash a company generates after accounting for cash outflows to support operations and maintain capital assets. Consistent FCF growth gives a company the flexibility to pay dividends, buy back shares, reduce debt, or reinvest in growth.",
           tiers: [
             { label: "Excellent", range: "> 15%", color: "text-green-500" },
@@ -123,6 +134,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           ],
           getInsights: () => analyzeGrowthHistory(result.fcfHistory || [], "free cash flow"),
         };
+      }
       case "roic":
         return {
           ...defaultData,
@@ -190,6 +202,121 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           ],
           getInsights: () => analyzeEfficiencyHistory(result.profitabilityHistory || [], "Net Margin", 15),
         };
+      case "pe":
+        return {
+          ...defaultData,
+          title: "P/E Ratio",
+          icon: "🏷️",
+          score: result.valuationScores.pe,
+          value: result.valuationMetrics.peRatio,
+          unit: "",
+          chartData: result.peHistory || [],
+          chartValueType: "number" as const,
+          directionStrategy: "lowerIsBetter" as const,
+          description: "Price-to-Earnings Ratio over historical fiscal periods.",
+          formula: "P/E Ratio = Stock Price / Earnings Per Share (EPS)",
+          mathExplanation: getLatestMathExplanation(result.peHistory || [], "P/E Ratio", "x"),
+          whyItMatters: "The P/E ratio evaluates how much investors are paying per dollar of current earnings. A lower P/E ratio suggests a cheaper valuation relative to profits.",
+          tiers: [
+            { label: "Excellent", range: "< 10.0x", color: "text-green-500" },
+            { label: "Good", range: "10.0x - 20.0x", color: "text-blue-500" },
+            { label: "Average", range: "20.0x - 35.0x", color: "text-amber-500" },
+            { label: "Poor", range: "> 35.0x", color: "text-red-500" },
+          ],
+          getInsights: () => analyzeValuationHistory(result.peHistory || [], "P/E Ratio", 15, 30),
+        };
+      case "ps":
+        return {
+          ...defaultData,
+          title: "P/S Ratio",
+          icon: "📢",
+          score: result.valuationScores.ps,
+          value: result.valuationMetrics.priceToSalesRatio,
+          unit: "",
+          chartData: result.psHistory || [],
+          chartValueType: "number" as const,
+          directionStrategy: "lowerIsBetter" as const,
+          description: "Price-to-Sales Ratio over historical fiscal periods.",
+          formula: "P/S Ratio = Market Capitalization / Total Revenue",
+          mathExplanation: getLatestMathExplanation(result.psHistory || [], "P/S Ratio", "x"),
+          whyItMatters: "The P/S ratio evaluates market valuation relative to total sales. It is particularly useful for growth or cyclical companies where earnings may fluctuate.",
+          tiers: [
+            { label: "Excellent", range: "< 1.5x", color: "text-green-500" },
+            { label: "Good", range: "1.5x - 3.5x", color: "text-blue-500" },
+            { label: "Average", range: "3.5x - 6.0x", color: "text-amber-500" },
+            { label: "Poor", range: "> 6.0x", color: "text-red-500" },
+          ],
+          getInsights: () => analyzeValuationHistory(result.psHistory || [], "P/S Ratio", 2, 5),
+        };
+      case "evs":
+        return {
+          ...defaultData,
+          title: "EV/Sales Ratio",
+          icon: "🏢",
+          score: result.valuationScores.evs,
+          value: result.valuationMetrics.evToSales,
+          unit: "",
+          chartData: result.evsHistory || [],
+          chartValueType: "number" as const,
+          directionStrategy: "lowerIsBetter" as const,
+          description: "Enterprise Value to Sales Ratio.",
+          formula: "EV/Sales = (Market Cap + Total Debt - Cash) / Revenue",
+          mathExplanation: getLatestMathExplanation(result.evsHistory || [], "EV/Sales Ratio", "x"),
+          whyItMatters: "EV/Sales accounts for debt and cash balances on the balance sheet, providing a more accurate takeover valuation metric than P/S.",
+          tiers: [
+            { label: "Excellent", range: "< 1.5x", color: "text-green-500" },
+            { label: "Good", range: "1.5x - 3.5x", color: "text-blue-500" },
+            { label: "Average", range: "3.5x - 6.0x", color: "text-amber-500" },
+            { label: "Poor", range: "> 6.0x", color: "text-red-500" },
+          ],
+          getInsights: () => analyzeValuationHistory(result.evsHistory || [], "EV/Sales Ratio", 2, 5),
+        };
+      case "pfcf":
+        return {
+          ...defaultData,
+          title: "P/FCF Ratio",
+          icon: "💸",
+          score: result.valuationScores.pfcf,
+          value: result.valuationMetrics.priceToFreeCashFlowsRatio,
+          unit: "",
+          chartData: result.pfcfHistory || [],
+          chartValueType: "number" as const,
+          directionStrategy: "lowerIsBetter" as const,
+          description: "Price to Free Cash Flow Ratio.",
+          formula: "P/FCF = Market Capitalization / Free Cash Flow",
+          mathExplanation: getLatestMathExplanation(result.pfcfHistory || [], "P/FCF Ratio", "x"),
+          whyItMatters: "Cash flow is much harder to manipulate than accounting earnings. A low P/FCF ratio indicates strong free cash generation relative to stock valuation.",
+          tiers: [
+            { label: "Excellent", range: "< 12.0x", color: "text-green-500" },
+            { label: "Good", range: "12.0x - 20.0x", color: "text-blue-500" },
+            { label: "Average", range: "20.0x - 35.0x", color: "text-amber-500" },
+            { label: "Poor", range: "> 35.0x", color: "text-red-500" },
+          ],
+          getInsights: () => analyzeValuationHistory(result.pfcfHistory || [], "P/FCF Ratio", 15, 30),
+        };
+      case "historical":
+        return {
+          ...defaultData,
+          title: "Historical Valuation Premium",
+          icon: "⏳",
+          score: result.valuationScores.historical,
+          value: result.valuationMetrics.averagePremium !== null ? result.valuationMetrics.averagePremium * 100 : null,
+          unit: "%",
+          chartData: result.valuationPremiumHistory || [],
+          chartValueType: "percent" as const,
+          directionStrategy: "lowerIsBetter" as const,
+          description: "Percentage premium or discount compared to historical mean multiples.",
+          formula: "Premium % = (Current Multiples - Historical Avg Multiples) / Historical Avg Multiples",
+          mathExplanation: getAverageMathExplanation(result.valuationPremiumHistory || [], "%"),
+          whyItMatters: "Comparing current multiples against historical averages shows whether a stock is trading at a discount or premium relative to its own valuation history.",
+          tiers: [
+            { label: "Excellent", range: "< -15%", color: "text-green-500" },
+            { label: "Good", range: "-15% - +10%", color: "text-blue-500" },
+            { label: "Average", range: "+10% - +25%", color: "text-amber-500" },
+            { label: "Poor", range: "> +25%", color: "text-red-500" },
+          ],
+          getInsights: () => analyzeValuationHistory(result.valuationPremiumHistory || [], "Valuation Premium", 0, 20),
+        };
       default:
         return defaultData;
     }
@@ -217,13 +344,27 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
   };
 
   // Math Explanations generators
-  function getMathCAGRExplanation(data: { label: string; value: number }[], type: "currency" | "percent" | "number"): string[] {
+  function getMathCAGRExplanation(
+    data: { label: string; value: number }[],
+    type: "currency" | "percent" | "number",
+    actualCAGR: number | null
+  ): string[] {
     if (data.length < 2) return ["Insufficient historical data to calculate CAGR."];
     const first = data[0];
     const last = data[data.length - 1];
     const n = data.length - 1;
+
+    if (first.value <= 0) {
+      return [
+        `1. Beginning Value (${first.label}): ${formatChartValue(first.value, type)}`,
+        `2. Ending Value (${last.label}): ${formatChartValue(last.value, type)}`,
+        `3. Period (n): ${n} years (from ${first.label} to ${last.label})`,
+        `4. Note: CAGR cannot be calculated when the starting baseline value is zero or negative.`,
+      ];
+    }
+
     const ratio = last.value / first.value;
-    const cagr = Math.pow(ratio, 1 / n) - 1;
+    const finalPct = actualCAGR !== null ? (actualCAGR * 100).toFixed(2) : ((Math.pow(ratio, 1 / n) - 1) * 100).toFixed(2);
 
     return [
       `1. Beginning Value (${first.label}): ${formatChartValue(first.value, type)}`,
@@ -232,7 +373,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       `4. Division Ratio: ${formatChartValue(last.value, type)} / ${formatChartValue(first.value, type)} = ${ratio.toFixed(4)}`,
       `5. CAGR formula: (${ratio.toFixed(4)}) ^ (1 / ${n}) - 1`,
       `6. Growth Factor: ${Math.pow(ratio, 1 / n).toFixed(4)}`,
-      `7. Final Result: ${(cagr * 100).toFixed(2)}% CAGR`,
+      `7. Final Result: ${finalPct}% CAGR`,
     ];
   }
 
@@ -357,6 +498,21 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       }
     }
 
+    return text;
+  }
+
+  function analyzeValuationHistory(data: { label: string; value: number }[], name: string, lowVal: number, highVal: number): string {
+    if (data.length === 0) return "No historical valuation data available.";
+    const latest = data[data.length - 1].value;
+    const avg = data.reduce((acc, curr) => acc + curr.value, 0) / data.length;
+    let text = `The latest ${name} is ${latest.toFixed(1)}, with a ${data.length}-year historical average of ${avg.toFixed(1)}. `;
+    if (latest <= lowVal) {
+      text += "This places current valuation in an attractive discount range relative to historical norms. ";
+    } else if (latest >= highVal) {
+      text += "This places current valuation in a premium/expensive range. ";
+    } else {
+      text += "This indicates valuation is in line with reasonable historical expectations. ";
+    }
     return text;
   }
 
@@ -610,21 +766,38 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
               </svg>
             </button>
 
-            {/* Score Summary Block */}
-            <div className="flex items-center justify-between mb-6">
+            {/* Metric Value & Score Summary Block */}
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6 bg-white dark:bg-slate-800/80 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-widest block mb-0.5">
-                  Metric score
+                  Metric Value
                 </span>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-extrabold text-slate-900 dark:text-white">
-                    {config.score !== null ? config.score : "N/A"}
-                  </span>
-                  <span className="text-slate-400 dark:text-slate-500 text-sm">/ 100</span>
+                <div className="text-3xl font-extrabold text-slate-900 dark:text-white">
+                  {config.value !== null ? (
+                    <>
+                      {config.unit === "%" && Math.abs(config.value) <= 1
+                        ? (config.value * 100).toFixed(2)
+                        : config.value.toFixed(2)}
+                      <span className="text-lg text-slate-500 font-semibold ml-1">{config.unit}</span>
+                    </>
+                  ) : (
+                    "N/A"
+                  )}
                 </div>
               </div>
-              <div className={`px-4 py-1.5 border rounded-full font-bold text-xs ${getBadgeClasses(scoreColor)}`}>
-                {scoreLabel}
+              <div className="text-right">
+                <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-widest block mb-0.5">
+                  Quality Score
+                </span>
+                <div className="flex items-center justify-end gap-2">
+                  <span className="text-3xl font-extrabold text-slate-900 dark:text-white">
+                    {config.score !== null ? config.score : "N/A"}
+                  </span>
+                  <span className="text-slate-400 dark:text-slate-500 text-xs">/ 100</span>
+                  <div className={`ml-2 px-3 py-1 border rounded-full font-bold text-xs ${getBadgeClasses(scoreColor)}`}>
+                    {scoreLabel}
+                  </div>
+                </div>
               </div>
             </div>
 

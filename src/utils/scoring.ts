@@ -17,122 +17,139 @@ export const SCORE_RANGES = {
 };
 
 /**
+ * Helper to interpolate scores based on threshold tiers
+ */
+function interpolateScore(
+  val: number,
+  tiers: { minVal: number; maxVal: number; minScore: number; maxScore: number }[]
+): number {
+  for (const tier of tiers) {
+    if (val >= tier.minVal && val <= tier.maxVal) {
+      if (tier.maxVal === tier.minVal) return Math.round(tier.minScore);
+      const pct = (val - tier.minVal) / (tier.maxVal - tier.minVal);
+      return Math.round(tier.minScore + pct * (tier.maxScore - tier.minScore));
+    }
+  }
+  if (val > tiers[tiers.length - 1].maxVal) return Math.round(tiers[tiers.length - 1].maxScore);
+  return Math.round(tiers[0].minScore);
+}
+
+/**
  * Score revenue growth (0-100)
- * Excellent: > 15%
- * Good: 8-15%
- * Poor: < 8%
+ * Excellent: >= 15% (Score 85-100)
+ * Good: 8% - 15%   (Score 70-84)
+ * Average: 5% - 8% (Score 50-69)
+ * Poor: < 5%       (Score 0-49)
  */
 export function scoreRevenueGrowth(cagr: number | null): number | null {
-  if (cagr === null) {
-    return null;
-  }
+  if (cagr === null) return null;
 
-  if (cagr <= -0.1) {
-    return 0;
-  }
-
-  if (cagr >= 0.2) {
-    return 100;
-  }
-
-  return Math.round(100 * Math.pow((cagr + 0.1) / 0.3, 0.8));
+  return interpolateScore(cagr, [
+    { minVal: -0.10, maxVal: 0.00, minScore: 0, maxScore: 29 },
+    { minVal: 0.00, maxVal: 0.05, minScore: 30, maxScore: 49 },
+    { minVal: 0.05, maxVal: 0.08, minScore: 50, maxScore: 69 },
+    { minVal: 0.08, maxVal: 0.15, minScore: 70, maxScore: 84 },
+    { minVal: 0.15, maxVal: 0.25, minScore: 85, maxScore: 100 },
+  ]);
 }
 
 /**
  * Score EPS growth (0-100)
- * Excellent: > 15%
- * Good: 5-15%
- * Poor: negative growth
+ * Excellent: >= 15% (Score 85-100)
+ * Good: 8% - 15%   (Score 70-84)
+ * Average: 5% - 8% (Score 50-69)
+ * Poor: < 5%       (Score 0-49)
  */
 export function scoreEPSGrowth(cagr: number | null): number | null {
-  if (cagr === null) {
-    return null;
-  }
+  if (cagr === null) return null;
 
-  const minGrowth = -0.1; // -10% EPS CAGR = 0
-  const maxGrowth = 0.25; // 25% EPS CAGR = 100
-
-  const score = ((cagr - minGrowth) / (maxGrowth - minGrowth)) * 100;
-
-  return Math.max(0, Math.min(100, Math.round(score)));
+  return interpolateScore(cagr, [
+    { minVal: -0.10, maxVal: 0.00, minScore: 0, maxScore: 29 },
+    { minVal: 0.00, maxVal: 0.05, minScore: 30, maxScore: 49 },
+    { minVal: 0.05, maxVal: 0.08, minScore: 50, maxScore: 69 },
+    { minVal: 0.08, maxVal: 0.15, minScore: 70, maxScore: 84 },
+    { minVal: 0.15, maxVal: 0.25, minScore: 85, maxScore: 100 },
+  ]);
 }
 
 /**
  * Score FCF growth (0-100)
- * Excellent: > 10%
- * Good: 5-10%
- * Poor: negative
+ * Excellent: >= 15% (Score 85-100)
+ * Good: 8% - 15%   (Score 70-84)
+ * Average: 5% - 8% (Score 50-69)
+ * Poor: < 5%       (Score 0-49)
  */
 export function scoreFCFGrowth(cagr: number | null): number | null {
-  if (cagr === null) {
-    return null;
-  }
+  if (cagr === null) return null;
 
-  const minGrowth = -0.1; // -10% CAGR = 0
-  const maxGrowth = 0.2; // 20% CAGR = 100
-
-  const score = ((cagr - minGrowth) / (maxGrowth - minGrowth)) * 100;
-
-  return Math.max(0, Math.min(100, Math.round(score)));
+  return interpolateScore(cagr, [
+    { minVal: -0.10, maxVal: 0.00, minScore: 0, maxScore: 29 },
+    { minVal: 0.00, maxVal: 0.05, minScore: 30, maxScore: 49 },
+    { minVal: 0.05, maxVal: 0.08, minScore: 50, maxScore: 69 },
+    { minVal: 0.08, maxVal: 0.15, minScore: 70, maxScore: 84 },
+    { minVal: 0.15, maxVal: 0.25, minScore: 85, maxScore: 100 },
+  ]);
 }
 
 /**
  * Score ROIC (0-100)
- * Excellent: > 15%
- * Good: 10-15%
- * Poor: < 10%
+ * Excellent: >= 15% (Score 85-100)
+ * Good: 10% - 15%  (Score 70-84)
+ * Average: 6% - 10% (Score 50-69)
+ * Poor: < 6%       (Score 0-49)
  */
 export function scoreROIC(roic: number | null): number | null {
-  if (roic === null) {
-    return null;
-  }
+  if (roic === null) return null;
 
-  const minROIC = 0;
-  const maxROIC = 25;
-
-  const score = ((roic - minROIC) / (maxROIC - minROIC)) * 100;
-
-  return Math.max(0, Math.min(100, Math.round(score)));
+  return interpolateScore(roic, [
+    { minVal: -5, maxVal: 0, minScore: 0, maxScore: 19 },
+    { minVal: 0, maxVal: 6, minScore: 20, maxScore: 49 },
+    { minVal: 6, maxVal: 10, minScore: 50, maxScore: 69 },
+    { minVal: 10, maxVal: 15, minScore: 70, maxScore: 84 },
+    { minVal: 15, maxVal: 25, minScore: 85, maxScore: 100 },
+  ]);
 }
 
 /**
  * Score debt-to-equity ratio (0-100)
- * Excellent: < 0.5
- * Good: 0.5-1
- * Poor: > 1
+ * Excellent: < 0.50  (Score 85-100)
+ * Good: 0.50 - 1.50  (Score 70-84)
+ * Average: 1.50 - 3.00 (Score 50-69)
+ * Poor: > 3.00       (Score 0-49)
  */
 export function scoreDebtToEquity(debtToEquity: number | null): number | null {
-  if (debtToEquity === null) {
-    return null;
+  if (debtToEquity === null || debtToEquity < 0) return 0;
+
+  if (debtToEquity <= 0.50) {
+    return Math.round(100 - (debtToEquity / 0.50) * 15); // 0 -> 100, 0.50 -> 85
+  } else if (debtToEquity <= 1.50) {
+    return Math.round(84 - ((debtToEquity - 0.50) / 1.00) * 14); // 0.50 -> 84, 1.50 -> 70
+  } else if (debtToEquity <= 3.00) {
+    return Math.round(69 - ((debtToEquity - 1.50) / 1.50) * 19); // 1.50 -> 69, 3.00 -> 50
+  } else if (debtToEquity <= 5.00) {
+    return Math.round(49 - ((debtToEquity - 3.00) / 2.00) * 49); // 3.00 -> 49, 5.00 -> 0
   }
-
-  if (debtToEquity < 0) {
-    return 0; // Negative equity is usually a red flag
-  }
-
-  const maxDebt = 2.5;
-
-  const score = 100 - (debtToEquity / maxDebt) * 100;
-
-  return Math.max(0, Math.min(100, Math.round(score)));
+  return 0;
 }
 
 /**
  * Score profitability based on margins (0-100)
- * Looks at net, operating, and gross margins
  */
-function scoreMargin(
+function scoreSingleMargin(
   margin: number | null,
-  poor: number,
-  excellent: number,
+  poorMax: number,
+  avgMax: number,
+  goodMax: number,
+  excellentMax: number
 ): number | null {
-  if (margin === null) {
-    return null;
-  }
+  if (margin === null) return null;
 
-  const score = ((margin - poor) / (excellent - poor)) * 100;
-
-  return Math.max(0, Math.min(100, Math.round(score)));
+  return interpolateScore(margin, [
+    { minVal: 0, maxVal: poorMax, minScore: 0, maxScore: 49 },
+    { minVal: poorMax, maxVal: avgMax, minScore: 50, maxScore: 69 },
+    { minVal: avgMax, maxVal: goodMax, minScore: 70, maxScore: 84 },
+    { minVal: goodMax, maxVal: excellentMax, minScore: 85, maxScore: 100 },
+  ]);
 }
 
 export function scoreProfitability(
@@ -142,24 +159,19 @@ export function scoreProfitability(
 ): number | null {
   const scores = [];
 
-  const net = scoreMargin(netMargin, 0, 25);
-  if (net !== null) {
-    scores.push(net);
-  }
+  // Net Margin: Excellent >= 15%, Good 8-15%, Average 5-8%, Poor < 5%
+  const net = scoreSingleMargin(netMargin, 5, 8, 15, 25);
+  if (net !== null) scores.push(net);
 
-  const op = scoreMargin(operatingMargin, 0, 30);
-  if (op !== null) {
-    scores.push(op);
-  }
+  // Operating Margin: Excellent >= 20%, Good 10-20%, Average 6-10%, Poor < 6%
+  const op = scoreSingleMargin(operatingMargin, 6, 10, 20, 30);
+  if (op !== null) scores.push(op);
 
-  const gross = scoreMargin(grossMargin, 0, 60);
-  if (gross !== null) {
-    scores.push(gross);
-  }
+  // Gross Margin: Excellent >= 40%, Good 25-40%, Average 15-25%, Poor < 15%
+  const gross = scoreSingleMargin(grossMargin, 15, 25, 40, 60);
+  if (gross !== null) scores.push(gross);
 
-  if (scores.length === 0) {
-    return null;
-  }
+  if (scores.length === 0) return null;
 
   return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
 }

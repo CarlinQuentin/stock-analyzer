@@ -139,6 +139,95 @@ function App() {
             return { label: year, value: netMargin };
           });
 
+        // 1. P/E Ratio History
+        const peHistory = [...incomeStatements]
+          .reverse()
+          .map(s => {
+            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+            const matchRatio = financialRatios ? financialRatios.find((r: any) => r.date && new Date(r.date).getFullYear().toString() === year) : null;
+            let val = matchRatio?.priceToEarningsRatio;
+            if (!val || val <= 0) {
+              if (profile.price && s.eps && s.eps > 0) {
+                val = profile.price / s.eps;
+              } else if (profile.mktCap && s.netIncome && s.netIncome > 0) {
+                val = profile.mktCap / s.netIncome;
+              }
+            }
+            return { label: year, value: val && val > 0 ? val : null };
+          })
+          .filter((item): item is { label: string; value: number } => item.value !== null && isFinite(item.value));
+
+        // 2. P/S Ratio History
+        const psHistory = [...incomeStatements]
+          .reverse()
+          .map(s => {
+            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+            const matchRatio = financialRatios ? financialRatios.find((r: any) => r.date && new Date(r.date).getFullYear().toString() === year) : null;
+            let val = matchRatio?.priceToSalesRatio;
+            if (!val || val <= 0) {
+              if (profile.mktCap && s.revenue && s.revenue > 0) {
+                val = profile.mktCap / s.revenue;
+              }
+            }
+            return { label: year, value: val && val > 0 ? val : null };
+          })
+          .filter((item): item is { label: string; value: number } => item.value !== null && isFinite(item.value));
+
+        // 3. EV/Sales History
+        const evsHistory = [...incomeStatements]
+          .reverse()
+          .map(s => {
+            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+            const matchMetric = keyMetrics ? keyMetrics.find((m: any) => m.date && new Date(m.date).getFullYear().toString() === year) : null;
+            let val = matchMetric?.evToSales;
+            if (!val || val <= 0) {
+              const matchBalance = balanceSheets.find(b => b.date && new Date(b.date).getFullYear().toString() === year);
+              if (profile.mktCap && s.revenue && s.revenue > 0 && matchBalance) {
+                const totalDebt = matchBalance.totalDebt || 0;
+                const cash = matchBalance.cashAndCashEquivalents || 0;
+                const ev = profile.mktCap + totalDebt - cash;
+                val = ev / s.revenue;
+              }
+            }
+            return { label: year, value: val && val > 0 ? val : null };
+          })
+          .filter((item): item is { label: string; value: number } => item.value !== null && isFinite(item.value));
+
+        // 4. P/FCF Ratio History
+        const pfcfHistory = [...cashFlowStatements]
+          .reverse()
+          .map(s => {
+            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+            const matchRatio = financialRatios ? financialRatios.find((r: any) => r.date && new Date(r.date).getFullYear().toString() === year) : null;
+            let val = matchRatio?.priceToFreeCashFlowRatio;
+            if (!val || val <= 0) {
+              const fcf = (s.operatingCashFlow || 0) - Math.abs(s.capitalExpenditure || 0);
+              if (profile.mktCap && fcf > 0) {
+                val = profile.mktCap / fcf;
+              }
+            }
+            return { label: year, value: val && val > 0 ? val : null };
+          })
+          .filter((item): item is { label: string; value: number } => item.value !== null && isFinite(item.value));
+
+        // 5. Valuation Premium History (% premium vs average)
+        const peAvg = peHistory.length > 0 ? peHistory.reduce((a, b) => a + b.value, 0) / peHistory.length : null;
+        const psAvg = psHistory.length > 0 ? psHistory.reduce((a, b) => a + b.value, 0) / psHistory.length : null;
+        const valuationPremiumHistory = peHistory.map(item => {
+          const matchPs = psHistory.find(p => p.label === item.label);
+          let sum = 0;
+          let count = 0;
+          if (peAvg && item.value) {
+            sum += ((item.value - peAvg) / peAvg) * 100;
+            count++;
+          }
+          if (psAvg && matchPs) {
+            sum += ((matchPs.value - psAvg) / psAvg) * 100;
+            count++;
+          }
+          return { label: item.label, value: count > 0 ? sum / count : 0 };
+        });
+
         setResult({
           ticker,
           companyProfile: profile,
@@ -160,6 +249,11 @@ function App() {
           overallValuationScore,
           valuationConfidenceScore,
           unavailableValuationMetrics,
+          peHistory,
+          psHistory,
+          evsHistory,
+          pfcfHistory,
+          valuationPremiumHistory,
         });
         setProfileOnly(null);
       } catch (statementError: any) {
@@ -173,7 +267,8 @@ function App() {
         setResult(null);
       }
     } catch (err: any) {
-      setError(err.message || "An error occurred while analyzing the stock");
+      const errMsg = typeof err === "string" ? err : (typeof err?.message === "string" ? err.message : (err?.message ? JSON.stringify(err.message) : "An error occurred while analyzing the stock"));
+      setError(errMsg);
     } finally {
       setIsLoading(false);
     }
@@ -366,8 +461,8 @@ function App() {
                   value={result.metrics.revenueCAGR}
                   unit="%"
                   score={result.scores.revenue}
-                  description="10-year CAGR"
-                  tooltip="The average yearly growth rate of the company's sales over the past ten years. Consistent revenue growth can indicate increasing demand and a growing business."
+                  description={result.revenueHistory && result.revenueHistory.length > 1 ? `${result.revenueHistory.length - 1}-year CAGR` : "CAGR"}
+                  tooltip="The average yearly growth rate of the company's sales over the historical period. Consistent revenue growth can indicate increasing demand and a growing business."
                   icon="📊"
                   chartData={result.revenueHistory}
                   chartValueType="currency"
@@ -380,8 +475,8 @@ function App() {
                   value={result.metrics.epsGrowth}
                   unit="%"
                   score={result.scores.eps}
-                  description="10-year CAGR"
-                  tooltip="The average yearly growth rate of the company's earnings per share over the past ten years. Consistent EPS growth can indicate a company's ability to generate increasing profits."
+                  description={result.epsHistory && result.epsHistory.length > 1 ? `${result.epsHistory.length - 1}-year CAGR` : "CAGR"}
+                  tooltip="The average yearly growth rate of the company's earnings per share over the historical period. Consistent EPS growth can indicate a company's ability to generate increasing profits."
                   icon="💹"
                   chartData={result.epsHistory}
                   chartValueType="currency"
@@ -394,8 +489,8 @@ function App() {
                   value={result.metrics.fcfGrowth}
                   unit="%"
                   score={result.scores.fcf}
-                  description="10-year CAGR"
-                  tooltip="The average yearly growth rate of the company's free cash flow over the past ten years. Free cash flow shows how much cash the business generates after paying for expenses and investments needed to keep growing."
+                  description={result.fcfHistory && result.fcfHistory.length > 1 ? `${result.fcfHistory.length - 1}-year CAGR` : "CAGR"}
+                  tooltip="The average yearly growth rate of the company's free cash flow over the historical period. Free cash flow shows how much cash the business generates after paying for expenses and investments needed to keep growing."
                   icon="💰"
                   chartData={result.fcfHistory}
                   chartValueType="currency"
@@ -452,7 +547,13 @@ function App() {
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
                 Detailed Financial Analysis
               </h2>
-              <AnalysisTable metrics={result.metrics} scores={result.scores} />
+              <AnalysisTable
+                metrics={result.metrics}
+                scores={result.scores}
+                revenueYears={result.revenueHistory && result.revenueHistory.length > 1 ? result.revenueHistory.length - 1 : undefined}
+                epsYears={result.epsHistory && result.epsHistory.length > 1 ? result.epsHistory.length - 1 : undefined}
+                fcfYears={result.fcfHistory && result.fcfHistory.length > 1 ? result.fcfHistory.length - 1 : undefined}
+              />
             </div>
 
             {/* Key Insights */}
@@ -518,9 +619,29 @@ function App() {
           <>
             {/* Valuation Metrics */}
             <div className="mb-8">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
-                Valuation Metrics
-              </h2>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                  Valuation Metrics
+                </h2>
+                {result.peHistory && result.peHistory.length > 0 && (
+                  <button
+                    onClick={() => setShowAllCharts(!showAllCharts)}
+                    className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-950/60 border border-blue-100 dark:border-blue-800/40 rounded-lg shadow-sm transition-all duration-200"
+                  >
+                    <span>{showAllCharts ? "Hide All Trend Charts" : "Show All Trend Charts"}</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={2.5}
+                      stroke="currentColor"
+                      className={`w-3 h-3 transition-transform duration-200 ${showAllCharts ? "rotate-180" : ""}`}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                    </svg>
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <MetricCard
                   title="P/E Ratio"
@@ -529,6 +650,11 @@ function App() {
                   description="Price to Earnings"
                   tooltip="Calculates the share price divided by earnings per share. A high P/E ratio indicates that investors expect higher earnings growth in the future."
                   icon="🏷️"
+                  chartData={result.peHistory}
+                  chartValueType="number"
+                  isExpanded={showAllCharts}
+                  onClick={() => setSelectedMetric("pe")}
+                  directionStrategy="lowerIsBetter"
                 />
                 <MetricCard
                   title="P/S Ratio"
@@ -537,6 +663,11 @@ function App() {
                   description="Price to Sales"
                   tooltip="Shows how much the market values every dollar of the company's sales. Helpful for valuing growth companies without consistent earnings."
                   icon="📢"
+                  chartData={result.psHistory}
+                  chartValueType="number"
+                  isExpanded={showAllCharts}
+                  onClick={() => setSelectedMetric("ps")}
+                  directionStrategy="lowerIsBetter"
                 />
                 <MetricCard
                   title="EV/Sales"
@@ -545,6 +676,11 @@ function App() {
                   description="Enterprise Value to Sales"
                   tooltip="Compares enterprise value (market capitalization + debt - cash) to annual revenue. More robust than P/S as it accounts for balance sheet debt."
                   icon="🏢"
+                  chartData={result.evsHistory}
+                  chartValueType="number"
+                  isExpanded={showAllCharts}
+                  onClick={() => setSelectedMetric("evs")}
+                  directionStrategy="lowerIsBetter"
                 />
                 <MetricCard
                   title="P/FCF Ratio"
@@ -553,15 +689,25 @@ function App() {
                   description="Price to Free Cash Flow"
                   tooltip="Compares stock price to free cash flow. Since cash flow is harder to manipulate than accounting earnings, it is a highly reliable valuation ratio."
                   icon="💸"
+                  chartData={result.pfcfHistory}
+                  chartValueType="number"
+                  isExpanded={showAllCharts}
+                  onClick={() => setSelectedMetric("pfcf")}
+                  directionStrategy="lowerIsBetter"
                 />
                 <MetricCard
                   title="Historical Valuation Premium"
                   value={result.valuationMetrics.averagePremium !== null ? result.valuationMetrics.averagePremium * 100 : null}
                   unit="%"
                   score={result.valuationScores.historical}
-                  description="Vs. 10-Year Average"
-                  tooltip="Measures the average premium or discount of the current valuation multiples compared to their 10-year historical averages."
+                  description="Vs. Historical Average"
+                  tooltip="Measures the average premium or discount of the current valuation multiples compared to their historical averages."
                   icon="⏳"
+                  chartData={result.valuationPremiumHistory}
+                  chartValueType="percent"
+                  isExpanded={showAllCharts}
+                  onClick={() => setSelectedMetric("historical")}
+                  directionStrategy="lowerIsBetter"
                 />
               </div>
             </div>
