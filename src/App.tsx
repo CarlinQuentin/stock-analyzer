@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { StockSearch } from "./components/StockSearch";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { CompanyHeader } from "./components/CompanyHeader";
@@ -11,6 +11,9 @@ import { LoadingSpinner } from "./components/LoadingSpinner";
 import { ErrorMessage } from "./components/ErrorMessage";
 import { MetricDetailModal } from "./components/MetricDetailModal";
 import { ProfileOnlyPage } from "./components/ProfileOnlyPage";
+import { AuthModal } from "./components/AuthModal";
+import { UserHeader } from "./components/UserHeader";
+import { authService, UserProfile } from "./services/authService";
 import { fmpService } from "./services/financialModelingPrep";
 import { calculateAllMetrics } from "./utils/financialCalculations";
 import { calculateMetricScores, calculateOverallScore, calculateDataConfidenceScore, getUnavailableMetrics } from "./utils/scoring";
@@ -25,6 +28,9 @@ import {
 import { AnalysisResult } from "./types";
 
 function App() {
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [profileOnly, setProfileOnly] = useState<{
     ticker: string;
@@ -36,6 +42,20 @@ function App() {
   const [activeTab, setActiveTab] = useState<"fundamentals" | "valuation">("fundamentals");
   const [showAllCharts, setShowAllCharts] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+
+  useEffect(() => {
+    authService.getMe().then((userProfile) => {
+      setUser(userProfile);
+      setIsCheckingAuth(false);
+    });
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    authService.logout();
+    setUser(null);
+    setResult(null);
+    setProfileOnly(null);
+  }, []);
 
   const handleSearch = useCallback(async (ticker: string) => {
     setIsLoading(true);
@@ -285,9 +305,30 @@ function App() {
     setProfileOnly(null);
   }, []);
 
+  if (isCheckingAuth) {
+    return (
+      <>
+        <ThemeToggle />
+        <LoadingSpinner message="Checking authentication..." />
+      </>
+    );
+  }
+
+  if (!user) {
+    return (
+      <>
+        <ThemeToggle />
+        <AuthModal onLoginSuccess={(u) => setUser(u)} />
+      </>
+    );
+  }
+
   if (isLoading) {
     return (
       <>
+        <div className="fixed top-4 left-4 z-40">
+          <UserHeader user={user} onLogout={handleLogout} />
+        </div>
         <ThemeToggle />
         <LoadingSpinner message="Analyzing company fundamentals..." />
       </>
@@ -297,6 +338,9 @@ function App() {
   if (error) {
     return (
       <>
+        <div className="fixed top-4 left-4 z-40">
+          <UserHeader user={user} onLogout={handleLogout} />
+        </div>
         <ThemeToggle />
         <ErrorMessage
           title="Analysis Failed"
@@ -310,6 +354,9 @@ function App() {
   if (!result && !profileOnly) {
     return (
       <>
+        <div className="fixed top-4 left-4 z-40">
+          <UserHeader user={user} onLogout={handleLogout} />
+        </div>
         <ThemeToggle />
         <StockSearch onSearch={handleSearch} isLoading={isLoading} />
       </>
@@ -319,6 +366,9 @@ function App() {
   if (profileOnly) {
     return (
       <>
+        <div className="fixed top-4 left-4 z-40">
+          <UserHeader user={user} onLogout={handleLogout} />
+        </div>
         <ThemeToggle />
         <ProfileOnlyPage
           profile={profileOnly.profile}
@@ -338,6 +388,9 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 py-8 px-4 transition-colors duration-300">
+      <div className="fixed top-4 left-4 z-40">
+        <UserHeader user={user} onLogout={handleLogout} />
+      </div>
       <ThemeToggle />
       <div className="max-w-7xl mx-auto">
         {/* Back button */}
