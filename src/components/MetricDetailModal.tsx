@@ -306,8 +306,8 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           chartValueType: "percent" as const,
           directionStrategy: "lowerIsBetter" as const,
           description: "Percentage premium or discount compared to historical mean multiples.",
-          formula: "Premium % = (Current Multiples - Historical Avg Multiples) / Historical Avg Multiples",
-          mathExplanation: getAverageMathExplanation(result.valuationMetrics.averagePremium !== null ? result.valuationMetrics.averagePremium * 100 : null, result.valuationPremiumHistory || [], "%"),
+          formula: "Premium % = (Current Multiple - Historical Avg Multiple) / Historical Avg Multiple",
+          mathExplanation: getHistoricalPremiumMathExplanation(result),
           whyItMatters: "Comparing current multiples against historical averages shows whether a stock is trading at a discount or premium relative to its own valuation history.",
           tiers: [
             { label: "Excellent", range: "< -15%", color: "text-green-500" },
@@ -387,6 +387,43 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       `4. Invested Capital = Total Shareholders' Equity + Total Debt`,
       `5. Measured ROIC Result: ${val.toFixed(2)}%`,
     ];
+  }
+
+  function getHistoricalPremiumMathExplanation(res: AnalysisResult): string[] {
+    const v = res.valuationMetrics;
+    if (!v || v.averagePremium === null) {
+      return ["Insufficient valuation history to calculate historical premium."];
+    }
+
+    const lines: string[] = [
+      "1. Premium % Formula: Premium % = (Current Multiple - Historical Avg Multiple) / Historical Avg Multiple",
+      "2. Individual Metric Premium Calculations:",
+    ];
+
+    if (v.peRatio && v.historicalPeAverage) {
+      const pePrem = ((v.peRatio - v.historicalPeAverage) / v.historicalPeAverage) * 100;
+      lines.push(`   • P/E Ratio: (${v.peRatio.toFixed(2)}x - ${v.historicalPeAverage.toFixed(2)}x) / ${v.historicalPeAverage.toFixed(2)}x = ${pePrem >= 0 ? "+" : ""}${pePrem.toFixed(1)}%`);
+    }
+
+    if (v.priceToSalesRatio && v.historicalPsAverage) {
+      const psPrem = ((v.priceToSalesRatio - v.historicalPsAverage) / v.historicalPsAverage) * 100;
+      lines.push(`   • P/S Ratio: (${v.priceToSalesRatio.toFixed(2)}x - ${v.historicalPsAverage.toFixed(2)}x) / ${v.historicalPsAverage.toFixed(2)}x = ${psPrem >= 0 ? "+" : ""}${psPrem.toFixed(1)}%`);
+    }
+
+    if (v.evToSales && v.historicalEvsAverage) {
+      const evsPrem = ((v.evToSales - v.historicalEvsAverage) / v.historicalEvsAverage) * 100;
+      lines.push(`   • EV/Sales Ratio: (${v.evToSales.toFixed(2)}x - ${v.historicalEvsAverage.toFixed(2)}x) / ${v.historicalEvsAverage.toFixed(2)}x = ${evsPrem >= 0 ? "+" : ""}${evsPrem.toFixed(1)}%`);
+    }
+
+    if (v.priceToFreeCashFlowsRatio && v.historicalPfcfAverage) {
+      const pfcfPrem = ((v.priceToFreeCashFlowsRatio - v.historicalPfcfAverage) / v.historicalPfcfAverage) * 100;
+      lines.push(`   • P/FCF Ratio: (${v.priceToFreeCashFlowsRatio.toFixed(2)}x - ${v.historicalPfcfAverage.toFixed(2)}x) / ${v.historicalPfcfAverage.toFixed(2)}x = ${pfcfPrem >= 0 ? "+" : ""}${pfcfPrem.toFixed(1)}%`);
+    }
+
+    const overallPct = (v.averagePremium * 100).toFixed(1);
+    lines.push(`3. Composite Historical Valuation Premium: ${v.averagePremium >= 0 ? "+" : ""}${overallPct}%`);
+
+    return lines;
   }
 
   function getAverageMathExplanation(actualValue: number | null, data: { label: string; value: number }[], symbol: string): string[] {
