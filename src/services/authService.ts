@@ -1,10 +1,7 @@
-import axios from "axios";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
-const TOKEN_KEY = "stock_analyzer_jwt_token";
+import { supabase, isSupabaseConfigured } from "./supabaseClient";
 
 export interface UserProfile {
-  id: number;
+  id: string;
   name: string;
   email: string;
   created_at?: string;
@@ -12,80 +9,133 @@ export interface UserProfile {
 
 export interface AuthResponse {
   message: string;
-  token: string;
   user: UserProfile;
 }
 
+const LOCAL_DEMO_KEY = "stock_analyzer_demo_user";
+
 class AuthService {
-  getToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
-  }
-
-  setToken(token: string): void {
-    localStorage.setItem(TOKEN_KEY, token);
-  }
-
-  removeToken(): void {
-    localStorage.removeItem(TOKEN_KEY);
-  }
-
-  private getAuthHeader() {
-    const token = this.getToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }
-
   async register(name: string, email: string, password: string): Promise<AuthResponse> {
-    try {
-      const response = await axios.post<AuthResponse>(`${API_BASE_URL}/auth/register`, {
-        name,
-        email,
-        password,
-      });
-
-      if (response.data.token) {
-        this.setToken(response.data.token);
-      }
-      return response.data;
-    } catch (error: any) {
-      const msg = error.response?.data?.message || "Registration failed. Please try again.";
-      throw new Error(msg);
+    if (!isSupabaseConfigured) {
+      // Local fallback mode when Supabase credentials are not configured in .env.local
+      const user: UserProfile = {
+        id: "local-" + Date.now(),
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        created_at: new Date().toISOString(),
+      };
+      localStorage.setItem(LOCAL_DEMO_KEY, JSON.stringify(user));
+      return { message: "Registered successfully (Local mode)", user };
     }
+
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password,
+      options: {
+        data: {
+          name: name.trim(),
+        },
+      },
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data.user) {
+      throw new Error("Registration failed. Please try again.");
+    }
+
+    const user: UserProfile = {
+      id: data.user.id,
+      name: data.user.user_metadata?.name || name,
+      email: data.user.email || email,
+      created_at: data.user.created_at,
+    };
+
+    return { message: "Registered successfully", user };
   }
 
   async login(email: string, password: string): Promise<AuthResponse> {
-    try {
-      const response = await axios.post<AuthResponse>(`${API_BASE_URL}/auth/login`, {
-        email,
-        password,
-      });
-
-      if (response.data.token) {
-        this.setToken(response.data.token);
+    if (!isSupabaseConfigured) {
+      // Local fallback mode
+      const stored = localStorage.getItem(LOCAL_DEMO_KEY);
+      let user: UserProfile;
+      if (stored) {
+        user = JSON.parse(stored);
+        user.email = email.trim().toLowerCase();
+      } else {
+        user = {
+          id: "demo-user-123",
+          name: email.split("@")[0] || "Demo Investor",
+          email: email.trim().toLowerCase(),
+          created_at: new Date().toISOString(),
+        };
       }
-      return response.data;
-    } catch (error: any) {
-      const msg = error.response?.data?.message || "Invalid email or password";
-      throw new Error(msg);
+      localStorage.setItem(LOCAL_DEMO_KEY, JSON.stringify(user));
+      return { message: "Logged in successfully (Local mode)", user };
     }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data.user) {
+      throw new Error("Login failed. Invalid credentials.");
+    }
+
+    const user: UserProfile = {
+      id: data.user.id,
+      name: data.user.user_metadata?.name || data.user.email?.split("@")[0] || "Investor",
+      email: data.user.email || email,
+      created_at: data.user.created_at,
+    };
+
+    return { message: "Logged in successfully", user };
   }
 
   async getMe(): Promise<UserProfile | null> {
-    const token = this.getToken();
-    if (!token) return null;
+    if (!isSupabaseConfigured) {
+      const stored = localStorage.getItem(LOCAL_DEMO_KEY);
+      if (!stored) return null;
+      try {
+        return JSON.parse(stored);
+      } catch (err) {
+        return null;
+      }
+    }
 
     try {
-      const response = await axios.get<{ user: UserProfile }>(`${API_BASE_URL}/auth/me`, {
-        headers: this.getAuthHeader(),
-      });
-      return response.data.user;
-    } catch (error) {
-      this.removeToken();
+      const { data } = await supabase.auth.getUser();
+      if (!data || !data.user) return null;
+
+      return {
+        id: data.user.id,
+        name: data.user.user_metadata?.name || data.user.email?.split("@")[0] || "Investor",
+        email: data.user.email || "",
+        created_at: data.user.created_at,
+      };
+    } catch (err) {
       return null;
     }
   }
 
-  logout(): void {
-    this.removeToken();
+  async logout(): Promise<void> {
+    if (!isSupabaseConfigured) {
+      localStorage.removeItem(LOCAL_DEMO_KEY);
+      return;
+    }
+
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.warn("Supabase sign out warning:", err);
+    }
   }
 }
 

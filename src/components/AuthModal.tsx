@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { authService, UserProfile } from "../services/authService";
+import { isSupabaseConfigured } from "../services/supabaseClient";
 
 interface AuthModalProps {
   onLoginSuccess: (user: UserProfile) => void;
@@ -49,7 +50,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onLoginSuccess }) => {
     setIsLoading(true);
     setError(null);
     try {
-      // Try logging in with demo account or register if not existing
       try {
         const res = await authService.login("demo@stockanalyzer.com", "Password123");
         onLoginSuccess(res.user);
@@ -68,16 +68,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onLoginSuccess }) => {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-blue-950 flex items-center justify-center p-4 transition-colors duration-300">
       <div className="w-full max-w-md bg-white dark:bg-slate-900/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-slate-200/80 dark:border-slate-800 transition-all duration-300">
         {/* Brand Header */}
-        <div className="text-center mb-8">
-          <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/25">
+        <div className="text-center mb-6">
+          <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-blue-500/25">
             <span className="text-2xl">📈</span>
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-1">
             Stock Quality Analyzer
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
             Sign in to access fundamental analysis & market research
           </p>
+
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100/80 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/50 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+            <span>⚡</span>
+            <span>
+              {isSupabaseConfigured ? "Connected to Supabase Auth" : "Supabase Auth Ready (Local Mode)"}
+            </span>
+          </div>
         </div>
 
         {/* Mode Switcher Tabs */}
