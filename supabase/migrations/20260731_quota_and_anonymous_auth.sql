@@ -14,30 +14,18 @@ CREATE TABLE IF NOT EXISTS public.user_analyses (
 ALTER TABLE public.user_analyses ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Users can view their own analyses
-DO $$ 
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE tablename = 'user_analyses' AND policyname = 'Users can view own analyses'
-  ) THEN
-    CREATE POLICY "Users can view own analyses"
-      ON public.user_analyses
-      FOR SELECT
-      USING (auth.uid() = user_id);
-  END IF;
-END $$;
+DROP POLICY IF EXISTS "Users can view own analyses" ON public.user_analyses;
+CREATE POLICY "Users can view own analyses"
+  ON public.user_analyses
+  FOR SELECT
+  USING (auth.uid() = user_id);
 
 -- RLS Policy: Users can insert their own analyses
-DO $$ 
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE tablename = 'user_analyses' AND policyname = 'Users can insert own analyses'
-  ) THEN
-    CREATE POLICY "Users can insert own analyses"
-      ON public.user_analyses
-      FOR INSERT
-      WITH CHECK (auth.uid() = user_id);
-  END IF;
-END $$;
+DROP POLICY IF EXISTS "Users can insert own analyses" ON public.user_analyses;
+CREATE POLICY "Users can insert own analyses"
+  ON public.user_analyses
+  FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
 
 -- Index for fast user_id and ticker lookups
 CREATE INDEX IF NOT EXISTS idx_user_analyses_user_ticker 
