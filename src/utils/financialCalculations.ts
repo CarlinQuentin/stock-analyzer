@@ -274,7 +274,7 @@ export function calculateMargins(statement: FinancialStatement): {
 }
 
 /**
- * Calculate average margins from recent statements
+ * Calculate average margins from all available statements
  */
 export function calculateAverageMargins(statements: FinancialStatement[]): {
   grossMargin: number | null;
@@ -285,9 +285,6 @@ export function calculateAverageMargins(statements: FinancialStatement[]): {
     return { grossMargin: null, operatingMargin: null, netMargin: null };
   }
 
-  // Use last 3 years
-  const recentStatements = statements.slice(0, 3);
-
   let totalGross = 0,
     totalOp = 0,
     totalNet = 0;
@@ -295,7 +292,7 @@ export function calculateAverageMargins(statements: FinancialStatement[]): {
     opCount = 0,
     netCount = 0;
 
-  for (const statement of recentStatements) {
+  for (const statement of statements) {
     const margins = calculateMargins(statement);
 
     if (margins.grossMargin !== null) {

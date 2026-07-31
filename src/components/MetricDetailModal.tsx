@@ -170,7 +170,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           directionStrategy: "lowerIsBetter" as const,
           description: "Calculates the proportion of debt compared to shareholders' equity.",
           formula: "Debt-to-Equity = Total Debt / Total Shareholders' Equity",
-          mathExplanation: getLatestMathExplanation(result.debtEquityHistory || [], "Debt-to-Equity", ""),
+          mathExplanation: getLatestMathExplanation(result.metrics.debtToEquity, result.debtEquityHistory || [], "Debt-to-Equity", ""),
           whyItMatters: "Debt-to-Equity evaluates a company's financial leverage and solvency risk. A lower ratio suggests a more stable, self-funding business that is less exposed to interest rate cycles and bankruptcy risk. However, optimal leverage varies by industry.",
           tiers: [
             { label: "Excellent", range: "< 0.50", color: "text-green-500" },
@@ -192,7 +192,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           chartValueType: "percent" as const,
           description: "Reflects the company's average Net Income divided by total Revenue.",
           formula: "Net Profit Margin = Net Income / Revenue",
-          mathExplanation: getAverageMathExplanation(result.profitabilityHistory || [], "%"),
+          mathExplanation: getAverageMathExplanation(result.metrics.netMargin, result.profitabilityHistory || [], "%"),
           whyItMatters: "Net profit margin indicates how much of each dollar earned translates directly into profits. Expansion of margins indicates operating leverage, pricing power, and an expanding economic moat.",
           tiers: [
             { label: "Excellent", range: "> 15%", color: "text-green-500" },
@@ -215,7 +215,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           directionStrategy: "lowerIsBetter" as const,
           description: "Price-to-Earnings Ratio over historical fiscal periods.",
           formula: "P/E Ratio = Stock Price / Earnings Per Share (EPS)",
-          mathExplanation: getLatestMathExplanation(result.peHistory || [], "P/E Ratio", "x"),
+          mathExplanation: getLatestMathExplanation(result.valuationMetrics.peRatio, result.peHistory || [], "P/E Ratio", "x"),
           whyItMatters: "The P/E ratio evaluates how much investors are paying per dollar of current earnings. A lower P/E ratio suggests a cheaper valuation relative to profits.",
           tiers: [
             { label: "Excellent", range: "< 10.0x", color: "text-green-500" },
@@ -238,7 +238,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           directionStrategy: "lowerIsBetter" as const,
           description: "Price-to-Sales Ratio over historical fiscal periods.",
           formula: "P/S Ratio = Market Capitalization / Total Revenue",
-          mathExplanation: getLatestMathExplanation(result.psHistory || [], "P/S Ratio", "x"),
+          mathExplanation: getLatestMathExplanation(result.valuationMetrics.priceToSalesRatio, result.psHistory || [], "P/S Ratio", "x"),
           whyItMatters: "The P/S ratio evaluates market valuation relative to total sales. It is particularly useful for growth or cyclical companies where earnings may fluctuate.",
           tiers: [
             { label: "Excellent", range: "< 1.5x", color: "text-green-500" },
@@ -261,7 +261,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           directionStrategy: "lowerIsBetter" as const,
           description: "Enterprise Value to Sales Ratio.",
           formula: "EV/Sales = (Market Cap + Total Debt - Cash) / Revenue",
-          mathExplanation: getLatestMathExplanation(result.evsHistory || [], "EV/Sales Ratio", "x"),
+          mathExplanation: getLatestMathExplanation(result.valuationMetrics.evToSales, result.evsHistory || [], "EV/Sales Ratio", "x"),
           whyItMatters: "EV/Sales accounts for debt and cash balances on the balance sheet, providing a more accurate takeover valuation metric than P/S.",
           tiers: [
             { label: "Excellent", range: "< 1.5x", color: "text-green-500" },
@@ -284,7 +284,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           directionStrategy: "lowerIsBetter" as const,
           description: "Price to Free Cash Flow Ratio.",
           formula: "P/FCF = Market Capitalization / Free Cash Flow",
-          mathExplanation: getLatestMathExplanation(result.pfcfHistory || [], "P/FCF Ratio", "x"),
+          mathExplanation: getLatestMathExplanation(result.valuationMetrics.priceToFreeCashFlowsRatio, result.pfcfHistory || [], "P/FCF Ratio", "x"),
           whyItMatters: "Cash flow is much harder to manipulate than accounting earnings. A low P/FCF ratio indicates strong free cash generation relative to stock valuation.",
           tiers: [
             { label: "Excellent", range: "< 12.0x", color: "text-green-500" },
@@ -307,7 +307,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           directionStrategy: "lowerIsBetter" as const,
           description: "Percentage premium or discount compared to historical mean multiples.",
           formula: "Premium % = (Current Multiples - Historical Avg Multiples) / Historical Avg Multiples",
-          mathExplanation: getAverageMathExplanation(result.valuationPremiumHistory || [], "%"),
+          mathExplanation: getAverageMathExplanation(result.valuationMetrics.averagePremium !== null ? result.valuationMetrics.averagePremium * 100 : null, result.valuationPremiumHistory || [], "%"),
           whyItMatters: "Comparing current multiples against historical averages shows whether a stock is trading at a discount or premium relative to its own valuation history.",
           tiers: [
             { label: "Excellent", range: "< -15%", color: "text-green-500" },
@@ -389,25 +389,23 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     ];
   }
 
-  function getAverageMathExplanation(data: { label: string; value: number }[], symbol: string): string[] {
-    if (data.length === 0) return ["No data available."];
-    const recentData = data.length > 3 ? data.slice(data.length - 3) : data;
-    const sum = recentData.reduce((acc, curr) => acc + curr.value, 0);
-    const avg = sum / recentData.length;
+  function getAverageMathExplanation(actualValue: number | null, data: { label: string; value: number }[], symbol: string): string[] {
+    if (actualValue === null || data.length === 0) return ["No data available."];
+    const sum = data.reduce((acc, curr) => acc + curr.value, 0);
 
     return [
-      `1. Sum of recent ${recentData.length} annual values: ${recentData.map(d => `${d.value.toFixed(1)}${symbol}`).join(" + ")} = ${sum.toFixed(1)}${symbol}`,
-      `2. Total periods: ${recentData.length} years (${recentData.map(d => d.label).join(", ")})`,
-      `3. Average calculation: ${sum.toFixed(1)}${symbol} / ${recentData.length} = ${avg.toFixed(2)}${symbol}`,
+      `1. Sum of ${data.length} annual values: ${data.map(d => `${d.value.toFixed(1)}${symbol}`).join(" + ")} = ${sum.toFixed(1)}${symbol}`,
+      `2. Total periods: ${data.length} years (${data.map(d => d.label).join(", ")})`,
+      `3. Measured Average Result: ${actualValue.toFixed(2)}${symbol}`,
     ];
   }
 
-  function getLatestMathExplanation(data: { label: string; value: number }[], name: string, symbol: string): string[] {
-    if (data.length === 0) return ["No data available."];
+  function getLatestMathExplanation(actualValue: number | null, data: { label: string; value: number }[], name: string, symbol: string): string[] {
+    if (actualValue === null || data.length === 0) return ["No data available."];
     const latest = data[data.length - 1];
     return [
-      `1. Latest fiscal year checked: ${latest.label}`,
-      `2. Measured ${name} value: ${latest.value.toFixed(2)}${symbol}`,
+      `1. Latest fiscal year checked: ${latest ? latest.label : "Most Recent Fiscal Year"}`,
+      `2. Measured ${name} value: ${actualValue.toFixed(2)}${symbol}`,
     ];
   }
 

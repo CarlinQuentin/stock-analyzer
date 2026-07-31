@@ -200,7 +200,7 @@ describe("calculateMargins & calculateAverageMargins", () => {
     expect(margins.netMargin).toBe(15);
   });
 
-  it("should calculate average margins across up to 3 years", () => {
+  it("should calculate average margins across all available statements", () => {
     const statements: FinancialStatement[] = [
       { date: "2024-12-31", revenue: 1000, grossProfit: 400, operatingIncome: 200, netIncome: 100 },
       { date: "2023-12-31", revenue: 1000, grossProfit: 500, operatingIncome: 300, netIncome: 200 },
