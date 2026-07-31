@@ -57,6 +57,17 @@ export interface ValuationScores {
   historical: number | null;
 }
 
+export interface HistoricalPricePoint {
+  date: string;
+  open?: number;
+  high?: number;
+  low?: number;
+  close: number;
+  volume?: number;
+  change?: number;
+  changePercent?: number;
+}
+
 export interface AnalysisResult {
   ticker: string;
   companyProfile: CompanyProfile;
@@ -66,6 +77,7 @@ export interface AnalysisResult {
   analysis: string;
   dataConfidenceScore: number;
   unavailableMetrics: string[];
+  priceHistory?: HistoricalPricePoint[];
   fcfHistory?: { label: string; value: number }[];
   revenueHistory?: { label: string; value: number }[];
   epsHistory?: { label: string; value: number }[];

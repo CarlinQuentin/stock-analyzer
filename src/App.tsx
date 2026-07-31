@@ -3,6 +3,7 @@ import { StockSearch } from "./components/StockSearch";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { CompanyHeader } from "./components/CompanyHeader";
 import { ScoreGauge } from "./components/ScoreGauge";
+import { StockPriceChart } from "./components/StockPriceChart";
 import { MetricCard } from "./components/MetricCard";
 import { AnalysisTable } from "./components/AnalysisTable";
 import { ValuationTable } from "./components/ValuationTable";
@@ -45,7 +46,10 @@ function App() {
     setSelectedMetric(null);
 
     try {
-      const profile = await fmpService.getCompanyProfile(ticker);
+      const [profile, historicalPrices] = await Promise.all([
+        fmpService.getCompanyProfile(ticker),
+        fmpService.getHistoricalPrices(ticker),
+      ]);
 
       try {
         const {
@@ -237,6 +241,7 @@ function App() {
           analysis: `${profile.companyName} has a quality score of ${overallScore}/100`,
           dataConfidenceScore,
           unavailableMetrics,
+          priceHistory: historicalPrices,
           fcfHistory,
           revenueHistory,
           epsHistory,
@@ -368,6 +373,12 @@ function App() {
             </span>
           </p>
         </div>
+
+        {/* Stock Price History Chart */}
+        <StockPriceChart
+          priceHistory={result.priceHistory || []}
+          profile={result.companyProfile}
+        />
 
         {/* Gauges Side by Side */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">

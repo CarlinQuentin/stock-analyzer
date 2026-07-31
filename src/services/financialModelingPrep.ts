@@ -3,6 +3,7 @@ import {
   CompanyProfile,
   FinancialStatement,
   DividendMetrics,
+  HistoricalPricePoint,
   ApiError,
 } from "../types";
 
@@ -175,6 +176,46 @@ class FinancialModelingPrepService {
         );
     } catch (error) {
       throw this.handleError(error);
+    }
+  }
+
+  async getHistoricalPrices(ticker: string): Promise<HistoricalPricePoint[]> {
+    try {
+      let response = await this.client.get("/historical-price-eod/full", {
+        params: { ...this.getParams(), symbol: ticker.toUpperCase() },
+      });
+
+      let data = response.data;
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        response = await this.client.get("/historical-price-eod/light", {
+          params: { ...this.getParams(), symbol: ticker.toUpperCase() },
+        });
+        data = response.data;
+      }
+
+      if (!data || !Array.isArray(data)) {
+        return [];
+      }
+
+      return data
+        .map((item: any) => ({
+          date: item.date,
+          open: typeof item.open === "number" ? item.open : item.price,
+          high: typeof item.high === "number" ? item.high : item.price,
+          low: typeof item.low === "number" ? item.low : item.price,
+          close: typeof item.close === "number" ? item.close : item.price,
+          volume: typeof item.volume === "number" ? item.volume : 0,
+          change: typeof item.change === "number" ? item.change : 0,
+          changePercent: typeof item.changePercent === "number" ? item.changePercent : 0,
+        }))
+        .filter((item: HistoricalPricePoint) => item.date && typeof item.close === "number" && !isNaN(item.close))
+        .sort(
+          (a: HistoricalPricePoint, b: HistoricalPricePoint) =>
+            new Date(a.date).getTime() - new Date(b.date).getTime()
+        );
+    } catch (error) {
+      console.warn("Failed to fetch historical prices:", error);
+      return [];
     }
   }
 
