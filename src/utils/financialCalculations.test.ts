@@ -70,7 +70,7 @@ describe("calculateRevenueCAGR", () => {
 });
 
 describe("calculateEPSGrowth", () => {
-  it("should calculate EPS growth CAGR correctly", () => {
+  it("should calculate EPS growth CAGR correctly for positive series", () => {
     const statements: FinancialStatement[] = [
       { date: "2020-12-31", eps: 1.0 },
       { date: "2021-12-31", eps: 1.2 },
@@ -83,12 +83,17 @@ describe("calculateEPSGrowth", () => {
     expect(growth).toBeCloseTo(0.1892, 4);
   });
 
-  it("should return null for negative starting EPS values", () => {
+  it("should find the first positive EPS fiscal year baseline when starting EPS is negative", () => {
     const statements: FinancialStatement[] = [
-      { date: "2020-12-31", eps: -0.5 },
-      { date: "2024-12-31", eps: 2.0 },
+      { date: "2021-12-31", eps: -0.5 },
+      { date: "2022-12-31", eps: -0.2 },
+      { date: "2023-12-31", eps: 0.5 },
+      { date: "2024-12-31", eps: 1.0 },
+      { date: "2025-12-31", eps: 2.0 },
     ];
-    expect(calculateEPSGrowth(statements)).toBeNull();
+    // Baseline = 0.50 (2023), Ending = 2.00 (2025), Years = 2 -> (2.0/0.5)^(1/2) - 1 = 100% CAGR
+    const growth = calculateEPSGrowth(statements);
+    expect(growth).toBeCloseTo(1.0, 4);
   });
 
   it("should return null for negative ending EPS values", () => {
@@ -99,9 +104,10 @@ describe("calculateEPSGrowth", () => {
     expect(calculateEPSGrowth(statements)).toBeNull();
   });
 
-  it("should return null when both starting and ending EPS are negative", () => {
+  it("should return null when no positive EPS value exists in the historical series", () => {
     const statements: FinancialStatement[] = [
       { date: "2020-12-31", eps: -1.5 },
+      { date: "2022-12-31", eps: -1.0 },
       { date: "2024-12-31", eps: -0.5 },
     ];
     expect(calculateEPSGrowth(statements)).toBeNull();

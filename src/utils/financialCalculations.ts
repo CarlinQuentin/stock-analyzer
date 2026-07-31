@@ -45,7 +45,9 @@ export function calculateRevenueCAGR(
 }
 
 /**
- * Calculate EPS Growth from income statements
+ * Calculate EPS Growth from income statements.
+ * If the initial EPS is negative or zero, find the first fiscal year in the historical series
+ * where EPS becomes positive (> 0), and calculate CAGR from that baseline to the latest EPS.
  */
 export function calculateEPSGrowth(
   statements: FinancialStatement[],
@@ -58,15 +60,32 @@ export function calculateEPSGrowth(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
   );
 
-  const firstEPS = sortedByDate[0].eps;
-  const lastEPS = sortedByDate[sortedByDate.length - 1].eps;
+  const lastStatement = sortedByDate[sortedByDate.length - 1];
+  const lastEPS = lastStatement.eps;
 
-  if (!firstEPS || !lastEPS || firstEPS <= 0 || lastEPS <= 0) {
+  // Do not calculate CAGR if ending EPS is missing or <= 0
+  if (lastEPS === undefined || lastEPS === null || lastEPS <= 0) {
     return null;
   }
 
-  const years = sortedByDate.length - 1;
-  return calculateCAGR(firstEPS, lastEPS, years);
+  // Find the first statement in chronological order where eps > 0
+  const firstPositiveIndex = sortedByDate.findIndex(
+    (s) => s.eps !== undefined && s.eps !== null && s.eps > 0,
+  );
+
+  // Return null if no positive EPS exists, or if first positive EPS is the ending year itself
+  if (firstPositiveIndex === -1 || firstPositiveIndex === sortedByDate.length - 1) {
+    return null;
+  }
+
+  const firstPositiveEPS = sortedByDate[firstPositiveIndex].eps!;
+  const years = sortedByDate.length - 1 - firstPositiveIndex;
+
+  if (years <= 0) {
+    return null;
+  }
+
+  return calculateCAGR(firstPositiveEPS, lastEPS, years);
 }
 
 /**
