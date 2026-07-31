@@ -28,6 +28,11 @@ describe("calculateCAGR", () => {
     expect(cagr).toBeCloseTo(-0.1434, 4); // ~-14.3% / -14.4%
   });
 
+  it("should calculate declining CAGR correctly for Beginning FCF = 924 and Ending FCF = 501.5 over 10 years", () => {
+    const cagr = calculateCAGR(924, 501.5, 10);
+    expect(cagr).toBeCloseTo(-0.0593, 4); // -5.93%
+  });
+
   it("should return 0 when starting, ending, or years is invalid", () => {
     expect(calculateCAGR(-100, 500, 5)).toBe(0);
     expect(calculateCAGR(100, -500, 5)).toBe(0);

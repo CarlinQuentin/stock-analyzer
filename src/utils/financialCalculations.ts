@@ -112,7 +112,7 @@ export function calculateFCF(
   if (operatingCashFlow === undefined || capitalExpenditure === undefined) {
     return null;
   }
-  return operatingCashFlow - (capitalExpenditure || 0);
+  return operatingCashFlow - Math.abs(capitalExpenditure || 0);
 }
 
 /**
