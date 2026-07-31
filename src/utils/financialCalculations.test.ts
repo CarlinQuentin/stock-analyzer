@@ -83,10 +83,26 @@ describe("calculateEPSGrowth", () => {
     expect(growth).toBeCloseTo(0.1892, 4);
   });
 
-  it("should return null for negative or missing EPS values", () => {
+  it("should return null for negative starting EPS values", () => {
     const statements: FinancialStatement[] = [
       { date: "2020-12-31", eps: -0.5 },
       { date: "2024-12-31", eps: 2.0 },
+    ];
+    expect(calculateEPSGrowth(statements)).toBeNull();
+  });
+
+  it("should return null for negative ending EPS values", () => {
+    const statements: FinancialStatement[] = [
+      { date: "2020-12-31", eps: 2.0 },
+      { date: "2024-12-31", eps: -0.5 },
+    ];
+    expect(calculateEPSGrowth(statements)).toBeNull();
+  });
+
+  it("should return null when both starting and ending EPS are negative", () => {
+    const statements: FinancialStatement[] = [
+      { date: "2020-12-31", eps: -1.5 },
+      { date: "2024-12-31", eps: -0.5 },
     ];
     expect(calculateEPSGrowth(statements)).toBeNull();
   });
