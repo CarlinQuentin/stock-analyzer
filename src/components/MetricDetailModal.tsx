@@ -147,7 +147,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           chartValueType: "percent" as const,
           description: "Measures a company's efficiency in allocating capital to profitable investments.",
           formula: "ROIC = Net Operating Profit After Tax (NOPAT) / Invested Capital",
-          mathExplanation: getAverageMathExplanation(result.roicHistory || [], "%"),
+          mathExplanation: getROICMathExplanation(result.metrics.roic, result.roicHistory || []),
           whyItMatters: "ROIC is one of the most reliable indicators of a company's competitive advantage (moat) and quality of management. High ROIC companies create value by earning returns far above their cost of capital, compounding shareholder value over time.",
           tiers: [
             { label: "Excellent", range: "> 15%", color: "text-green-500" },
@@ -377,15 +377,28 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     ];
   }
 
+  function getROICMathExplanation(val: number | null, data: { label: string; value: number }[]): string[] {
+    if (val === null || data.length === 0) return ["No ROIC data available."];
+    const latest = data[data.length - 1];
+    return [
+      `1. Latest fiscal year measured: ${latest.label}`,
+      `2. Formula: ROIC = Net Operating Profit After Tax (NOPAT) / Invested Capital`,
+      `3. NOPAT = Operating Income × (1 - Tax Rate)`,
+      `4. Invested Capital = Total Shareholders' Equity + Total Debt`,
+      `5. Measured ROIC Result: ${val.toFixed(2)}%`,
+    ];
+  }
+
   function getAverageMathExplanation(data: { label: string; value: number }[], symbol: string): string[] {
     if (data.length === 0) return ["No data available."];
-    const sum = data.reduce((acc, curr) => acc + curr.value, 0);
-    const avg = sum / data.length;
+    const recentData = data.length > 3 ? data.slice(data.length - 3) : data;
+    const sum = recentData.reduce((acc, curr) => acc + curr.value, 0);
+    const avg = sum / recentData.length;
 
     return [
-      `1. Sum of annual values: ${data.map(d => `${d.value.toFixed(1)}${symbol}`).join(" + ")} = ${sum.toFixed(1)}${symbol}`,
-      `2. Total periods: ${data.length} years`,
-      `3. Average calculation: ${sum.toFixed(1)}${symbol} / ${data.length} = ${avg.toFixed(2)}${symbol}`,
+      `1. Sum of recent ${recentData.length} annual values: ${recentData.map(d => `${d.value.toFixed(1)}${symbol}`).join(" + ")} = ${sum.toFixed(1)}${symbol}`,
+      `2. Total periods: ${recentData.length} years (${recentData.map(d => d.label).join(", ")})`,
+      `3. Average calculation: ${sum.toFixed(1)}${symbol} / ${recentData.length} = ${avg.toFixed(2)}${symbol}`,
     ];
   }
 

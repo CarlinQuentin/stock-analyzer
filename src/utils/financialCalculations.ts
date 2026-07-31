@@ -190,7 +190,12 @@ export function calculateAverageROIC(
   incomeStatements: FinancialStatement[],
   balanceSheets: FinancialStatement[],
 ): number | null {
-  if (!incomeStatements || !balanceSheets) {
+  if (
+    !incomeStatements ||
+    !balanceSheets ||
+    incomeStatements.length === 0 ||
+    balanceSheets.length === 0
+  ) {
     return null;
   }
 
@@ -198,19 +203,20 @@ export function calculateAverageROIC(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
 
-  const sortedBalance = [...balanceSheets].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-  );
-
-  if (sortedIncome.length === 0 || sortedBalance.length === 0) {
-    return null;
-  }
-
   const latestIncome = sortedIncome[0];
-  const latestBalance = sortedBalance[0];
+  const latestYear = latestIncome.date
+    ? new Date(latestIncome.date).getFullYear()
+    : null;
+
+  // Pair latest income statement with matching balance sheet year
+  const latestBalance =
+    balanceSheets.find(
+      (b) => b.date && new Date(b.date).getFullYear() === latestYear,
+    ) || balanceSheets[0];
 
   if (
     !latestIncome.operatingIncome ||
+    !latestBalance ||
     !latestBalance.totalEquity ||
     !latestBalance.totalDebt
   ) {
