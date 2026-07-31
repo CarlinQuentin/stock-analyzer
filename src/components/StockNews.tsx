@@ -21,13 +21,47 @@ export const StockNews: React.FC<StockNewsProps> = ({ ticker, companyName }) => 
     setIsLoading(true);
     setError(null);
     try {
-      const query = encodeURIComponent(`${ticker} ${companyName || "stock"}`);
-      const rssUrl = `https://news.google.com/rss/search?q=${query}&hl=en-US&gl=US&ceid=US:en`;
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`;
+      // Clean company name (strip legal suffixes & punctuation like ", Inc.", "Group, Inc.", etc.)
+      const cleanName = (companyName || "")
+        .replace(/,?\s*(Inc\.?|Corp\.?|Corporation|Co\.?|Group|Ltd\.?|LLC)/gi, "")
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .trim();
 
-      const response = await fetch(proxyUrl);
-      if (!response.ok) throw new Error("Network error fetching news");
-      const xmlText = await response.text();
+      const queries = [
+        `${ticker} ${cleanName}`.trim(),
+        `${ticker} stock`,
+      ];
+
+      let xmlText = "";
+
+      for (const query of queries) {
+        if (xmlText && xmlText.includes("<item>")) break;
+
+        const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+        const proxyUrls = [
+          `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`,
+          `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rssUrl)}`,
+        ];
+
+        for (const proxyUrl of proxyUrls) {
+          try {
+            const response = await fetch(proxyUrl);
+            if (response.ok) {
+              const text = await response.text();
+              if (text && text.includes("<item>")) {
+                xmlText = text;
+                break;
+              }
+            }
+          } catch {
+            // Ignore single proxy failure & try next fallback
+          }
+        }
+      }
+
+      if (!xmlText) {
+        throw new Error("Unable to fetch news data");
+      }
 
       // Parse XML items
       const parser = new DOMParser();
@@ -40,7 +74,6 @@ export const StockNews: React.FC<StockNewsProps> = ({ ticker, companyName }) => 
         const pubDateRaw = item.querySelector("pubDate")?.textContent || "";
         const sourceText = item.querySelector("source")?.textContent;
 
-        // Clean up title by separating publisher if present at end " - Source"
         let title = titleFull;
         let source = sourceText || "News";
 
@@ -63,7 +96,6 @@ export const StockNews: React.FC<StockNewsProps> = ({ ticker, companyName }) => 
       });
 
       if (parsedNews.length === 0) {
-        // Fallback sample news if empty
         setNews([
           {
             title: `${companyName || ticker} Releases Recent Financial & Operational Updates`,
@@ -85,7 +117,7 @@ export const StockNews: React.FC<StockNewsProps> = ({ ticker, companyName }) => 
 
   useEffect(() => {
     fetchNews();
-  }, [ticker]);
+  }, [ticker, companyName]);
 
   const formatRelativeTime = (rawDateStr: string): string => {
     if (!rawDateStr) return "Recent";
