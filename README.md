@@ -1,10 +1,10 @@
-# Stock Quality Analyzer MVP
+# Investor's Edge
 
 A React + TypeScript web application that analyzes long-term stock investment quality based on fundamental business metrics.
 
 ## Overview
 
-The Stock Quality Analyzer evaluates whether a company is a high-quality long-term investment candidate by analyzing:
+Investor's Edge evaluates whether a company is a high-quality long-term investment candidate by analyzing:
 
 - **Revenue Growth** (5-year CAGR)
 - **Earnings Per Share Growth** (5-year CAGR)

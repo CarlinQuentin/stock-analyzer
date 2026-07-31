@@ -1,4 +1,4 @@
-# Stock Quality Analyzer - Project Instructions
+# Investor's Edge - Project Instructions
 
 ## Project Overview
 
