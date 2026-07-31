@@ -724,15 +724,15 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
             <div className="border border-slate-100 dark:border-slate-800 rounded-lg overflow-hidden">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-100 dark:border-slate-850 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  <tr className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-100 dark:border-slate-800/60 text-xs font-semibold text-slate-500 dark:text-slate-400">
                     <th className="px-4 py-2.5">Fiscal Year</th>
                     <th className="px-4 py-2.5 text-right">Value</th>
                     <th className="px-4 py-2.5 text-right">YoY Growth</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-850 text-xs text-slate-700 dark:text-slate-300">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs text-slate-700 dark:text-slate-300">
                   {config.chartData.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-850/30 transition-colors">
+                    <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                       <td className="px-4 py-2.5 font-medium">{item.label}</td>
                       <td className="px-4 py-2.5 text-right font-semibold text-slate-900 dark:text-white">
                         {formatChartValue(item.value, config.chartValueType)}
@@ -840,7 +840,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
               </h4>
               <div className="grid grid-cols-2 gap-3">
                 {config.tiers.map((tier, idx) => (
-                  <div key={idx} className="flex justify-between items-center text-xs border border-slate-100 dark:border-slate-800/50 bg-white dark:bg-slate-850 px-3 py-2 rounded-lg">
+                  <div key={idx} className="flex justify-between items-center text-xs border border-slate-100 dark:border-slate-800/50 bg-white dark:bg-slate-800/60 px-3 py-2 rounded-lg">
                     <span className="font-semibold text-slate-600 dark:text-slate-400">{tier.label}</span>
                     <span className={`font-bold ${tier.color}`}>{tier.range}</span>
                   </div>
