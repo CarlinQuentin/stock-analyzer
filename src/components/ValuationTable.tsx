@@ -76,7 +76,7 @@ export const ValuationTable: React.FC<ValuationTableProps> = ({
                 Current Value
               </th>
               <th className="text-right px-6 py-4 font-semibold text-slate-900 dark:text-slate-200">
-                5-Yr Avg
+                10-Yr Avg
               </th>
               <th className="text-center px-6 py-4 font-semibold text-slate-900 dark:text-slate-200">
                 Valuation Rating
