@@ -10,6 +10,14 @@ export interface CompanyProfile {
   price?: number;
 }
 
+export interface CompanySearchResult {
+  symbol: string;
+  name: string;
+  currency?: string;
+  exchange?: string;
+  exchangeFullName?: string;
+}
+
 export interface FinancialStatement {
   date: string;
   revenue?: number;

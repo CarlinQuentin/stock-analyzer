@@ -56,6 +56,64 @@ class FinancialModelingPrepService {
     }
   }
 
+  async searchCompany(query: string): Promise<any[]> {
+    if (!query || query.trim().length === 0) return [];
+    try {
+      const response = await this.client.get("/search-name", {
+        params: { ...this.getParams(), query: query.trim(), limit: 10 },
+      });
+
+      if (!response.data || !Array.isArray(response.data)) {
+        return [];
+      }
+
+      const results = response.data.map((item: any) => ({
+        symbol: item.symbol,
+        name: item.name,
+        currency: item.currency,
+        exchange: item.exchangeShortName || item.exchange,
+        exchangeFullName: item.exchangeFullName,
+      }));
+
+      // Sort so US exchanges (NASDAQ, NYSE, AMEX) come first
+      return results.sort((a: any, b: any) => {
+        const isUsA = a.exchange === "NASDAQ" || a.exchange === "NYSE" || a.exchange === "AMEX" || a.currency === "USD";
+        const isUsB = b.exchange === "NASDAQ" || b.exchange === "NYSE" || b.exchange === "AMEX" || b.currency === "USD";
+        if (isUsA && !isUsB) return -1;
+        if (!isUsA && isUsB) return 1;
+        return 0;
+      });
+    } catch (error) {
+      console.warn("Company search failed:", error);
+      return [];
+    }
+  }
+
+  async resolveTicker(input: string): Promise<string> {
+    const trimmed = input.trim();
+    if (!trimmed) return "";
+
+    // If input looks like an exact ticker symbol (1-5 chars with no spaces), try direct profile check first
+    if (/^[A-Za-z0-9]{1,5}$/.test(trimmed)) {
+      try {
+        const profile = await this.getCompanyProfile(trimmed);
+        if (profile && profile.symbol) return profile.symbol;
+      } catch {
+        // Fall back to company search below
+      }
+    }
+
+    // Search by company name
+    const searchResults = await this.searchCompany(trimmed);
+    if (searchResults.length > 0) {
+      // Find clean match without dot suffix like .DE or .L if available
+      const cleanMatch = searchResults.find((r) => !r.symbol.includes(".")) || searchResults[0];
+      return cleanMatch.symbol;
+    }
+
+    return trimmed.toUpperCase();
+  }
+
   async getIncomeStatements(
     ticker: string,
     limit: number = 10,
