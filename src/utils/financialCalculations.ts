@@ -33,15 +33,29 @@ export function calculateRevenueCAGR(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
   );
 
-  const firstRevenue = sortedByDate[0].revenue;
-  const lastRevenue = sortedByDate[sortedByDate.length - 1].revenue;
+  const lastStatement = sortedByDate[sortedByDate.length - 1];
+  const lastRevenue = lastStatement.revenue;
 
-  if (!firstRevenue || !lastRevenue || firstRevenue <= 0) {
+  if (!lastRevenue || lastRevenue <= 0) {
     return null;
   }
 
-  const years = sortedByDate.length - 1;
-  return calculateCAGR(firstRevenue, lastRevenue, years);
+  const firstPositiveIndex = sortedByDate.findIndex(
+    (s) => s.revenue !== undefined && s.revenue !== null && s.revenue > 0,
+  );
+
+  if (firstPositiveIndex === -1 || firstPositiveIndex === sortedByDate.length - 1) {
+    return null;
+  }
+
+  const firstPositiveRevenue = sortedByDate[firstPositiveIndex].revenue!;
+  const years = sortedByDate.length - 1 - firstPositiveIndex;
+
+  if (years <= 0) {
+    return null;
+  }
+
+  return calculateCAGR(firstPositiveRevenue, lastRevenue, years);
 }
 
 /**
@@ -115,24 +129,38 @@ export function calculateFCFGrowth(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
   );
 
-  const fcfValues: number[] = [];
+  const lastStatement = sortedByDate[sortedByDate.length - 1];
+  const lastFCF = calculateFCF(
+    lastStatement.operatingCashFlow,
+    lastStatement.capitalExpenditure,
+  );
 
-  for (const statement of sortedByDate) {
-    const fcf = calculateFCF(
-      statement.operatingCashFlow,
-      statement.capitalExpenditure,
-    );
-    if (fcf !== null && fcf > 0) {
-      fcfValues.push(fcf);
-    }
-  }
-
-  if (fcfValues.length < 2) {
+  // Return null if ending FCF is missing or <= 0
+  if (lastFCF === null || lastFCF <= 0) {
     return null;
   }
 
-  const years = fcfValues.length - 1;
-  return calculateCAGR(fcfValues[0], fcfValues[fcfValues.length - 1], years);
+  const statementsWithFCF = sortedByDate.map((statement) => ({
+    statement,
+    fcf: calculateFCF(statement.operatingCashFlow, statement.capitalExpenditure),
+  }));
+
+  const firstPositiveIndex = statementsWithFCF.findIndex(
+    (item) => item.fcf !== null && item.fcf > 0,
+  );
+
+  if (firstPositiveIndex === -1 || firstPositiveIndex === statementsWithFCF.length - 1) {
+    return null;
+  }
+
+  const firstPositiveFCF = statementsWithFCF[firstPositiveIndex].fcf!;
+  const years = statementsWithFCF.length - 1 - firstPositiveIndex;
+
+  if (years <= 0) {
+    return null;
+  }
+
+  return calculateCAGR(firstPositiveFCF, lastFCF, years);
 }
 
 export function calculateDividendCAGR(

@@ -124,23 +124,70 @@ describe("calculateFCF", () => {
 });
 
 describe("calculateFCFGrowth", () => {
-  it("should calculate positive growth CAGR over 5 years (6 data points)", () => {
-    // $8B -> $96B over 5 years
+  it("1. Positive growth: should calculate positive CAGR when FCF increases (e.g. 100 to 200 over 10 years)", () => {
     const statements: FinancialStatement[] = [
-      { date: "2020-12-31", operatingCashFlow: 8000000000, capitalExpenditure: 0 },
-      { date: "2021-12-31", operatingCashFlow: 15000000000, capitalExpenditure: 0 },
-      { date: "2022-12-31", operatingCashFlow: 30000000000, capitalExpenditure: 0 },
-      { date: "2023-12-31", operatingCashFlow: 50000000000, capitalExpenditure: 0 },
-      { date: "2024-12-31", operatingCashFlow: 70000000000, capitalExpenditure: 0 },
-      { date: "2025-12-31", operatingCashFlow: 96000000000, capitalExpenditure: 0 },
+      { date: "2015-12-31", operatingCashFlow: 100, capitalExpenditure: 0 },
+      { date: "2016-12-31", operatingCashFlow: 110, capitalExpenditure: 0 },
+      { date: "2017-12-31", operatingCashFlow: 120, capitalExpenditure: 0 },
+      { date: "2018-12-31", operatingCashFlow: 130, capitalExpenditure: 0 },
+      { date: "2019-12-31", operatingCashFlow: 140, capitalExpenditure: 0 },
+      { date: "2020-12-31", operatingCashFlow: 150, capitalExpenditure: 0 },
+      { date: "2021-12-31", operatingCashFlow: 160, capitalExpenditure: 0 },
+      { date: "2022-12-31", operatingCashFlow: 170, capitalExpenditure: 0 },
+      { date: "2023-12-31", operatingCashFlow: 180, capitalExpenditure: 0 },
+      { date: "2024-12-31", operatingCashFlow: 190, capitalExpenditure: 0 },
+      { date: "2025-12-31", operatingCashFlow: 200, capitalExpenditure: 0 },
     ];
+    // 100 -> 200 over 10 years: (200/100)^(1/10) - 1 = 2^0.1 - 1 ≈ +7.18%
     const cagr = calculateFCFGrowth(statements);
-    expect(cagr).toBeCloseTo(0.6438, 4);
+    expect(cagr).not.toBeNull();
+    expect(cagr!).toBeGreaterThan(0);
+    expect(cagr!).toBeCloseTo(0.07177, 3);
   });
 
-  it("should return null for empty or insufficient statement history", () => {
+  it("2. Declining FCF: should calculate negative CAGR approx -5.93% when FCF declines from 924.0 to 501.5 over 10 years", () => {
+    const statements: FinancialStatement[] = [
+      { date: "2015-12-31", operatingCashFlow: 924.0, capitalExpenditure: 0 },
+      { date: "2016-12-31", operatingCashFlow: 850.0, capitalExpenditure: 0 },
+      { date: "2017-12-31", operatingCashFlow: 800.0, capitalExpenditure: 0 },
+      { date: "2018-12-31", operatingCashFlow: 750.0, capitalExpenditure: 0 },
+      { date: "2019-12-31", operatingCashFlow: 700.0, capitalExpenditure: 0 },
+      { date: "2020-12-31", operatingCashFlow: 650.0, capitalExpenditure: 0 },
+      { date: "2021-12-31", operatingCashFlow: 600.0, capitalExpenditure: 0 },
+      { date: "2022-12-31", operatingCashFlow: 580.0, capitalExpenditure: 0 },
+      { date: "2023-12-31", operatingCashFlow: 550.0, capitalExpenditure: 0 },
+      { date: "2024-12-31", operatingCashFlow: 520.0, capitalExpenditure: 0 },
+      { date: "2025-12-31", operatingCashFlow: 501.5, capitalExpenditure: 0 },
+    ];
+    // (501.5 / 924.0)^(1/10) - 1 = 0.940718 - 1 = -5.93%
+    const cagr = calculateFCFGrowth(statements);
+    expect(cagr).not.toBeNull();
+    expect(cagr!).toBeLessThan(0);
+    expect(cagr!).toBeCloseTo(-0.05928, 3);
+  });
+
+  it("3. No change: should return 0% CAGR when beginning FCF equals ending FCF (100 to 100)", () => {
+    const statements: FinancialStatement[] = [
+      { date: "2015-12-31", operatingCashFlow: 100, capitalExpenditure: 0 },
+      { date: "2025-12-31", operatingCashFlow: 100, capitalExpenditure: 0 },
+    ];
+    const cagr = calculateFCFGrowth(statements);
+    expect(cagr).not.toBeNull();
+    expect(cagr!).toBe(0);
+  });
+
+  it("4. Invalid inputs: should return null when no positive beginning FCF exists or ending FCF is <= 0", () => {
+    const zeroBeginning: FinancialStatement[] = [
+      { date: "2015-12-31", operatingCashFlow: 0, capitalExpenditure: 0 },
+      { date: "2025-12-31", operatingCashFlow: 100, capitalExpenditure: 0 },
+    ];
+    const negativeEnding: FinancialStatement[] = [
+      { date: "2015-12-31", operatingCashFlow: 100, capitalExpenditure: 0 },
+      { date: "2025-12-31", operatingCashFlow: -50, capitalExpenditure: 0 },
+    ];
     expect(calculateFCFGrowth([])).toBeNull();
-    expect(calculateFCFGrowth([{ date: "2024-12-31", operatingCashFlow: 100 }])).toBeNull();
+    expect(calculateFCFGrowth(zeroBeginning)).toBeNull();
+    expect(calculateFCFGrowth(negativeEnding)).toBeNull();
   });
 });
 
