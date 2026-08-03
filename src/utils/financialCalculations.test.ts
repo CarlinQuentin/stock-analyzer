@@ -1003,7 +1003,7 @@ describe("calculateFCFGrowth", () => {
       expect(trendData.burnChangePct).toBeCloseTo(75, 1);
     });
 
-    it("Test 4: Negative to positive FCF (-100M -> 50M) returns turnaround classification", () => {
+    it("Test 4: Negative to positive FCF (-100M -> 50M) returns turnaround classification and +150% improvement", () => {
       const statements: FinancialStatement[] = [
         { date: "2015-12-31", operatingCashFlow: -100, capitalExpenditure: 0 },
         { date: "2025-12-31", operatingCashFlow: 50, capitalExpenditure: 0 },
@@ -1013,9 +1013,22 @@ describe("calculateFCFGrowth", () => {
       expect(trendData.trend).toBe("Turnaround");
       expect(trendData.isPositive).toBe(true);
       expect(trendData.score).toBe(75);
+      expect(trendData.burnChangePct).toBeCloseTo(150, 1);
     });
 
-    it("Test 5: Positive to negative FCF (100M -> -50M) returns deterioration classification", () => {
+    it("Test 4b: Verifies prompt turnaround example (-2.2B -> +6.2B = +381.82% improvement)", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2015-12-31", operatingCashFlow: -2200000000, capitalExpenditure: 0 },
+        { date: "2025-12-31", operatingCashFlow: 6200000000, capitalExpenditure: 0 },
+      ];
+      expect(calculateFCFGrowth(statements)).toBeNull();
+      const trendData = calculateFCFTrend(statements);
+      expect(trendData.trend).toBe("Turnaround");
+      expect(trendData.isPositive).toBe(true);
+      expect(trendData.burnChangePct).toBeCloseTo(381.82, 2);
+    });
+
+    it("Test 5: Positive to negative FCF (100M -> -50M) returns deterioration classification and -150% deterioration", () => {
       const statements: FinancialStatement[] = [
         { date: "2015-12-31", operatingCashFlow: 100, capitalExpenditure: 0 },
         { date: "2025-12-31", operatingCashFlow: -50, capitalExpenditure: 0 },
@@ -1025,6 +1038,7 @@ describe("calculateFCFGrowth", () => {
       expect(trendData.trend).toBe("Deteriorating");
       expect(trendData.isPositive).toBe(false);
       expect(trendData.score).toBe(0);
+      expect(trendData.burnChangePct).toBeCloseTo(-150, 1);
     });
 
     it("Verifies prompt example (-45.9M -> -321.8M = -601.09% cash burn deterioration)", () => {

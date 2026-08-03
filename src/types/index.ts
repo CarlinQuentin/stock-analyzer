@@ -118,6 +118,7 @@ export interface FinancialMetrics {
   epsGrowth: number | null;
   epsTrend?: "Improving" | "Deteriorating" | "Declining" | "Flat" | "Turnaround" | "Emerging";
   epsTrendScore?: number | null;
+  epsChangePct?: number | null;
   fcfGrowth: number | null;
   fcfTrend?: "Improving" | "Deteriorating" | "Declining" | "Flat" | "Turnaround" | "Emerging";
   fcfTrendScore?: number | null;

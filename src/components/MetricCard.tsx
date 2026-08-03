@@ -10,6 +10,7 @@ interface MetricCardProps {
   title: string;
   value: number | null;
   statusText?: string;
+  changePct?: number | null;
   unit?: string;
   score: number | null;
   description?: string;
@@ -26,6 +27,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   title,
   value,
   statusText,
+  changePct,
   unit = "",
   score,
   description,
@@ -288,6 +290,17 @@ export const MetricCard: React.FC<MetricCardProps> = ({
                 <span className="text-xl text-slate-600 dark:text-slate-400 ml-1">{unit}</span>
               )}
             </p>
+          ) : changePct !== undefined && changePct !== null ? (
+            <div>
+              <p className="text-3xl font-extrabold text-slate-900 dark:text-white">
+                {changePct >= 0 ? "+" : ""}{changePct.toFixed(2)}%
+              </p>
+              {statusText && (
+                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-1">
+                  Trend: <span className="text-slate-800 dark:text-slate-200">{statusText}</span>
+                </p>
+              )}
+            </div>
           ) : statusText ? (
             <p className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">
               {statusText}

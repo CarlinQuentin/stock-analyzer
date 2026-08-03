@@ -97,6 +97,7 @@ export interface EPSTrendResult {
   trend: "Improving" | "Deteriorating" | "Declining" | "Flat" | "Turnaround" | "Emerging";
   isProfitable: boolean;
   score: number;
+  changePct: number | null;
 }
 
 /**
@@ -247,7 +248,7 @@ export function calculateEPSTrend(
   statements: FinancialStatement[] | null | undefined,
 ): EPSTrendResult {
   if (!statements || !Array.isArray(statements) || statements.length === 0) {
-    return { trend: "Flat", isProfitable: false, score: 25 };
+    return { trend: "Flat", isProfitable: false, score: 25, changePct: null };
   }
 
   const validStatements = statements.filter(
@@ -260,7 +261,7 @@ export function calculateEPSTrend(
   );
 
   if (validStatements.length === 0) {
-    return { trend: "Flat", isProfitable: false, score: 25 };
+    return { trend: "Flat", isProfitable: false, score: 25, changePct: null };
   }
 
   // 1. Sort financial statements chronologically by fiscal date
@@ -289,6 +290,7 @@ export function calculateEPSTrend(
       trend: "Flat",
       isProfitable,
       score: isProfitable ? 50 : 20,
+      changePct: null,
     };
   }
 
@@ -309,10 +311,25 @@ export function calculateEPSTrend(
     trend = "Declining";
   }
 
+  let changePct: number | null = null;
+  if (startingEPS !== 0) {
+    if (startingEPS <= 0 && endingEPS > 0) {
+      changePct = ((endingEPS - startingEPS) / Math.abs(startingEPS)) * 100;
+    } else if (startingEPS > 0 && endingEPS <= 0) {
+      changePct = ((endingEPS - startingEPS) / startingEPS) * 100;
+    } else if (startingEPS <= 0 && endingEPS <= 0) {
+      const absStart = Math.abs(startingEPS);
+      const absEnd = Math.abs(endingEPS);
+      changePct = ((absStart - absEnd) / absStart) * 100;
+    } else {
+      changePct = (netChange / startingEPS) * 100;
+    }
+  }
+
   // 4. Calculate dynamic EPS Quality Score using helper function
   const score = calculateEPSQualityScore(startingEPS, endingEPS);
 
-  return { trend, isProfitable, score };
+  return { trend, isProfitable, score, changePct };
 }
 
 /**
@@ -421,22 +438,28 @@ export function calculateFCFTrend(
   }
 
   // Scenario 2: Negative/Zero FCF -> Positive FCF (Turnaround or Emerging)
+  // Formula: ((Ending FCF - Beginning FCF) / ABS(Beginning FCF)) * 100
   if (startingFCF <= 0 && endingFCF > 0) {
+    const improvementPct = startingFCF !== 0
+      ? ((endingFCF - startingFCF) / Math.abs(startingFCF)) * 100
+      : null;
     return {
       trend: startingFCF === 0 ? "Emerging" : "Turnaround",
       isPositive: true,
       score: 75,
-      burnChangePct: null,
+      burnChangePct: improvementPct,
     };
   }
 
   // Scenario 3: Positive FCF -> Zero/Negative FCF (Declining or Deterioration)
+  // Formula: ((Ending FCF - Beginning FCF) / Beginning FCF) * 100
   if (startingFCF > 0 && endingFCF <= 0) {
+    const deteriorationPct = ((endingFCF - startingFCF) / startingFCF) * 100;
     return {
       trend: endingFCF === 0 ? "Declining" : "Deteriorating",
       isPositive: false,
       score: 0,
-      burnChangePct: null,
+      burnChangePct: deteriorationPct,
     };
   }
 
@@ -679,6 +702,7 @@ export function calculateAllMetrics(
     epsGrowth: calculateEPSGrowth(incomeStatements),
     epsTrend: epsTrendData.trend,
     epsTrendScore: epsTrendData.score,
+    epsChangePct: epsTrendData.changePct,
     fcfGrowth: calculateFCFGrowth(cashFlowStatements),
     fcfTrend: fcfTrendData.trend,
     fcfTrendScore: fcfTrendData.score,

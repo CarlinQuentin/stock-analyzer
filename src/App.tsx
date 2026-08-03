@@ -607,6 +607,7 @@ function App() {
                   title="EPS Growth"
                   value={result.metrics.epsGrowth}
                   statusText={result.metrics.epsTrend}
+                  changePct={result.metrics.epsChangePct}
                   unit="%"
                   score={result.scores.eps}
                   description={result.epsHistory && result.epsHistory.length > 1 ? `${result.epsHistory.length - 1}-year CAGR` : "CAGR"}
@@ -622,6 +623,7 @@ function App() {
                   title="FCF Growth"
                   value={result.metrics.fcfGrowth}
                   statusText={result.metrics.fcfTrend}
+                  changePct={result.metrics.fcfBurnChangePct}
                   unit="%"
                   score={result.scores.fcf}
                   description={result.fcfHistory && result.fcfHistory.length > 1 ? `${result.fcfHistory.length - 1}-year CAGR` : "CAGR"}

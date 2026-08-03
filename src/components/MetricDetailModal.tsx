@@ -45,6 +45,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       score: 0,
       value: null as number | null,
       statusText: undefined as string | undefined,
+      changePct: undefined as number | null | undefined,
       unit: "",
       chartData: [] as { label: string; value: number }[],
       chartValueType: "currency" as "currency" | "percent" | "number",
@@ -93,6 +94,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           score: result.scores.eps,
           value: result.metrics.epsGrowth,
           statusText: result.metrics.epsTrend,
+          changePct: result.metrics.epsChangePct,
           unit: "%",
           chartData: result.epsHistory || [],
           chartValueType: "currency" as const,
@@ -131,6 +133,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           score: result.scores.fcf,
           value: result.metrics.fcfGrowth,
           statusText: result.metrics.fcfTrend,
+          changePct: result.metrics.fcfBurnChangePct,
           unit: "%",
           chartData: result.fcfHistory || [],
           chartValueType: "currency" as const,
@@ -937,6 +940,17 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                         : config.value.toFixed(2)}
                       <span className="text-lg text-slate-500 font-semibold ml-1">{config.unit}</span>
                     </>
+                  ) : config.changePct !== undefined && config.changePct !== null ? (
+                    <div>
+                      <span>
+                        {config.changePct >= 0 ? "+" : ""}{config.changePct.toFixed(2)}%
+                      </span>
+                      {config.statusText && (
+                        <span className="block text-xs font-bold text-slate-500 dark:text-slate-400 mt-0.5 font-sans">
+                          Trend: <span className="text-slate-800 dark:text-slate-200">{config.statusText}</span>
+                        </span>
+                      )}
+                    </div>
                   ) : config.statusText ? (
                     <span className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">
                       {config.statusText}
