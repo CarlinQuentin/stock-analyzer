@@ -93,47 +93,79 @@ export function calculateRevenueCAGR(
 }
 
 /**
- * Calculate EPS Growth from income statements.
- * If the initial EPS is negative or zero, find the first fiscal year in the historical series
- * where EPS becomes positive (> 0), and calculate CAGR from that baseline to the latest EPS.
+ * Calculate EPS Growth (CAGR) from income statements.
+ * Uses the latest 5-year CAGR period (6 most recent fiscal years) if more than 6 years are provided.
+ * Formula: CAGR = (Ending EPS / Beginning EPS) ^ (1 / n) - 1
+ * Rules:
+ * - Beginning EPS and Ending EPS must both be > 0.
+ * - Returns 0 if beginning EPS <= 0 or ending EPS <= 0, or if inputs are invalid.
  */
 export function calculateEPSGrowth(
-  statements: FinancialStatement[],
-): number | null {
-  if (!statements || statements.length < 2) {
-    return null;
+  statements: FinancialStatement[] | null | undefined,
+): number {
+  if (!statements || !Array.isArray(statements) || statements.length < 2) {
+    return 0;
   }
 
-  const sortedByDate = [...statements].sort(
+  // Filter out invalid statement objects or missing/non-numeric EPS
+  const validStatements = statements.filter(
+    (s) =>
+      s &&
+      s.date &&
+      typeof s.eps === "number" &&
+      !isNaN(s.eps) &&
+      isFinite(s.eps),
+  );
+
+  if (validStatements.length < 2) {
+    return 0;
+  }
+
+  // Clone to prevent mutating input array and sort chronologically by date
+  const sortedByDate = [...validStatements].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
   );
 
-  const lastStatement = sortedByDate[sortedByDate.length - 1];
-  const lastEPS = lastStatement.eps;
-
-  // Do not calculate CAGR if ending EPS is missing or <= 0
-  if (lastEPS === undefined || lastEPS === null || lastEPS <= 0) {
-    return null;
+  // Handle duplicate dates by keeping the latest occurrence
+  const uniqueByDate: FinancialStatement[] = [];
+  const seenDates = new Set<string>();
+  for (let i = sortedByDate.length - 1; i >= 0; i--) {
+    const dateStr = new Date(sortedByDate[i].date).toISOString().split("T")[0];
+    if (!seenDates.has(dateStr)) {
+      seenDates.add(dateStr);
+      uniqueByDate.unshift(sortedByDate[i]);
+    }
   }
 
-  // Find the first statement in chronological order where eps > 0
-  const firstPositiveIndex = sortedByDate.findIndex(
-    (s) => s.eps !== undefined && s.eps !== null && s.eps > 0,
-  );
-
-  // Return null if no positive EPS exists, or if first positive EPS is the ending year itself
-  if (firstPositiveIndex === -1 || firstPositiveIndex === sortedByDate.length - 1) {
-    return null;
+  if (uniqueByDate.length < 2) {
+    return 0;
   }
 
-  const firstPositiveEPS = sortedByDate[firstPositiveIndex].eps!;
-  const years = sortedByDate.length - 1 - firstPositiveIndex;
+  // Use the 6 most recent fiscal years (latest 5-year CAGR period) if more than 6 years are provided
+  const windowStatements =
+    uniqueByDate.length > 6 ? uniqueByDate.slice(-6) : uniqueByDate;
+
+  const firstStatement = windowStatements[0];
+  const lastStatement = windowStatements[windowStatements.length - 1];
+
+  const firstEPS = firstStatement.eps!;
+  const lastEPS = lastStatement.eps!;
+
+  // Business rule: EPS CAGR can only be calculated when beginning and ending EPS are positive (> 0)
+  if (firstEPS <= 0 || lastEPS <= 0) {
+    return 0;
+  }
+
+  const firstYear = new Date(firstStatement.date).getFullYear();
+  const lastYear = new Date(lastStatement.date).getFullYear();
+  const yearDiff = lastYear - firstYear;
+  const years = yearDiff > 0 ? yearDiff : windowStatements.length - 1;
 
   if (years <= 0) {
-    return null;
+    return 0;
   }
 
-  return calculateCAGR(firstPositiveEPS, lastEPS, years);
+  return calculateCAGR(firstEPS, lastEPS, years);
 }
 
 /**

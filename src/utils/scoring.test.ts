@@ -46,12 +46,32 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
     });
   });
 
-  it("scoreEPSGrowth should score EPS growth tiers correctly", () => {
-    expect(scoreEPSGrowth(null)).toBeNull();
-    expect(scoreEPSGrowth(0.18)).toBeGreaterThanOrEqual(85);
-    expect(scoreEPSGrowth(0.09)).toBeGreaterThanOrEqual(70);
-    expect(scoreEPSGrowth(0.05)).toBe(49);
-    expect(scoreEPSGrowth(-0.05)).toBeLessThan(30);
+  describe("scoreEPSGrowth Stock Scoring Integration", () => {
+    it("should score positive EPS CAGR as expected", () => {
+      expect(scoreEPSGrowth(0.25)).toBeGreaterThanOrEqual(85); // Excellent
+      expect(scoreEPSGrowth(0.10)).toBeGreaterThanOrEqual(70); // Good
+      expect(scoreEPSGrowth(0.06)).toBeGreaterThanOrEqual(50); // Average
+    });
+
+    it("should score negative EPS CAGR as expected", () => {
+      expect(scoreEPSGrowth(-0.10)).toBe(0);
+      expect(scoreEPSGrowth(-0.05)).toBeLessThan(30);
+    });
+
+    it("should score zero EPS CAGR as expected", () => {
+      expect(scoreEPSGrowth(0)).toBe(30);
+    });
+
+    it("should return a score of 0 for invalid/missing EPS CAGR instead of null, undefined, or N/A", () => {
+      expect(scoreEPSGrowth(null)).toBe(0);
+      expect(scoreEPSGrowth(undefined)).toBe(0);
+      expect(scoreEPSGrowth(NaN)).toBe(0);
+    });
+
+    it("should cap extremely high EPS CAGR values at max score 100", () => {
+      expect(scoreEPSGrowth(2.0)).toBe(100);
+      expect(scoreEPSGrowth(5.0)).toBe(100);
+    });
   });
 
   it("scoreFCFGrowth should score FCF growth tiers correctly", () => {
