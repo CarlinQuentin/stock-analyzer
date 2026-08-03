@@ -530,6 +530,25 @@ describe("calculateEPSGrowth", () => {
       expect(trendRes.trend).toBe("Declining");
       expect(trendRes.score).toBe(0);
     });
+
+    it("7. Negative EPS to Positive EPS turnaround: Trend = Improving, isProfitable = true, Score = 80", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2018-12-31", eps: -4.67 },
+        { date: "2019-12-31", eps: -15.44 },
+        { date: "2020-12-31", eps: -7.39 },
+        { date: "2021-12-31", eps: -1.39 },
+        { date: "2022-12-31", eps: -3.68 },
+        { date: "2023-12-31", eps: -1.42 },
+        { date: "2024-12-31", eps: 0.30 },
+        { date: "2025-12-31", eps: 2.19 },
+      ];
+      expect(calculateEPSGrowth(statements)).toBeNull();
+
+      const res = calculateEPSTrend(statements);
+      expect(res.trend).toBe("Improving");
+      expect(res.isProfitable).toBe(true);
+      expect(res.score).toBe(80);
+    });
   });
 
   describe("Negative EPS Handling Tests", () => {
