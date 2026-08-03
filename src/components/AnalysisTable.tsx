@@ -222,7 +222,7 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
                 </div>
               </td>
               <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200">
-                {formatPercentage(metrics.netMargin)}
+                {formatPercentage(metrics.netMargin, true)}
               </td>
               <td className="text-center px-6 py-4">
                 {metrics.netMargin !== null ? (

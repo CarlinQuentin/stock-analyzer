@@ -62,6 +62,22 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
     it("9. ROIC = 0 displays as 0.00%", () => {
       expect(formatPercentageMetric(0, true)).toBe("0.00%");
     });
+
+    it("10. Net Profitability = -4982.30 displays as -4982.30%", () => {
+      expect(formatPercentageMetric(-4982.30, true)).toBe("-4982.30%");
+    });
+
+    it("11. Net Profitability = 25 displays as 25.00%", () => {
+      expect(formatPercentageMetric(25, true)).toBe("25.00%");
+    });
+
+    it("12. Net Profitability = 0 displays as 0.00%", () => {
+      expect(formatPercentageMetric(0, true)).toBe("0.00%");
+    });
+
+    it("13. Net Profitability = 158 displays as 158.00%", () => {
+      expect(formatPercentageMetric(158, true)).toBe("158.00%");
+    });
   });
 
   describe("scoreRevenueGrowth Stock Scoring Integration", () => {
