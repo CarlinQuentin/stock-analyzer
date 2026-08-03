@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   SCORE_RANGES,
+  formatPercentageMetric,
   scoreRevenueGrowth,
   scoreEPSGrowth,
   scoreFCFGrowth,
@@ -19,6 +20,38 @@ import {
 import { FinancialMetrics, MetricScores, FinancialStatement } from "../types";
 
 describe("Scoring Utilities - Individual Metric Scores", () => {
+  describe("formatPercentageMetric & Revenue CAGR Display Formatting", () => {
+    it("1. CAGR result of 158% (1.58) displays as 158.00%", () => {
+      expect(formatPercentageMetric(1.58)).toBe("158.00%");
+    });
+
+    it("2. CAGR result of 12.5% (0.125) displays as 12.50%", () => {
+      expect(formatPercentageMetric(0.125)).toBe("12.50%");
+    });
+
+    it("3. Negative CAGR values (-0.1525) display correctly as -15.25%", () => {
+      expect(formatPercentageMetric(-0.1525)).toBe("-15.25%");
+    });
+
+    it("4. Zero CAGR (0) displays correctly as 0.00%", () => {
+      expect(formatPercentageMetric(0)).toBe("0.00%");
+    });
+
+    it("5. Null/undefined/NaN displays as N/A", () => {
+      expect(formatPercentageMetric(null)).toBe("N/A");
+      expect(formatPercentageMetric(undefined)).toBe("N/A");
+      expect(formatPercentageMetric(NaN)).toBe("N/A");
+    });
+
+    it("6. Verifies Quality Score calculation remains unchanged for 158% CAGR", () => {
+      // High CAGR (> 15%) awards max score 100
+      expect(scoreRevenueGrowth(1.58)).toBe(100);
+      expect(scoreRevenueGrowth(0.125)).toBeGreaterThanOrEqual(70);
+      expect(scoreRevenueGrowth(-0.1525)).toBe(0);
+      expect(scoreRevenueGrowth(0)).toBe(30);
+    });
+  });
+
   describe("scoreRevenueGrowth Stock Scoring Integration", () => {
     it("should score positive CAGR as expected", () => {
       expect(scoreRevenueGrowth(0.20)).toBeGreaterThanOrEqual(85); // Excellent

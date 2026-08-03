@@ -18,6 +18,14 @@ export const SCORE_RANGES = {
 };
 
 /**
+ * Format a percentage metric value for UI display (e.g. 1.58 -> "158.00%", 0.125 -> "12.50%", -0.1525 -> "-15.25%", 0 -> "0.00%")
+ */
+export function formatPercentageMetric(value: number | null | undefined): string {
+  if (value === null || value === undefined || isNaN(value)) return "N/A";
+  return `${(value * 100).toFixed(2)}%`;
+}
+
+/**
  * Helper to interpolate scores based on threshold tiers
  */
 function interpolateScore(

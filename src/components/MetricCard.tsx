@@ -79,15 +79,14 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     return (isNegative ? "-" : "") + "$" + text;
   };
 
-  const displayValue =
-    typeof value === "number" && unit === "%" && Math.abs(value) <= 1
-      ? value * 100
-      : value;
-
   const formattedValue =
-    typeof displayValue === "number" && displayValue % 1 !== 0
-      ? displayValue.toFixed(2)
-      : displayValue;
+    typeof value === "number"
+      ? unit === "%"
+        ? (value * 100).toFixed(2)
+        : value % 1 !== 0
+        ? value.toFixed(2)
+        : value
+      : value;
 
   // Render SVG Chart components
   const renderChart = () => {

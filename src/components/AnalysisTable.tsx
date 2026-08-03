@@ -1,6 +1,6 @@
 import React from "react";
 import { FinancialMetrics, MetricScores } from "../types";
-import { getMetricAnalysis } from "../utils/scoring";
+import { getMetricAnalysis, formatPercentageMetric } from "../utils/scoring";
 
 interface AnalysisTableProps {
   metrics: FinancialMetrics;
@@ -28,8 +28,7 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
   };
 
   const formatPercentage = (value: number | null): string => {
-    if (value === null) return "N/A";
-    return `${(value * 100).toFixed(2)}%`;
+    return formatPercentageMetric(value);
   };
 
   const renderPerformanceBadge = (score: number | null) => {
