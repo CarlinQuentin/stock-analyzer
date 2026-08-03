@@ -15,7 +15,7 @@ import {
   getScoreBgColorClass,
   getMetricAnalysis,
 } from "./scoring";
-import { FinancialMetrics, MetricScores } from "../types";
+import { FinancialMetrics, MetricScores, FinancialStatement } from "../types";
 
 describe("Scoring Utilities - Individual Metric Scores", () => {
   it("scoreRevenueGrowth should score revenue growth tiers correctly", () => {
@@ -38,6 +38,40 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
     expect(scoreFCFGrowth(null)).toBeNull();
     expect(scoreFCFGrowth(0.20)).toBeGreaterThanOrEqual(85);
     expect(scoreFCFGrowth(0.10)).toBeGreaterThanOrEqual(70);
+  });
+
+  describe("scoreFCFGrowth deterioration vs N/A cases", () => {
+    it("1. Positive -> Positive: should score normal CAGR", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2015-12-31", operatingCashFlow: 100, capitalExpenditure: 0 },
+        { date: "2025-12-31", operatingCashFlow: 200, capitalExpenditure: 0 },
+      ];
+      expect(scoreFCFGrowth(0.0718, statements)).toBeGreaterThanOrEqual(50);
+    });
+
+    it("2. Positive -> Negative: should assign score 0 when ending FCF <= 0 and prior FCF was positive", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2015-12-31", operatingCashFlow: 1800000000, capitalExpenditure: 0 },
+        { date: "2025-12-31", operatingCashFlow: -188000000, capitalExpenditure: 0 },
+      ];
+      expect(scoreFCFGrowth(null, statements)).toBe(0);
+    });
+
+    it("3. Negative -> Positive: should return null (N/A) for potential turnaround", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2015-12-31", operatingCashFlow: -100000000, capitalExpenditure: 0 },
+        { date: "2025-12-31", operatingCashFlow: 200000000, capitalExpenditure: 0 },
+      ];
+      expect(scoreFCFGrowth(null, statements)).toBeNull();
+    });
+
+    it("4. Negative -> Negative: should return null (N/A) when all/ending FCF are <= 0 without prior positive", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2015-12-31", operatingCashFlow: -100000000, capitalExpenditure: 0 },
+        { date: "2025-12-31", operatingCashFlow: -50000000, capitalExpenditure: 0 },
+      ];
+      expect(scoreFCFGrowth(null, statements)).toBeNull();
+    });
   });
 
   it("scoreROIC should score ROIC tiers correctly", () => {

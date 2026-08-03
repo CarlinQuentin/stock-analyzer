@@ -1,4 +1,5 @@
-import { FinancialMetrics, MetricScores } from "../types";
+import { FinancialMetrics, MetricScores, FinancialStatement } from "../types";
+import { calculateFCF } from "./financialCalculations";
 
 export const SCORE_WEIGHTS = {
   revenue: 0.2, // 20%
@@ -79,16 +80,55 @@ export function scoreEPSGrowth(cagr: number | null): number | null {
  * Average: 5% - 8% (Score 50-69)
  * Poor: < 5%       (Score 0-49)
  */
-export function scoreFCFGrowth(cagr: number | null): number | null {
-  if (cagr === null) return null;
+/**
+ * Score FCF growth (0-100)
+ * Excellent: >= 15% (Score 85-100)
+ * Good: 8% - 15%   (Score 70-84)
+ * Average: 5% - 8% (Score 50-69)
+ * Poor: < 5%       (Score 0-49)
+ *
+ * If CAGR is null, check if initial FCF in historical series was positive but ending FCF is <= 0.
+ * If so, assign a score of 0 (cash destruction). Otherwise return null (N/A).
+ */
+export function scoreFCFGrowth(
+  cagr: number | null,
+  cashFlowStatements?: FinancialStatement[],
+): number | null {
+  if (cagr !== null) {
+    return interpolateScore(cagr, [
+      { minVal: -0.10, maxVal: 0.00, minScore: 0, maxScore: 29 },
+      { minVal: 0.00, maxVal: 0.05, minScore: 30, maxScore: 49 },
+      { minVal: 0.05, maxVal: 0.08, minScore: 50, maxScore: 69 },
+      { minVal: 0.08, maxVal: 0.15, minScore: 70, maxScore: 84 },
+      { minVal: 0.15, maxVal: 0.25, minScore: 85, maxScore: 100 },
+    ]);
+  }
 
-  return interpolateScore(cagr, [
-    { minVal: -0.10, maxVal: 0.00, minScore: 0, maxScore: 29 },
-    { minVal: 0.00, maxVal: 0.05, minScore: 30, maxScore: 49 },
-    { minVal: 0.05, maxVal: 0.08, minScore: 50, maxScore: 69 },
-    { minVal: 0.08, maxVal: 0.15, minScore: 70, maxScore: 84 },
-    { minVal: 0.15, maxVal: 0.25, minScore: 85, maxScore: 100 },
-  ]);
+  if (cashFlowStatements && cashFlowStatements.length >= 2) {
+    const sortedByDate = [...cashFlowStatements].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
+
+    const lastStatement = sortedByDate[sortedByDate.length - 1];
+    const endingFCF = calculateFCF(
+      lastStatement.operatingCashFlow,
+      lastStatement.capitalExpenditure,
+    );
+
+    if (endingFCF !== null && endingFCF <= 0) {
+      // Check if any prior statement had positive FCF (Beginning FCF > 0)
+      const hasPriorPositive = sortedByDate.slice(0, -1).some((s) => {
+        const fcf = calculateFCF(s.operatingCashFlow, s.capitalExpenditure);
+        return fcf !== null && fcf > 0;
+      });
+
+      if (hasPriorPositive) {
+        return 0;
+      }
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -179,11 +219,14 @@ export function scoreProfitability(
 /**
  * Calculate all metric scores
  */
-export function calculateMetricScores(metrics: FinancialMetrics): MetricScores {
+export function calculateMetricScores(
+  metrics: FinancialMetrics,
+  cashFlowStatements?: FinancialStatement[],
+): MetricScores {
   return {
     revenue: scoreRevenueGrowth(metrics.revenueCAGR),
     eps: scoreEPSGrowth(metrics.epsGrowth),
-    fcf: scoreFCFGrowth(metrics.fcfGrowth),
+    fcf: scoreFCFGrowth(metrics.fcfGrowth, cashFlowStatements),
     roic: scoreROIC(metrics.roic),
     debt: scoreDebtToEquity(metrics.debtToEquity),
     profitability: scoreProfitability(

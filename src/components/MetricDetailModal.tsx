@@ -354,6 +354,15 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     const last = data[data.length - 1];
 
     if (last.value <= 0) {
+      const hasPriorPositive = data.slice(0, -1).some((d) => d.value > 0);
+      if (hasPriorPositive) {
+        return [
+          `1. Initial Baseline Value (${first.label}): ${formatChartValue(first.value, type)}`,
+          `2. Latest Ending Value (${last.label}): ${formatChartValue(last.value, type)}`,
+          `3. Note: CAGR is not mathematically valid because ending value is negative (${formatChartValue(last.value, type)}).`,
+          `4. Score Assigned: 0 / 100 due to negative current free cash flow destroying cash.`,
+        ];
+      }
       return [
         `1. Initial Historical Value (${first.label}): ${formatChartValue(first.value, type)}`,
         `2. Ending Value (${last.label}): ${formatChartValue(last.value, type)}`,

@@ -99,7 +99,7 @@ function App() {
           cashFlowStatements,
           dividendMetrics,
         );
-        const scores = calculateMetricScores(metrics);
+        const scores = calculateMetricScores(metrics, cashFlowStatements);
         const overallScore = calculateOverallScore(scores);
         const dataConfidenceScore = calculateDataConfidenceScore(scores);
         const unavailableMetrics = getUnavailableMetrics(scores);
