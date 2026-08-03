@@ -448,8 +448,72 @@ describe("calculateEPSGrowth", () => {
         { date: "2025-12-31", eps: 8.02 },
       ];
       // Windowing uses latest 6 years: 2020 (2.61) to 2025 (8.02) over 5 periods
-      // (8.02 / 2.61)^(1/5) - 1 ≈ 25.1% (0.2517)
+      // (8.02 / 2.61)^(1/5) - 1 ≈ 25.17% (25.14%)
       const growth = calculateEPSGrowth(statements);
+      expect(growth).toBeCloseTo(0.2517, 4);
+    });
+  });
+
+  describe("EPS Metadata & Window Consistency Regression Tests", () => {
+    it("1. CAGR result and calculated beginning year always match the 5-year window start", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2015-12-31", eps: -0.54 },
+        { date: "2016-12-31", eps: 1.57 },
+        { date: "2017-12-31", eps: 3.38 },
+        { date: "2018-12-31", eps: 5.38 },
+        { date: "2019-12-31", eps: 3.06 },
+        { date: "2020-12-31", eps: 2.61 },
+        { date: "2021-12-31", eps: 15.67 },
+        { date: "2022-12-31", eps: 21.06 },
+        { date: "2023-12-31", eps: 14.72 },
+        { date: "2024-12-31", eps: 9.89 },
+        { date: "2025-12-31", eps: 8.02 },
+      ];
+      const growth = calculateEPSGrowth(statements);
+      const expectedCAGR = Math.pow(8.02 / 2.61, 1 / 5) - 1;
+      expect(growth).toBeCloseTo(expectedCAGR, 4);
+    });
+
+    it("2. Negative beginning EPS in the selected CAGR window never produces a positive CAGR", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", eps: -1.0 },
+        { date: "2021-12-31", eps: 2.0 },
+        { date: "2022-12-31", eps: 3.0 },
+        { date: "2023-12-31", eps: 4.0 },
+        { date: "2024-12-31", eps: 5.0 },
+        { date: "2025-12-31", eps: 6.0 },
+      ];
+      expect(calculateEPSGrowth(statements)).toBe(0);
+    });
+
+    it("3. The 2015-2025 dataset uses the 2020-2025 valid calculation period", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2015-12-31", eps: -0.54 },
+        { date: "2016-12-31", eps: 1.57 },
+        { date: "2017-12-31", eps: 3.38 },
+        { date: "2018-12-31", eps: 5.38 },
+        { date: "2019-12-31", eps: 3.06 },
+        { date: "2020-12-31", eps: 2.61 },
+        { date: "2021-12-31", eps: 15.67 },
+        { date: "2022-12-31", eps: 21.06 },
+        { date: "2023-12-31", eps: 14.72 },
+        { date: "2024-12-31", eps: 9.89 },
+        { date: "2025-12-31", eps: 8.02 },
+      ];
+      const growth = calculateEPSGrowth(statements);
+      expect(growth).toBeCloseTo(0.2517, 4);
+    });
+
+    it("4. EPS CAGR calculation does not silently change baseline year without matching calculation window", () => {
+      const window = [
+        { date: "2020-12-31", eps: 2.61 },
+        { date: "2021-12-31", eps: 15.67 },
+        { date: "2022-12-31", eps: 21.06 },
+        { date: "2023-12-31", eps: 14.72 },
+        { date: "2024-12-31", eps: 9.89 },
+        { date: "2025-12-31", eps: 8.02 },
+      ];
+      const growth = calculateEPSGrowth(window);
       expect(growth).toBeCloseTo(0.2517, 4);
     });
   });

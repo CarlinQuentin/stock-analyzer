@@ -345,11 +345,15 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
 
   // Math Explanations generators
   function getMathCAGRExplanation(
-    data: { label: string; value: number }[],
+    rawSeries: { label: string; value: number }[],
     type: "currency" | "percent" | "number",
     actualCAGR: number | null
   ): string[] {
-    if (data.length < 2) return ["Insufficient historical data to calculate CAGR."];
+    if (!rawSeries || rawSeries.length < 2) return ["Insufficient historical data to calculate CAGR."];
+    
+    // CAGR calculations use the latest 5-year period (6 most recent fiscal years) when > 6 statements exist
+    const data = rawSeries.length > 6 ? rawSeries.slice(-6) : rawSeries;
+
     const first = data[0];
     const last = data[data.length - 1];
 
@@ -374,13 +378,13 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       return [
         `1. Beginning Value (${first.label}): ${formatChartValue(first.value, type)}`,
         `2. Ending Value (${last.label}): ${formatChartValue(last.value, type)}`,
-        `3. Note: CAGR cannot be calculated when the starting baseline value is zero or negative.`,
+        `3. Note: CAGR cannot be calculated because the beginning EPS is zero or negative.`,
       ];
     }
 
     const n = data.length - 1;
     const ratio = last.value / first.value;
-    const finalPct = actualCAGR !== null ? (actualCAGR * 100).toFixed(2) : ((Math.pow(ratio, 1 / n) - 1) * 100).toFixed(2);
+    const finalPct = actualCAGR !== null && actualCAGR !== 0 ? (actualCAGR * 100).toFixed(2) : ((Math.pow(ratio, 1 / n) - 1) * 100).toFixed(2);
 
     const lines: string[] = [];
     lines.push(`1. Beginning Value (${first.label}): ${formatChartValue(first.value, type)}`);
