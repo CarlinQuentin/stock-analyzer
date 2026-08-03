@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  SCORE_RANGES,
   scoreRevenueGrowth,
   scoreEPSGrowth,
   scoreFCFGrowth,
@@ -47,25 +48,41 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
   });
 
   describe("scoreEPSGrowth Stock Scoring Integration", () => {
-    it("should score positive EPS CAGR as expected", () => {
-      expect(scoreEPSGrowth(0.25)).toBeGreaterThanOrEqual(85); // Excellent
-      expect(scoreEPSGrowth(0.10)).toBeGreaterThanOrEqual(70); // Good
-      expect(scoreEPSGrowth(0.06)).toBeGreaterThanOrEqual(50); // Average
+    it("Test 1: EPS CAGR = 20% (0.20) -> Rating = Excellent, Score >= 85", () => {
+      const score = scoreEPSGrowth(0.20);
+      expect(score).not.toBeNull();
+      expect(score!).toBeGreaterThanOrEqual(85);
+      const cat = SCORE_RANGES.excellent;
+      expect(score!).toBeGreaterThanOrEqual(cat.min);
+      expect(score!).toBeLessThanOrEqual(cat.max);
     });
 
-    it("should score negative EPS CAGR as expected", () => {
-      expect(scoreEPSGrowth(-0.10)).toBe(0);
-      expect(scoreEPSGrowth(-0.05)).toBeLessThan(30);
+    it("Test 2: EPS CAGR = 10% (0.10) -> Rating = Good (70 - 84)", () => {
+      const score = scoreEPSGrowth(0.10);
+      expect(score).not.toBeNull();
+      expect(score!).toBeGreaterThanOrEqual(SCORE_RANGES.good.min);
+      expect(score!).toBeLessThanOrEqual(SCORE_RANGES.good.max);
     });
 
-    it("should score zero EPS CAGR as expected", () => {
-      expect(scoreEPSGrowth(0)).toBe(30);
+    it("Test 3: EPS CAGR = 6.30% (0.063) -> Rating = Average (50 - 69)", () => {
+      const score = scoreEPSGrowth(0.063);
+      expect(score).not.toBeNull();
+      expect(score!).toBeGreaterThanOrEqual(SCORE_RANGES.average.min);
+      expect(score!).toBeLessThanOrEqual(SCORE_RANGES.average.max);
+      expect(score!).toBe(58);
     });
 
-    it("should return a score of 0 for invalid/missing EPS CAGR instead of null, undefined, or N/A", () => {
-      expect(scoreEPSGrowth(null)).toBe(0);
-      expect(scoreEPSGrowth(undefined)).toBe(0);
-      expect(scoreEPSGrowth(NaN)).toBe(0);
+    it("Test 4: EPS CAGR = 3% (0.03) -> Rating = Poor (0 - 49)", () => {
+      const score = scoreEPSGrowth(0.03);
+      expect(score).not.toBeNull();
+      expect(score!).toBeGreaterThanOrEqual(SCORE_RANGES.poor.min);
+      expect(score!).toBeLessThanOrEqual(SCORE_RANGES.poor.max);
+    });
+
+    it("Test 5: EPS CAGR = null -> returns null (No EPS CAGR score awarded)", () => {
+      expect(scoreEPSGrowth(null)).toBeNull();
+      expect(scoreEPSGrowth(undefined)).toBeNull();
+      expect(scoreEPSGrowth(NaN)).toBeNull();
     });
 
     it("should cap extremely high EPS CAGR values at max score 100", () => {

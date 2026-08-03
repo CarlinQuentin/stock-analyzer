@@ -55,17 +55,17 @@ export function scoreRevenueGrowth(cagr: number | null | undefined): number {
 }
 
 /**
- * Score EPS growth (0-100)
- * Excellent: >= 15% (Score 85-100)
- * Good: 8% - 15%   (Score 70-84)
- * Average: 5% - 8% (Score 50-69)
- * Poor: < 5%       (Score 0-49)
+ * Score EPS growth (0-100) based on EPS CAGR evaluation standards:
+ * - Excellent: > 15% (Score 85-100)
+ * - Good: 8% - 15% (Score 70-84)
+ * - Average: 5% - 8% (Score 50-69)
+ * - Poor: < 5% (Score 0-49)
  */
-export function scoreEPSGrowth(cagr: number | null | undefined): number {
-  if (cagr === null || cagr === undefined || isNaN(cagr)) return 0;
+export function scoreEPSGrowth(cagr: number | null | undefined): number | null {
+  if (cagr === null || cagr === undefined || isNaN(cagr)) return null;
 
   return interpolateScore(cagr, [
-    { minVal: -0.10, maxVal: 0.00, minScore: 0, maxScore: 30 },
+    { minVal: -0.10, maxVal: 0.00, minScore: 0, maxScore: 29 },
     { minVal: 0.00, maxVal: 0.05, minScore: 30, maxScore: 49 },
     { minVal: 0.05, maxVal: 0.08, minScore: 50, maxScore: 69 },
     { minVal: 0.08, maxVal: 0.15, minScore: 70, maxScore: 84 },
