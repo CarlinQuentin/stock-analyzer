@@ -78,6 +78,10 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
     it("13. Net Profitability = 158 displays as 158.00%", () => {
       expect(formatPercentageMetric(158, true)).toBe("158.00%");
     });
+
+    it("14. Metric value -4982.3042 renders -4982.30%", () => {
+      expect(formatPercentageMetric(-4982.3042, true)).toBe("-4982.30%");
+    });
   });
 
   describe("scoreRevenueGrowth Stock Scoring Integration", () => {

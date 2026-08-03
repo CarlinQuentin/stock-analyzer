@@ -871,7 +871,9 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                   {config.value !== null ? (
                     <>
                       {config.unit === "%"
-                        ? config.title.toLowerCase().includes("roic")
+                        ? config.title.toLowerCase().includes("roic") ||
+                          config.title.toLowerCase().includes("profitability") ||
+                          config.title.toLowerCase().includes("margin")
                           ? config.value.toFixed(2)
                           : (config.value * 100).toFixed(2)
                         : config.value.toFixed(2)}
