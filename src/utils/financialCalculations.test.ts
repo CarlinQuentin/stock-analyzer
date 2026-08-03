@@ -412,40 +412,92 @@ describe("calculateEPSGrowth", () => {
       const growth = calculateEPSGrowth(statements);
       expect(growth).toBeCloseTo(0.2517, 4);
     });
+  });
 
-    it("3. Returns null (N/A) when beginning EPS is non-positive (e.g. 2015 EPS is -$0.54)", () => {
+  describe("EPS CAGR Baseline Selection Tests", () => {
+    it("1. Calculates CAGR from first positive EPS year (2020: 0.25 to 2025: 1.18 = ~36.4%)", () => {
       const statements: FinancialStatement[] = [
-        { date: "2015-12-31", eps: -0.54 },
-        { date: "2016-12-31", eps: 1.57 },
-        { date: "2017-12-31", eps: 3.38 },
-        { date: "2018-12-31", eps: 5.38 },
-        { date: "2019-12-31", eps: 3.06 },
-        { date: "2020-12-31", eps: 2.61 },
-        { date: "2021-12-31", eps: 15.67 },
-        { date: "2022-12-31", eps: 21.06 },
-        { date: "2023-12-31", eps: 14.72 },
-        { date: "2024-12-31", eps: 9.89 },
-        { date: "2025-12-31", eps: 8.02 },
+        { date: "2015-12-31", eps: -0.46 },
+        { date: "2016-12-31", eps: -0.31 },
+        { date: "2017-12-31", eps: -0.79 },
+        { date: "2018-12-31", eps: -0.38 },
+        { date: "2019-12-31", eps: -0.33 },
+        { date: "2020-12-31", eps: 0.25 },
+        { date: "2021-12-31", eps: 1.87 },
+        { date: "2022-12-31", eps: 4.02 },
+        { date: "2023-12-31", eps: 4.73 },
+        { date: "2024-12-31", eps: 2.23 },
+        { date: "2025-12-31", eps: 1.18 },
       ];
-      // Beginning EPS (-0.54) <= 0 -> returns null (N/A), does NOT return 0 or shift baseline
+      // First positive EPS year is 2020 (0.25). Ending year is 2025 (1.18).
+      // Periods = 5. (1.18 / 0.25)^(1/5) - 1 = 4.72^0.2 - 1 ≈ 36.39% (36.4%)
       const growth = calculateEPSGrowth(statements);
-      expect(growth).toBeNull();
+      expect(growth).not.toBeNull();
+      expect(growth).toBeCloseTo(0.3639, 3);
     });
 
-    it("4. Returns null (N/A) when ending EPS is non-positive", () => {
+    it("2. Negative EPS history followed by positive EPS uses first positive EPS year", () => {
       const statements: FinancialStatement[] = [
-        { date: "2020-12-31", eps: 5.0 },
-        { date: "2025-12-31", eps: -1.0 },
+        { date: "2018-12-31", eps: -2.0 },
+        { date: "2019-12-31", eps: -1.0 },
+        { date: "2020-12-31", eps: 0.50 },
+        { date: "2021-12-31", eps: 1.00 },
+        { date: "2022-12-31", eps: 2.00 },
+      ];
+      // (2.0 / 0.5)^(1/2) - 1 = 4.0^0.5 - 1 = 2.0 - 1 = 1.0 (100%)
+      const growth = calculateEPSGrowth(statements);
+      expect(growth).toBeCloseTo(1.0, 4);
+    });
+
+    it("3. Multiple years of positive EPS uses earliest valid positive EPS year", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2015-12-31", eps: 1.0 },
+        { date: "2016-12-31", eps: 1.2 },
+        { date: "2017-12-31", eps: 1.5 },
+        { date: "2018-12-31", eps: 1.8 },
+        { date: "2019-12-31", eps: 2.0 },
+        { date: "2020-12-31", eps: 2.3 },
+        { date: "2021-12-31", eps: 2.6 },
+        { date: "2022-12-31", eps: 3.0 },
+        { date: "2023-12-31", eps: 3.4 },
+        { date: "2024-12-31", eps: 3.8 },
+        { date: "2025-12-31", eps: 4.0 },
+      ];
+      // 2015 (1.0) to 2025 (4.0) over 10 periods: ~14.87%
+      const growth = calculateEPSGrowth(statements);
+      expect(growth).toBeCloseTo(0.1487, 4);
+    });
+
+    it("4. No positive EPS exists: returns null", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", eps: -0.5 },
+        { date: "2021-12-31", eps: -0.4 },
+        { date: "2022-12-31", eps: -0.3 },
+        { date: "2023-12-31", eps: -0.2 },
+        { date: "2024-12-31", eps: -0.1 },
       ];
       expect(calculateEPSGrowth(statements)).toBeNull();
     });
 
-    it("5. Does not return 0% for invalid EPS CAGR", () => {
+    it("5. Positive EPS exists but not enough years: returns null", () => {
       const statements: FinancialStatement[] = [
-        { date: "2020-12-31", eps: -1.0 },
-        { date: "2025-12-31", eps: 5.0 },
+        { date: "2020-12-31", eps: -0.5 },
+        { date: "2021-12-31", eps: -0.4 },
+        { date: "2022-12-31", eps: -0.3 },
+        { date: "2023-12-31", eps: -0.2 },
+        { date: "2024-12-31", eps: 0.5 },
       ];
-      expect(calculateEPSGrowth(statements)).not.toBe(0);
+      // Only 1 positive year (2024), periods = 0 -> returns null
+      expect(calculateEPSGrowth(statements)).toBeNull();
+    });
+
+    it("6. Ending EPS becomes negative again: returns null", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", eps: 0.5 },
+        { date: "2021-12-31", eps: 1.0 },
+        { date: "2022-12-31", eps: 0.8 },
+        { date: "2023-12-31", eps: -0.2 },
+      ];
       expect(calculateEPSGrowth(statements)).toBeNull();
     });
   });
@@ -542,7 +594,8 @@ describe("calculateEPSGrowth", () => {
         { date: "2024-12-31", eps: 0.30 },
         { date: "2025-12-31", eps: 2.19 },
       ];
-      expect(calculateEPSGrowth(statements)).toBeNull();
+      // Uses 2024 (0.30) to 2025 (2.19) over 1 period (6.3 = 630% CAGR)
+      expect(calculateEPSGrowth(statements)).toBeCloseTo(6.3, 1);
 
       const res = calculateEPSTrend(statements);
       expect(res.trend).toBe("Improving");
@@ -641,7 +694,7 @@ describe("calculateEPSGrowth", () => {
       expect(growth).toBeCloseTo(0.1487, 4);
     });
 
-    it("2. Returns null when 10-year beginning EPS is non-positive", () => {
+    it("2. Uses earliest valid positive EPS year when older negative EPS years exist", () => {
       const statements: FinancialStatement[] = [
         { date: "2015-12-31", eps: -5.0 },
         { date: "2016-12-31", eps: -2.0 },
@@ -653,7 +706,7 @@ describe("calculateEPSGrowth", () => {
         { date: "2025-12-31", eps: 8.02 },
       ];
       const growth = calculateEPSGrowth(statements);
-      expect(growth).toBeNull();
+      expect(growth).toBeCloseTo(0.2517, 4);
     });
 
     it("3. Correctly calculates growth periods (2020 -> 2025 equals 5 periods)", () => {

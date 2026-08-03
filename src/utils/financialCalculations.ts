@@ -100,11 +100,12 @@ export interface EPSTrendResult {
 
 /**
  * Calculate EPS Growth (CAGR) from income statements.
- * Uses up to 10 years of EPS history (11 statement entries) when available.
- * Formula: CAGR = (Ending EPS / Beginning EPS) ^ (1 / n) - 1
  * Rules:
- * - Beginning EPS and Ending EPS must both be > 0.
- * - Returns null (N/A) if beginning EPS <= 0 or ending EPS <= 0, or if inputs are invalid.
+ * 1. Search chronologically for the earliest fiscal year where EPS is positive (> 0).
+ * 2. Use that year as beginning EPS value.
+ * 3. Use the latest available fiscal year EPS as ending EPS value.
+ * 4. Calculate CAGR if ending EPS > 0 and endingYear - beginningYear >= 1.
+ * 5. Returns null (N/A) if no positive EPS baseline exists, ending EPS <= 0, or insufficient periods.
  */
 export function calculateEPSGrowth(
   statements: FinancialStatement[] | null | undefined,
@@ -151,21 +152,27 @@ export function calculateEPSGrowth(
   const windowStatements =
     uniqueByDate.length > 11 ? uniqueByDate.slice(-11) : uniqueByDate;
 
-  const firstStatement = windowStatements[0];
   const lastStatement = windowStatements[windowStatements.length - 1];
-
-  const firstEPS = firstStatement.eps!;
   const lastEPS = lastStatement.eps!;
 
-  // Business rule: EPS CAGR can only be calculated when beginning and ending EPS are positive (> 0)
-  if (firstEPS <= 0 || lastEPS <= 0) {
+  // Business rule: ending EPS must be positive (> 0)
+  if (lastEPS <= 0) {
     return null;
   }
 
-  const firstYear = new Date(firstStatement.date).getFullYear();
+  // Search chronologically from oldest to newest for the first positive EPS statement (> 0)
+  const firstPositiveIdx = windowStatements.findIndex((s) => s.eps! > 0);
+  if (firstPositiveIdx === -1 || firstPositiveIdx === windowStatements.length - 1) {
+    return null;
+  }
+
+  const firstPositiveStatement = windowStatements[firstPositiveIdx];
+  const firstEPS = firstPositiveStatement.eps!;
+
+  const firstYear = new Date(firstPositiveStatement.date).getFullYear();
   const lastYear = new Date(lastStatement.date).getFullYear();
   const yearDiff = lastYear - firstYear;
-  const years = yearDiff > 0 ? yearDiff : windowStatements.length - 1;
+  const years = yearDiff > 0 ? yearDiff : windowStatements.length - 1 - firstPositiveIdx;
 
   if (years <= 0) {
     return null;
