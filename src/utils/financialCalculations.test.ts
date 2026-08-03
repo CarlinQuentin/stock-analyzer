@@ -500,6 +500,33 @@ describe("calculateEPSGrowth", () => {
       ];
       expect(calculateEPSGrowth(statements)).toBeNull();
     });
+
+    it("7. Regression case: Negative history followed by only 1 year of positive EPS returns null CAGR and defers to EPS Trend", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2024-12-31", eps: 0.30 },
+        { date: "2025-12-31", eps: 2.19 },
+      ];
+      // Only 1 period of positive history (2024 to 2025: n=1 < 2) -> returns null
+      expect(calculateEPSGrowth(statements)).toBeNull();
+
+      const trend = calculateEPSTrend(statements);
+      expect(trend.trend).toBe("Improving");
+      expect(trend.isProfitable).toBe(true);
+      expect(trend.score).toBe(100);
+    });
+
+    it("8. Regression case: Positive EPS history for 3+ years calculates CAGR normally", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2022-12-31", eps: 0.50 },
+        { date: "2023-12-31", eps: 1.00 },
+        { date: "2024-12-31", eps: 1.50 },
+        { date: "2025-12-31", eps: 2.00 },
+      ];
+      // (2.00 / 0.50)^(1/3) - 1 = 4.0^(1/3) - 1 ≈ 58.74%
+      const growth = calculateEPSGrowth(statements);
+      expect(growth).not.toBeNull();
+      expect(growth).toBeCloseTo(0.5874, 4);
+    });
   });
 
   describe("calculateEPSTrend Tests", () => {
@@ -583,7 +610,7 @@ describe("calculateEPSGrowth", () => {
       expect(trendRes.score).toBe(0);
     });
 
-    it("7. Negative EPS to Positive EPS turnaround: Trend = Improving, isProfitable = true, Score = 80", () => {
+    it("7. Negative EPS to Positive EPS turnaround: Trend = Improving, isProfitable = true, Score = 80 (CAGR null due to n=1)", () => {
       const statements: FinancialStatement[] = [
         { date: "2018-12-31", eps: -4.67 },
         { date: "2019-12-31", eps: -15.44 },
@@ -594,8 +621,8 @@ describe("calculateEPSGrowth", () => {
         { date: "2024-12-31", eps: 0.30 },
         { date: "2025-12-31", eps: 2.19 },
       ];
-      // Uses 2024 (0.30) to 2025 (2.19) over 1 period (6.3 = 630% CAGR)
-      expect(calculateEPSGrowth(statements)).toBeCloseTo(6.3, 1);
+      // Only 1 period of positive history (2024 to 2025: n=1 < 2) -> returns null (N/A)
+      expect(calculateEPSGrowth(statements)).toBeNull();
 
       const res = calculateEPSTrend(statements);
       expect(res.trend).toBe("Improving");

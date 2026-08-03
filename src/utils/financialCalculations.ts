@@ -174,7 +174,8 @@ export function calculateEPSGrowth(
   const yearDiff = lastYear - firstYear;
   const years = yearDiff > 0 ? yearDiff : windowStatements.length - 1 - firstPositiveIdx;
 
-  if (years <= 0) {
+  // Minimum period requirement: EPS CAGR requires at least 2 compounding periods (>= 2 years)
+  if (years < 2) {
     return null;
   }
 

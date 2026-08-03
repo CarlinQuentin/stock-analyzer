@@ -29,8 +29,7 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
 
   const formatPercentage = (value: number | null): string => {
     if (value === null) return "N/A";
-    const normalized = Math.abs(value) <= 1 ? value * 100 : value;
-    return `${normalized.toFixed(2)}%`;
+    return `${(value * 100).toFixed(2)}%`;
   };
 
   const renderPerformanceBadge = (score: number | null) => {

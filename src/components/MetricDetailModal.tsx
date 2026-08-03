@@ -870,7 +870,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                 <div className="text-3xl font-extrabold text-slate-900 dark:text-white">
                   {config.value !== null ? (
                     <>
-                      {config.unit === "%" && Math.abs(config.value) <= 1
+                      {config.unit === "%"
                         ? (config.value * 100).toFixed(2)
                         : config.value.toFixed(2)}
                       <span className="text-lg text-slate-500 font-semibold ml-1">{config.unit}</span>
