@@ -9,6 +9,7 @@ interface ChartDataPoint {
 interface MetricCardProps {
   title: string;
   value: number | null;
+  statusText?: string;
   unit?: string;
   score: number | null;
   description?: string;
@@ -24,6 +25,7 @@ interface MetricCardProps {
 export const MetricCard: React.FC<MetricCardProps> = ({
   title,
   value,
+  statusText,
   unit = "",
   score,
   description,
@@ -285,6 +287,10 @@ export const MetricCard: React.FC<MetricCardProps> = ({
               {unit && (
                 <span className="text-xl text-slate-600 dark:text-slate-400 ml-1">{unit}</span>
               )}
+            </p>
+          ) : statusText ? (
+            <p className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">
+              {statusText}
             </p>
           ) : (
             <p className="text-lg text-slate-500 dark:text-slate-400 italic">Data not available</p>

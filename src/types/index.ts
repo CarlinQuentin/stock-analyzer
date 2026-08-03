@@ -107,7 +107,7 @@ export interface AnalysisResult {
 }
 
 export interface FCFTrendResult {
-  trend: "Improving" | "Deteriorating" | "Flat" | "Turnaround";
+  trend: "Improving" | "Deteriorating" | "Declining" | "Flat" | "Turnaround" | "Emerging";
   isPositive: boolean;
   score: number;
   burnChangePct: number | null;
@@ -116,10 +116,10 @@ export interface FCFTrendResult {
 export interface FinancialMetrics {
   revenueCAGR: number | null;
   epsGrowth: number | null;
-  epsTrend?: "Improving" | "Declining" | "Flat";
+  epsTrend?: "Improving" | "Deteriorating" | "Declining" | "Flat" | "Turnaround" | "Emerging";
   epsTrendScore?: number | null;
   fcfGrowth: number | null;
-  fcfTrend?: "Improving" | "Deteriorating" | "Flat" | "Turnaround";
+  fcfTrend?: "Improving" | "Deteriorating" | "Declining" | "Flat" | "Turnaround" | "Emerging";
   fcfTrendScore?: number | null;
   fcfBurnChangePct?: number | null;
   roic: number | null;

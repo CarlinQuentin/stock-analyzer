@@ -44,6 +44,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       icon: "📊",
       score: 0,
       value: null as number | null,
+      statusText: undefined as string | undefined,
       unit: "",
       chartData: [] as { label: string; value: number }[],
       chartValueType: "currency" as "currency" | "percent" | "number",
@@ -91,6 +92,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           icon: "💹",
           score: result.scores.eps,
           value: result.metrics.epsGrowth,
+          statusText: result.metrics.epsTrend,
           unit: "%",
           chartData: result.epsHistory || [],
           chartValueType: "currency" as const,
@@ -105,9 +107,9 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           mathExplanation: result.metrics.epsGrowth !== null
             ? getMathCAGRExplanation(result.epsHistory || [], "currency", result.metrics.epsGrowth)
             : [
-                `1. EPS CAGR: N/A (Cannot calculate CAGR when beginning or ending EPS is zero or negative).`,
+                `1. Note: CAGR was not calculated because beginning or ending EPS is zero or negative. Evaluated using EPS Trend methodology.`,
                 `2. Evaluated EPS Direction Trend: ${result.metrics.epsTrend || "N/A"}.`,
-                `3. Trend Scoring Rule Applied: Positive Increasing (100), Shrinking Losses (60), Flat (40), Declining Positive (20), Expanding Losses (0).`,
+                `3. Trend Scoring Rule Applied: Positive Increasing (100), Turnaround (75), Shrinking Losses (45), Flat (25), Declining Positive (16), Expanding Losses (0).`,
                 `4. Metric Score Assigned: ${result.scores.eps !== null ? result.scores.eps : "N/A"} / 100.`,
               ],
           whyItMatters: "Earnings Per Share (EPS) growth shows how efficiently a company translates top-line growth into bottom-line profits for shareholders. EPS growth can be driven by expanding profit margins or by share repurchases (buybacks) reducing the share count.",
@@ -128,6 +130,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           icon: "💰",
           score: result.scores.fcf,
           value: result.metrics.fcfGrowth,
+          statusText: result.metrics.fcfTrend,
           unit: "%",
           chartData: result.fcfHistory || [],
           chartValueType: "currency" as const,
@@ -435,10 +438,19 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       return getMathCAGRExplanation(data, "currency", actualCAGR);
     }
 
+    let reason = "starting or ending Free Cash Flow is non-positive";
+    if (first.value > 0 && last.value <= 0) {
+      reason = "the Free Cash Flow changed from positive to negative";
+    } else if (first.value <= 0 && last.value > 0) {
+      reason = "the Free Cash Flow changed from negative to positive";
+    } else if (first.value <= 0 && last.value <= 0) {
+      reason = "both starting and ending Free Cash Flow values are negative";
+    }
+
     const lines: string[] = [
       `1. Beginning Year (${first.label}): ${formatChartValue(first.value, "currency")}`,
       `2. Ending Year (${last.label}): ${formatChartValue(last.value, "currency")}`,
-      `3. Note: CAGR was not used because starting or ending Free Cash Flow is non-positive. Evaluated using FCF cash burn trend methodology.`,
+      `3. Note: CAGR was not calculated because ${reason}. The metric was evaluated using the FCF Trend methodology.`,
     ];
 
     const fcfTrend = metrics?.fcfTrend || (last.value > first.value ? (first.value <= 0 && last.value > 0 ? "Turnaround" : "Improving") : "Deteriorating");
@@ -925,6 +937,10 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                         : config.value.toFixed(2)}
                       <span className="text-lg text-slate-500 font-semibold ml-1">{config.unit}</span>
                     </>
+                  ) : config.statusText ? (
+                    <span className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">
+                      {config.statusText}
+                    </span>
                   ) : (
                     "N/A"
                   )}

@@ -606,6 +606,7 @@ function App() {
                 <MetricCard
                   title="EPS Growth"
                   value={result.metrics.epsGrowth}
+                  statusText={result.metrics.epsTrend}
                   unit="%"
                   score={result.scores.eps}
                   description={result.epsHistory && result.epsHistory.length > 1 ? `${result.epsHistory.length - 1}-year CAGR` : "CAGR"}
@@ -620,6 +621,7 @@ function App() {
                 <MetricCard
                   title="FCF Growth"
                   value={result.metrics.fcfGrowth}
+                  statusText={result.metrics.fcfTrend}
                   unit="%"
                   score={result.scores.fcf}
                   description={result.fcfHistory && result.fcfHistory.length > 1 ? `${result.fcfHistory.length - 1}-year CAGR` : "CAGR"}

@@ -627,7 +627,7 @@ describe("calculateEPSGrowth", () => {
       expect(calculateEPSGrowth(statements)).toBeNull();
 
       const res = calculateEPSTrend(statements);
-      expect(res.trend).toBe("Improving");
+      expect(res.trend).toBe("Turnaround");
       expect(res.isProfitable).toBe(true);
       expect(res.score).toBe(79);
     });

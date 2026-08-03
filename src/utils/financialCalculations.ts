@@ -94,7 +94,7 @@ export function calculateRevenueCAGR(
 }
 
 export interface EPSTrendResult {
-  trend: "Improving" | "Declining" | "Flat";
+  trend: "Improving" | "Deteriorating" | "Declining" | "Flat" | "Turnaround" | "Emerging";
   isProfitable: boolean;
   score: number;
 }
@@ -234,12 +234,13 @@ export function calculateEPSQualityScore(
   }
 }
 
+
 /**
  * Calculate directional EPS Trend and dynamic EPS Quality Score when CAGR is unavailable or to supplement analysis.
  * Rules:
  * 1. Sort financial statements chronologically by fiscal date.
  * 2. Determine startingEPS, endingEPS, and isProfitable (endingEPS > 0).
- * 3. Categorize EPS Trend (Improving | Declining | Flat).
+ * 3. Categorize EPS Trend (Improving | Deteriorating | Declining | Flat | Turnaround | Emerging).
  * 4. Compute dynamic EPS Quality Score using calculateEPSQualityScore.
  */
 export function calculateEPSTrend(
@@ -295,9 +296,13 @@ export function calculateEPSTrend(
   const netChange = endingEPS - startingEPS;
   const isFlat = Math.abs(netChange) <= 0.02;
 
-  let trend: "Improving" | "Declining" | "Flat" = "Flat";
+  let trend: "Improving" | "Deteriorating" | "Declining" | "Flat" | "Turnaround" | "Emerging" = "Flat";
   if (isFlat) {
     trend = "Flat";
+  } else if (startingEPS <= 0 && endingEPS > 0) {
+    trend = startingEPS === 0 ? "Emerging" : "Turnaround";
+  } else if (startingEPS > 0 && endingEPS <= 0) {
+    trend = endingEPS === 0 ? "Declining" : "Deteriorating";
   } else if (netChange > 0) {
     trend = "Improving";
   } else {
@@ -415,20 +420,20 @@ export function calculateFCFTrend(
     return { trend, isPositive, score, burnChangePct: (netChange / startingFCF) * 100 };
   }
 
-  // Scenario 2: Negative FCF -> Positive FCF (Turnaround)
+  // Scenario 2: Negative/Zero FCF -> Positive FCF (Turnaround or Emerging)
   if (startingFCF <= 0 && endingFCF > 0) {
     return {
-      trend: "Turnaround",
+      trend: startingFCF === 0 ? "Emerging" : "Turnaround",
       isPositive: true,
       score: 75,
       burnChangePct: null,
     };
   }
 
-  // Scenario 3: Positive FCF -> Negative FCF (Deterioration)
+  // Scenario 3: Positive FCF -> Zero/Negative FCF (Declining or Deterioration)
   if (startingFCF > 0 && endingFCF <= 0) {
     return {
-      trend: "Deteriorating",
+      trend: endingFCF === 0 ? "Declining" : "Deteriorating",
       isPositive: false,
       score: 0,
       burnChangePct: null,
