@@ -109,6 +109,8 @@ export interface AnalysisResult {
 export interface FinancialMetrics {
   revenueCAGR: number | null;
   epsGrowth: number | null;
+  epsTrend?: "Improving" | "Declining" | "Flat";
+  epsTrendScore?: number | null;
   fcfGrowth: number | null;
   roic: number | null;
   debtToEquity: number | null;

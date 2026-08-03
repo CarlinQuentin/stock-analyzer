@@ -94,11 +94,22 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           unit: "%",
           chartData: result.epsHistory || [],
           chartValueType: "currency" as const,
-          description: epsYears > 0 
-            ? `${epsYears}-Year Compound Annual Growth Rate (CAGR) of Earnings Per Share (EPS).`
-            : "Compound Annual Growth Rate (CAGR) of Earnings Per Share (EPS).",
-          formula: "CAGR = (Ending EPS / Beginning EPS) ^ (1 / n) - 1",
-          mathExplanation: getMathCAGRExplanation(result.epsHistory || [], "currency", result.metrics.epsGrowth),
+          description: result.metrics.epsGrowth !== null
+            ? (epsYears > 0 
+                ? `${epsYears}-Year Compound Annual Growth Rate (CAGR) of Earnings Per Share (EPS).`
+                : "Compound Annual Growth Rate (CAGR) of Earnings Per Share (EPS).")
+            : `EPS Trend Analysis (${result.metrics.epsTrend || "Evaluated"}). EPS CAGR is N/A due to non-positive starting or ending EPS.`,
+          formula: result.metrics.epsGrowth !== null
+            ? "CAGR = (Ending EPS / Beginning EPS) ^ (1 / n) - 1"
+            : "EPS Trend Evaluation (Direction & Profitability)",
+          mathExplanation: result.metrics.epsGrowth !== null
+            ? getMathCAGRExplanation(result.epsHistory || [], "currency", result.metrics.epsGrowth)
+            : [
+                `1. EPS CAGR: N/A (Cannot calculate CAGR when beginning or ending EPS is zero or negative).`,
+                `2. Evaluated EPS Direction Trend: ${result.metrics.epsTrend || "N/A"}.`,
+                `3. Trend Scoring Rule Applied: Positive Increasing (100), Shrinking Losses (60), Flat (40), Declining Positive (20), Expanding Losses (0).`,
+                `4. Metric Score Assigned: ${result.scores.eps !== null ? result.scores.eps : "N/A"} / 100.`,
+              ],
           whyItMatters: "Earnings Per Share (EPS) growth shows how efficiently a company translates top-line growth into bottom-line profits for shareholders. EPS growth can be driven by expanding profit margins or by share repurchases (buybacks) reducing the share count.",
           tiers: [
             { label: "Excellent", range: "> 15%", color: "text-green-500" },

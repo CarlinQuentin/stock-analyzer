@@ -92,19 +92,25 @@ export function calculateRevenueCAGR(
   return calculateCAGR(firstRevenue, lastRevenue, years);
 }
 
+export interface EPSTrendResult {
+  trend: "Improving" | "Declining" | "Flat";
+  isProfitable: boolean;
+  score: number;
+}
+
 /**
  * Calculate EPS Growth (CAGR) from income statements.
- * Uses the latest 5-year CAGR period (6 most recent fiscal years) if more than 6 years are provided.
+ * Uses up to 10 years of EPS history (11 statement entries) when available.
  * Formula: CAGR = (Ending EPS / Beginning EPS) ^ (1 / n) - 1
  * Rules:
  * - Beginning EPS and Ending EPS must both be > 0.
- * - Returns 0 if beginning EPS <= 0 or ending EPS <= 0, or if inputs are invalid.
+ * - Returns null (N/A) if beginning EPS <= 0 or ending EPS <= 0, or if inputs are invalid.
  */
 export function calculateEPSGrowth(
   statements: FinancialStatement[] | null | undefined,
-): number {
+): number | null {
   if (!statements || !Array.isArray(statements) || statements.length < 2) {
-    return 0;
+    return null;
   }
 
   // Filter out invalid statement objects or missing/non-numeric EPS
@@ -118,7 +124,7 @@ export function calculateEPSGrowth(
   );
 
   if (validStatements.length < 2) {
-    return 0;
+    return null;
   }
 
   // Clone to prevent mutating input array and sort chronologically by date
@@ -138,12 +144,12 @@ export function calculateEPSGrowth(
   }
 
   if (uniqueByDate.length < 2) {
-    return 0;
+    return null;
   }
 
-  // Use the 6 most recent fiscal years (latest 5-year CAGR period) if more than 6 years are provided
+  // Use up to 10 years of EPS history (up to 11 statement entries)
   const windowStatements =
-    uniqueByDate.length > 6 ? uniqueByDate.slice(-6) : uniqueByDate;
+    uniqueByDate.length > 11 ? uniqueByDate.slice(-11) : uniqueByDate;
 
   const firstStatement = windowStatements[0];
   const lastStatement = windowStatements[windowStatements.length - 1];
@@ -153,7 +159,7 @@ export function calculateEPSGrowth(
 
   // Business rule: EPS CAGR can only be calculated when beginning and ending EPS are positive (> 0)
   if (firstEPS <= 0 || lastEPS <= 0) {
-    return 0;
+    return null;
   }
 
   const firstYear = new Date(firstStatement.date).getFullYear();
@@ -162,10 +168,94 @@ export function calculateEPSGrowth(
   const years = yearDiff > 0 ? yearDiff : windowStatements.length - 1;
 
   if (years <= 0) {
-    return 0;
+    return null;
   }
 
   return calculateCAGR(firstEPS, lastEPS, years);
+}
+
+/**
+ * Calculate directional EPS Trend and Score when CAGR is unavailable or for trend evaluation.
+ */
+export function calculateEPSTrend(
+  statements: FinancialStatement[] | null | undefined,
+): EPSTrendResult {
+  if (!statements || !Array.isArray(statements) || statements.length === 0) {
+    return { trend: "Flat", isProfitable: false, score: 40 };
+  }
+
+  const validStatements = statements.filter(
+    (s) =>
+      s &&
+      s.date &&
+      typeof s.eps === "number" &&
+      !isNaN(s.eps) &&
+      isFinite(s.eps),
+  );
+
+  if (validStatements.length === 0) {
+    return { trend: "Flat", isProfitable: false, score: 40 };
+  }
+
+  const sortedByDate = [...validStatements].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+  );
+
+  const uniqueByDate: FinancialStatement[] = [];
+  const seenDates = new Set<string>();
+  for (let i = sortedByDate.length - 1; i >= 0; i--) {
+    const dateStr = new Date(sortedByDate[i].date).toISOString().split("T")[0];
+    if (!seenDates.has(dateStr)) {
+      seenDates.add(dateStr);
+      uniqueByDate.unshift(sortedByDate[i]);
+    }
+  }
+
+  const epsValues = uniqueByDate.map((s) => s.eps!);
+  const firstEPS = epsValues[0];
+  const lastEPS = epsValues[epsValues.length - 1];
+  const isProfitable = lastEPS > 0;
+
+  if (epsValues.length === 1) {
+    return {
+      trend: "Flat",
+      isProfitable,
+      score: isProfitable ? 50 : 20,
+    };
+  }
+
+  const netChange = lastEPS - firstEPS;
+
+  let trend: "Improving" | "Declining" | "Flat" = "Flat";
+  if (Math.abs(netChange) <= 0.02) {
+    trend = "Flat";
+  } else if (netChange > 0) {
+    trend = "Improving";
+  } else {
+    trend = "Declining";
+  }
+
+  let score = 40;
+  if (isProfitable) {
+    if (trend === "Improving") {
+      score = 100;
+    } else if (trend === "Declining") {
+      score = 20;
+    } else {
+      score = 40;
+    }
+  } else {
+    // Unprofitable (lastEPS <= 0)
+    if (trend === "Improving") {
+      score = 60; // Losses shrinking
+    } else if (trend === "Declining") {
+      score = 0; // Losses increasing
+    } else {
+      score = 40;
+    }
+  }
+
+  return { trend, isProfitable, score };
 }
 
 /**
@@ -441,9 +531,12 @@ export function calculateAllMetrics(
   const sortedBalance = [...balanceSheets].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
+  const epsTrendData = calculateEPSTrend(incomeStatements);
   return {
     revenueCAGR: calculateRevenueCAGR(incomeStatements),
     epsGrowth: calculateEPSGrowth(incomeStatements),
+    epsTrend: epsTrendData.trend,
+    epsTrendScore: epsTrendData.score,
     fcfGrowth: calculateFCFGrowth(cashFlowStatements),
     roic: calculateAverageROIC(incomeStatements, balanceSheets),
     debtToEquity: calculateDebtToEquity(

@@ -118,14 +118,22 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
               <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
                 <div>{epsYears ? `${epsYears}-Year` : "Historical"} EPS Growth</div>
                 <div className="text-sm text-slate-500 dark:text-slate-400">
-                  Earnings per share growth
+                  {metrics.epsGrowth !== null
+                    ? "Earnings per share growth"
+                    : `EPS Trend: ${metrics.epsTrend || "N/A"}`}
                 </div>
               </td>
-              <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200">
-                {formatPercentage(metrics.epsGrowth)}
+              <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200 font-semibold">
+                {metrics.epsGrowth !== null ? (
+                  formatPercentage(metrics.epsGrowth)
+                ) : (
+                  <span className="text-slate-500 dark:text-slate-400 font-normal">
+                    N/A ({metrics.epsTrend || "Trend"})
+                  </span>
+                )}
               </td>
               <td className="text-center px-6 py-4">
-                {metrics.epsGrowth !== null ? (
+                {scores.eps !== null ? (
                   renderPerformanceBadge(scores.eps)
                 ) : (
                   <span className="text-slate-500 dark:text-slate-400">N/A</span>

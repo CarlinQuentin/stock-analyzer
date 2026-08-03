@@ -1,5 +1,5 @@
 import { FinancialMetrics, MetricScores, FinancialStatement } from "../types";
-import { calculateFCF } from "./financialCalculations";
+import { calculateFCF, calculateEPSTrend } from "./financialCalculations";
 
 export const SCORE_WEIGHTS = {
   revenue: 0.2, // 20%
@@ -222,10 +222,22 @@ export function scoreProfitability(
 export function calculateMetricScores(
   metrics: FinancialMetrics,
   cashFlowStatements?: FinancialStatement[],
+  incomeStatements?: FinancialStatement[],
 ): MetricScores {
+  let epsScore: number | null = null;
+  if (metrics.epsGrowth !== null) {
+    epsScore = scoreEPSGrowth(metrics.epsGrowth);
+  } else if (metrics.epsTrendScore !== undefined && metrics.epsTrendScore !== null) {
+    epsScore = metrics.epsTrendScore;
+  } else if (incomeStatements) {
+    epsScore = calculateEPSTrend(incomeStatements).score;
+  } else {
+    epsScore = null;
+  }
+
   return {
     revenue: scoreRevenueGrowth(metrics.revenueCAGR),
-    eps: scoreEPSGrowth(metrics.epsGrowth),
+    eps: epsScore,
     fcf: scoreFCFGrowth(metrics.fcfGrowth, cashFlowStatements),
     roic: scoreROIC(metrics.roic),
     debt: scoreDebtToEquity(metrics.debtToEquity),
