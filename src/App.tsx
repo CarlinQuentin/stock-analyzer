@@ -16,7 +16,7 @@ import { AuthModal } from "./components/AuthModal";
 import { UserHeader } from "./components/UserHeader";
 import { authService, UserProfile } from "./services/authService";
 import { fmpService } from "./services/financialModelingPrep";
-import { calculateAllMetrics } from "./utils/financialCalculations";
+import { calculateAllMetrics, calculateFCFMarginHistory } from "./utils/financialCalculations";
 import { calculateMetricScores, calculateOverallScore, calculateDataConfidenceScore, getUnavailableMetrics } from "./utils/scoring";
 import {
   calculateValuationMetrics,
@@ -175,6 +175,8 @@ function App() {
             return { label: year, value: netMargin };
           });
 
+        const fcfMarginHistory = calculateFCFMarginHistory(incomeStatements, cashFlowStatements);
+
         // 1. P/E Ratio History
         const peHistory = [...incomeStatements]
           .reverse()
@@ -280,6 +282,7 @@ function App() {
           roicHistory,
           debtEquityHistory,
           profitabilityHistory,
+          fcfMarginHistory,
           
           valuationMetrics,
           valuationScores,
@@ -633,6 +636,20 @@ function App() {
                   chartValueType="currency"
                   isExpanded={showAllCharts}
                   onClick={() => setSelectedMetric("fcf")}
+                  directionStrategy="higherIsBetter"
+                />
+                <MetricCard
+                  title="FCF Margin"
+                  value={result.metrics.fcfMargin}
+                  unit="%"
+                  score={result.scores.fcfMargin}
+                  description="Free Cash Flow Margin"
+                  tooltip="Measures how efficiently a company converts top-line revenue into bottom-line free cash flow. Higher margins indicate superior cash conversion."
+                  icon="💵"
+                  chartData={result.fcfMarginHistory}
+                  chartValueType="percent"
+                  isExpanded={showAllCharts}
+                  onClick={() => setSelectedMetric("fcfMargin")}
                   directionStrategy="higherIsBetter"
                 />
                 <MetricCard

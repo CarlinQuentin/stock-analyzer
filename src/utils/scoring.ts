@@ -2,12 +2,13 @@ import { FinancialMetrics, MetricScores, FinancialStatement } from "../types";
 import { calculateEPSTrend, calculateFCFTrend } from "./financialCalculations";
 
 export const SCORE_WEIGHTS = {
-  revenue: 0.2, // 20%
-  eps: 0.2, // 20%
+  revenue: 0.15, // 15%
+  eps: 0.15, // 15%
   fcf: 0.15, // 15%
+  fcfMargin: 0.15, // 15%
   roic: 0.15, // 15%
   debt: 0.1, // 10%
-  profitability: 0.2, // 20%
+  profitability: 0.15, // 15%
 };
 
 export const SCORE_RANGES = {
@@ -244,6 +245,7 @@ export function calculateMetricScores(
     revenue: scoreRevenueGrowth(metrics.revenueCAGR),
     eps: epsScore,
     fcf: fcfScore,
+    fcfMargin: scoreFCFMargin(metrics.fcfMargin),
     roic: scoreROIC(metrics.roic),
     debt: scoreDebtToEquity(metrics.debtToEquity),
     profitability: scoreProfitability(
@@ -252,6 +254,34 @@ export function calculateMetricScores(
       metrics.grossMargin,
     ),
   };
+}
+
+/**
+ * Score FCF Margin (0-100)
+ * Guidelines:
+ * - 20%+ = Excellent (85-100)
+ * - 10%-20% = Strong (70-84)
+ * - 5%-10% = Average (50-69)
+ * - 0%-5% = Weak (25-49)
+ * - Negative (< 0%) = Poor (0-24)
+ */
+export function scoreFCFMargin(fcfMargin: number | null): number | null {
+  if (fcfMargin === null || fcfMargin === undefined || isNaN(fcfMargin)) return null;
+
+  if (fcfMargin >= 20) {
+    return Math.min(100, Math.round(85 + Math.min(((fcfMargin - 20) / 20) * 15, 15)));
+  }
+  if (fcfMargin >= 10) {
+    return Math.round(70 + ((fcfMargin - 10) / 10) * 14);
+  }
+  if (fcfMargin >= 5) {
+    return Math.round(50 + ((fcfMargin - 5) / 5) * 19);
+  }
+  if (fcfMargin >= 0) {
+    return Math.round(25 + (fcfMargin / 5) * 24);
+  }
+  const absNeg = Math.abs(fcfMargin);
+  return Math.max(0, Math.round(24 - Math.min((absNeg / 20) * 24, 24)));
 }
 
 /**
@@ -266,6 +296,7 @@ export function calculateOverallScore(scores: MetricScores): number {
     "revenue",
     "eps",
     "fcf",
+    "fcfMargin",
     "roic",
     "debt",
     "profitability",
@@ -294,6 +325,7 @@ export function getUnavailableMetrics(scores: MetricScores): string[] {
     revenue: "Revenue Growth",
     eps: "EPS Growth",
     fcf: "FCF Growth",
+    fcfMargin: "FCF Margin",
     roic: "ROIC",
     debt: "Debt-to-Equity",
     profitability: "Profitability",

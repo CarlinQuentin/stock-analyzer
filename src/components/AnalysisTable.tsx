@@ -176,6 +176,26 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
 
             <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
               <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
+                <div>FCF Margin</div>
+                <div className="text-sm text-slate-500 dark:text-slate-400">
+                  Free cash flow efficiency
+                </div>
+              </td>
+              <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200">
+                {formatPercentage(metrics.fcfMargin, true)}
+              </td>
+              <td className="text-center px-6 py-4">
+                {renderPerformanceBadge(scores.fcfMargin)}
+              </td>
+              <td className="text-right px-6 py-4">
+                <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.fcfMargin)}`}>
+                  {scores.fcfMargin !== null ? scores.fcfMargin : "N/A"}
+                </span>
+              </td>
+            </tr>
+
+            <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+              <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
                 <div>Return on Invested Capital</div>
                 <div className="text-sm text-slate-500 dark:text-slate-400">
                   ROIC - capital efficiency

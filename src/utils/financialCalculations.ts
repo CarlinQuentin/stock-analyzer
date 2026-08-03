@@ -763,6 +763,93 @@ export function calculateAverageMargins(statements: FinancialStatement[]): {
 }
 
 /**
+ * Calculate FCF Margin from the most recent fiscal year statements.
+ * Formula: (Free Cash Flow / Revenue) * 100
+ * Returns null if Revenue or FCF is unavailable, invalid, or Revenue is 0.
+ */
+export function calculateFCFMargin(
+  incomeStatements?: FinancialStatement[] | null,
+  cashFlowStatements?: FinancialStatement[] | null,
+): number | null {
+  if (!incomeStatements || !cashFlowStatements || incomeStatements.length === 0 || cashFlowStatements.length === 0) {
+    return null;
+  }
+
+  const sortedIncome = [...incomeStatements]
+    .filter((s) => s && s.date && typeof s.revenue === "number" && !isNaN(s.revenue) && isFinite(s.revenue))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const sortedCashFlow = [...cashFlowStatements]
+    .filter((s) => s && s.date && s.operatingCashFlow !== undefined && s.capitalExpenditure !== undefined)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  if (sortedIncome.length === 0 || sortedCashFlow.length === 0) {
+    return null;
+  }
+
+  const latestIncome = sortedIncome[0];
+  const latestYear = new Date(latestIncome.date).getFullYear();
+
+  let matchingCashFlow = sortedCashFlow.find(
+    (c) => new Date(c.date).getFullYear() === latestYear,
+  );
+
+  if (!matchingCashFlow) {
+    matchingCashFlow = sortedCashFlow[0];
+  }
+
+  const revenue = latestIncome.revenue;
+  if (!revenue || revenue === 0) {
+    return null;
+  }
+
+  const fcf = calculateFCF(matchingCashFlow.operatingCashFlow, matchingCashFlow.capitalExpenditure);
+  if (fcf === null) {
+    return null;
+  }
+
+  return (fcf / revenue) * 100;
+}
+
+/**
+ * Calculate historical annual FCF Margin for charts and trend displays.
+ */
+export function calculateFCFMarginHistory(
+  incomeStatements?: FinancialStatement[] | null,
+  cashFlowStatements?: FinancialStatement[] | null,
+): { label: string; value: number }[] {
+  if (!incomeStatements || !cashFlowStatements || incomeStatements.length === 0 || cashFlowStatements.length === 0) {
+    return [];
+  }
+
+  const sortedIncome = [...incomeStatements]
+    .filter((s) => s && s.date && typeof s.revenue === "number" && !isNaN(s.revenue) && isFinite(s.revenue))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  const sortedCashFlow = [...cashFlowStatements]
+    .filter((s) => s && s.date && s.operatingCashFlow !== undefined && s.capitalExpenditure !== undefined)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  const history: { label: string; value: number }[] = [];
+
+  for (const inc of sortedIncome) {
+    const year = new Date(inc.date).getFullYear();
+    const cf = sortedCashFlow.find((c) => new Date(c.date).getFullYear() === year);
+    if (cf && inc.revenue && inc.revenue !== 0) {
+      const fcf = calculateFCF(cf.operatingCashFlow, cf.capitalExpenditure);
+      if (fcf !== null) {
+        history.push({
+          label: String(year),
+          value: (fcf / inc.revenue) * 100,
+        });
+      }
+    }
+  }
+
+  return history;
+}
+
+/**
  * Calculate all financial metrics
  */
 export function calculateAllMetrics(
@@ -786,6 +873,7 @@ export function calculateAllMetrics(
     fcfTrend: fcfTrendData.trend,
     fcfTrendScore: fcfTrendData.score,
     fcfBurnChangePct: fcfTrendData.burnChangePct,
+    fcfMargin: calculateFCFMargin(incomeStatements, cashFlowStatements),
     roic: calculateAverageROIC(incomeStatements, balanceSheets),
     debtToEquity: calculateDebtToEquity(
       sortedBalance[0]?.totalDebt,

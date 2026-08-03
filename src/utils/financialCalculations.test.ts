@@ -9,6 +9,7 @@ import {
   calculateFCFGrowth,
   calculateFCFTrend,
   getFCFFormula,
+  calculateFCFMargin,
   calculateDividendCAGR,
   calculateROIC,
   calculateAverageROIC,
@@ -1205,6 +1206,58 @@ describe("calculateMargins & calculateAverageMargins", () => {
     expect(avg.grossMargin).toBe(45);
     expect(avg.operatingMargin).toBe(25);
     expect(avg.netMargin).toBe(15);
+  });
+});
+
+describe("calculateFCFMargin", () => {
+  it("1. High FCF margin company (Revenue $1000M, FCF $250M = 25%)", () => {
+    const income: FinancialStatement[] = [
+      { date: "2024-12-31", revenue: 1000 },
+    ];
+    const cashFlow: FinancialStatement[] = [
+      { date: "2024-12-31", operatingCashFlow: 300, capitalExpenditure: 50 },
+    ];
+    const margin = calculateFCFMargin(income, cashFlow);
+    expect(margin).toBe(25);
+  });
+
+  it("2. Average FCF margin company (Revenue $1000M, FCF $80M = 8%)", () => {
+    const income: FinancialStatement[] = [
+      { date: "2024-12-31", revenue: 1000 },
+    ];
+    const cashFlow: FinancialStatement[] = [
+      { date: "2024-12-31", operatingCashFlow: 100, capitalExpenditure: 20 },
+    ];
+    const margin = calculateFCFMargin(income, cashFlow);
+    expect(margin).toBe(8);
+  });
+
+  it("3. Low FCF margin company (Revenue $1000M, FCF $20M = 2%)", () => {
+    const income: FinancialStatement[] = [
+      { date: "2024-12-31", revenue: 1000 },
+    ];
+    const cashFlow: FinancialStatement[] = [
+      { date: "2024-12-31", operatingCashFlow: 30, capitalExpenditure: 10 },
+    ];
+    const margin = calculateFCFMargin(income, cashFlow);
+    expect(margin).toBe(2);
+  });
+
+  it("4. Negative FCF scenario (Revenue $1000M, FCF -$150M = -15%)", () => {
+    const income: FinancialStatement[] = [
+      { date: "2024-12-31", revenue: 1000 },
+    ];
+    const cashFlow: FinancialStatement[] = [
+      { date: "2024-12-31", operatingCashFlow: -100, capitalExpenditure: 50 },
+    ];
+    const margin = calculateFCFMargin(income, cashFlow);
+    expect(margin).toBe(-15);
+  });
+
+  it("5. Missing/invalid revenue or FCF data returns null", () => {
+    expect(calculateFCFMargin([], [])).toBeNull();
+    expect(calculateFCFMargin([{ date: "2024-12-31", revenue: 0 }], [{ date: "2024-12-31", operatingCashFlow: 100, capitalExpenditure: 10 }])).toBeNull();
+    expect(calculateFCFMargin(undefined, undefined)).toBeNull();
   });
 });
 

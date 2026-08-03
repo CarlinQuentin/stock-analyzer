@@ -5,6 +5,7 @@ import {
   scoreRevenueGrowth,
   scoreEPSGrowth,
   scoreFCFGrowth,
+  scoreFCFMargin,
   scoreROIC,
   scoreDebtToEquity,
   scoreProfitability,
@@ -219,6 +220,47 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
     const highScore = scoreProfitability(20, 25, 50);
     expect(highScore).toBeGreaterThanOrEqual(85);
   });
+
+  describe("scoreFCFMargin", () => {
+    it("1. High FCF margin (25%+) awards high score (>= 85, Excellent)", () => {
+      const score = scoreFCFMargin(25);
+      expect(score).not.toBeNull();
+      expect(score!).toBeGreaterThanOrEqual(85);
+    });
+
+    it("2. Strong FCF margin (15%) awards strong score (70-84)", () => {
+      const score = scoreFCFMargin(15);
+      expect(score).not.toBeNull();
+      expect(score!).toBeGreaterThanOrEqual(70);
+      expect(score!).toBeLessThan(85);
+    });
+
+    it("3. Average FCF margin (7.5%) awards average score (50-69)", () => {
+      const score = scoreFCFMargin(7.5);
+      expect(score).not.toBeNull();
+      expect(score!).toBeGreaterThanOrEqual(50);
+      expect(score!).toBeLessThan(70);
+    });
+
+    it("4. Low FCF margin (2.5%) awards weak score (25-49)", () => {
+      const score = scoreFCFMargin(2.5);
+      expect(score).not.toBeNull();
+      expect(score!).toBeGreaterThanOrEqual(25);
+      expect(score!).toBeLessThan(50);
+    });
+
+    it("5. Negative FCF margin (-10%) awards poor score (< 25)", () => {
+      const score = scoreFCFMargin(-10);
+      expect(score).not.toBeNull();
+      expect(score!).toBeLessThan(25);
+    });
+
+    it("6. Missing or invalid FCF margin data returns null", () => {
+      expect(scoreFCFMargin(null)).toBeNull();
+      expect(scoreFCFMargin(undefined as any)).toBeNull();
+      expect(scoreFCFMargin(NaN)).toBeNull();
+    });
+  });
 });
 
 describe("calculateMetricScores & calculateOverallScore", () => {
@@ -226,6 +268,7 @@ describe("calculateMetricScores & calculateOverallScore", () => {
     revenueCAGR: 0.15,
     epsGrowth: 0.12,
     fcfGrowth: 0.10,
+    fcfMargin: 15,
     roic: 16,
     debtToEquity: 0.4,
     dividendYield: 0.02,
@@ -240,6 +283,7 @@ describe("calculateMetricScores & calculateOverallScore", () => {
     expect(scores.revenue).not.toBeNull();
     expect(scores.eps).not.toBeNull();
     expect(scores.fcf).not.toBeNull();
+    expect(scores.fcfMargin).not.toBeNull();
     expect(scores.roic).not.toBeNull();
     expect(scores.debt).not.toBeNull();
     expect(scores.profitability).not.toBeNull();
@@ -253,17 +297,18 @@ describe("calculateMetricScores & calculateOverallScore", () => {
 
   it("calculateOverallScore should calculate exact weighted Business Quality Score equation for all considerations", () => {
     const scores: MetricScores = {
-      revenue: 80,       // 80 * 0.20 = 16.0
-      eps: 90,           // 90 * 0.20 = 18.0
+      revenue: 80,       // 80 * 0.15 = 12.0
+      eps: 90,           // 90 * 0.15 = 13.5
       fcf: 70,           // 70 * 0.15 = 10.5
+      fcfMargin: 80,     // 80 * 0.15 = 12.0
       roic: 100,         // 100 * 0.15 = 15.0
       debt: 100,         // 100 * 0.10 = 10.0
-      profitability: 85, // 85 * 0.20 = 17.0
+      profitability: 85, // 85 * 0.15 = 12.75
     };
-    // Sum = 16 + 18 + 10.5 + 15 + 10 + 17 = 86.5
+    // Sum = 12 + 13.5 + 10.5 + 12 + 15 + 10 + 12.75 = 85.75
     // Weight sum = 1.00
-    // Round(86.5 / 1.00) = 87
-    expect(calculateOverallScore(scores)).toBe(87);
+    // Round(85.75 / 1.00) = 86
+    expect(calculateOverallScore(scores)).toBe(86);
   });
 
   it("calculateOverallScore should return 0 if all scores are null", () => {
@@ -271,6 +316,7 @@ describe("calculateMetricScores & calculateOverallScore", () => {
       revenue: null,
       eps: null,
       fcf: null,
+      fcfMargin: null,
       roic: null,
       debt: null,
       profitability: null,
@@ -285,6 +331,7 @@ describe("Data Confidence & Unavailable Metrics", () => {
       revenue: 80,
       eps: 80,
       fcf: 80,
+      fcfMargin: 80,
       roic: 80,
       debt: 80,
       profitability: 80,
@@ -298,6 +345,7 @@ describe("Data Confidence & Unavailable Metrics", () => {
       revenue: 80,
       eps: 80,
       fcf: null,
+      fcfMargin: null,
       roic: null,
       debt: 80,
       profitability: 80,

@@ -153,6 +153,29 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           getInsights: () => analyzeGrowthHistory(result.fcfHistory || [], "free cash flow"),
         };
       }
+      case "fcfMargin":
+        return {
+          ...defaultData,
+          title: "FCF Margin",
+          icon: "💵",
+          score: result.scores.fcfMargin,
+          value: result.metrics.fcfMargin,
+          unit: "%",
+          chartData: result.fcfMarginHistory || [],
+          chartValueType: "percent" as const,
+          description: "Measures the percentage of revenue that a company converts into free cash flow after operating expenses and capital expenditures.",
+          formula: "FCF Margin = (Free Cash Flow / Revenue) * 100",
+          mathExplanation: getFCFMarginMathExplanation(result.metrics.fcfMargin, result.fcfMarginHistory || []),
+          whyItMatters: "FCF Margin measures how efficiently a company converts top-line revenue into bottom-line cash. Higher FCF Margins indicate strong cash generation capability, capital efficiency, and financial resilience.",
+          tiers: [
+            { label: "Excellent", range: "> 20%", color: "text-green-500" },
+            { label: "Strong", range: "10% - 20%", color: "text-blue-500" },
+            { label: "Average", range: "5% - 10%", color: "text-amber-500" },
+            { label: "Weak", range: "0% - 5%", color: "text-amber-600" },
+            { label: "Poor", range: "< 0%", color: "text-red-500" },
+          ],
+          getInsights: () => analyzeEfficiencyHistory(result.fcfMarginHistory || [], "FCF Margin", 20),
+        };
       case "roic":
         return {
           ...defaultData,
@@ -482,6 +505,16 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     }
 
     return lines;
+  }
+
+  function getFCFMarginMathExplanation(val: number | null, data: { label: string; value: number }[]): string[] {
+    if (val === null || data.length === 0) return ["No FCF Margin data available."];
+    const latest = data[data.length - 1];
+    return [
+      `1. Latest Fiscal Year (${latest.label}) FCF Margin: ${latest.value.toFixed(2)}%`,
+      `2. Formula Used: FCF Margin = (Free Cash Flow / Revenue) * 100`,
+      `3. Quality Assessment: Evaluated against benchmark tiers (20%+ Excellent, 10%-20% Strong, 5%-10% Average, 0%-5% Weak, <0% Poor).`,
+    ];
   }
 
   function getROICMathExplanation(val: number | null, data: { label: string; value: number }[]): string[] {

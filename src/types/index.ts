@@ -92,6 +92,7 @@ export interface AnalysisResult {
   roicHistory?: { label: string; value: number }[];
   debtEquityHistory?: { label: string; value: number }[];
   profitabilityHistory?: { label: string; value: number }[];
+  fcfMarginHistory?: { label: string; value: number }[];
   
   // Valuation fields
   valuationMetrics: ValuationMetrics;
@@ -123,6 +124,7 @@ export interface FinancialMetrics {
   fcfTrend?: "Improving" | "Deteriorating" | "Declining" | "Flat" | "Turnaround" | "Emerging";
   fcfTrendScore?: number | null;
   fcfBurnChangePct?: number | null;
+  fcfMargin: number | null;
   roic: number | null;
   debtToEquity: number | null;
   dividendYield: number | null;
@@ -136,6 +138,7 @@ export interface MetricScores {
   revenue: number | null;
   eps: number | null;
   fcf: number | null;
+  fcfMargin: number | null;
   roic: number | null;
   debt: number | null;
   profitability: number | null;
