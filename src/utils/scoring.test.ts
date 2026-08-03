@@ -222,40 +222,33 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
   });
 
   describe("scoreFCFMargin", () => {
-    it("1. High FCF margin (25%+) awards high score (>= 85, Excellent)", () => {
-      const score = scoreFCFMargin(25);
-      expect(score).not.toBeNull();
-      expect(score!).toBeGreaterThanOrEqual(85);
+    it("1. Company with excellent FCF Margin (>20%) receives 100 score", () => {
+      expect(scoreFCFMargin(25)).toBe(100);
+      expect(scoreFCFMargin(20)).toBe(100);
     });
 
-    it("2. Strong FCF margin (15%) awards strong score (70-84)", () => {
-      const score = scoreFCFMargin(15);
-      expect(score).not.toBeNull();
-      expect(score!).toBeGreaterThanOrEqual(70);
-      expect(score!).toBeLessThan(85);
+    it("2. Company with strong FCF Margin (15%-20%) receives 85-100 score", () => {
+      expect(scoreFCFMargin(15)).toBe(85);
+      expect(scoreFCFMargin(17.5)).toBe(93);
     });
 
-    it("3. Average FCF margin (7.5%) awards average score (50-69)", () => {
-      const score = scoreFCFMargin(7.5);
-      expect(score).not.toBeNull();
-      expect(score!).toBeGreaterThanOrEqual(50);
-      expect(score!).toBeLessThan(70);
+    it("3. Company with average FCF Margin (5%-15%) receives 50-75 score", () => {
+      expect(scoreFCFMargin(10)).toBe(75);
+      expect(scoreFCFMargin(5)).toBe(50);
+      expect(scoreFCFMargin(7.5)).toBe(63);
     });
 
-    it("4. Low FCF margin (2.5%) awards weak score (25-49)", () => {
-      const score = scoreFCFMargin(2.5);
-      expect(score).not.toBeNull();
-      expect(score!).toBeGreaterThanOrEqual(25);
-      expect(score!).toBeLessThan(50);
+    it("4. Company with weak FCF Margin (0%-5%) receives 25-50 score", () => {
+      expect(scoreFCFMargin(0)).toBe(25);
+      expect(scoreFCFMargin(2.5)).toBe(38);
     });
 
-    it("5. Negative FCF margin (-10%) awards poor score (< 25)", () => {
-      const score = scoreFCFMargin(-10);
-      expect(score).not.toBeNull();
-      expect(score!).toBeLessThan(25);
+    it("5. Negative FCF Margin (<0%) receives 0 score", () => {
+      expect(scoreFCFMargin(-5)).toBe(0);
+      expect(scoreFCFMargin(-0.1)).toBe(0);
     });
 
-    it("6. Missing or invalid FCF margin data returns null", () => {
+    it("6. Missing Revenue or FCF data returns null", () => {
       expect(scoreFCFMargin(null)).toBeNull();
       expect(scoreFCFMargin(undefined as any)).toBeNull();
       expect(scoreFCFMargin(NaN)).toBeNull();
@@ -295,20 +288,20 @@ describe("calculateMetricScores & calculateOverallScore", () => {
     expect(overall).toBeGreaterThanOrEqual(80);
   });
 
-  it("calculateOverallScore should calculate exact weighted Business Quality Score equation for all considerations", () => {
+  it("calculateOverallScore should calculate exact weighted Business Quality Score equation using new weights (15/15/10/10/20/10/20)", () => {
     const scores: MetricScores = {
       revenue: 80,       // 80 * 0.15 = 12.0
       eps: 90,           // 90 * 0.15 = 13.5
-      fcf: 70,           // 70 * 0.15 = 10.5
-      fcfMargin: 80,     // 80 * 0.15 = 12.0
-      roic: 100,         // 100 * 0.15 = 15.0
+      fcf: 70,           // 70 * 0.10 = 7.0
+      fcfMargin: 80,     // 80 * 0.10 = 8.0
+      roic: 100,         // 100 * 0.20 = 20.0
       debt: 100,         // 100 * 0.10 = 10.0
-      profitability: 85, // 85 * 0.15 = 12.75
+      profitability: 85, // 85 * 0.20 = 17.0
     };
-    // Sum = 12 + 13.5 + 10.5 + 12 + 15 + 10 + 12.75 = 85.75
+    // Sum = 12 + 13.5 + 7 + 8 + 20 + 10 + 17 = 87.5
     // Weight sum = 1.00
-    // Round(85.75 / 1.00) = 86
-    expect(calculateOverallScore(scores)).toBe(86);
+    // Round(87.5 / 1.00) = 88
+    expect(calculateOverallScore(scores)).toBe(88);
   });
 
   it("calculateOverallScore should return 0 if all scores are null", () => {
