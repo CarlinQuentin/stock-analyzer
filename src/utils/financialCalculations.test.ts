@@ -4,6 +4,7 @@ import {
   calculateRevenueCAGR,
   calculateEPSGrowth,
   calculateEPSTrend,
+  calculateEPSQualityScore,
   calculateFCF,
   calculateFCFGrowth,
   calculateDividendCAGR,
@@ -554,7 +555,7 @@ describe("calculateEPSGrowth", () => {
       expect(res.score).toBe(16);
     });
 
-    it("3. Negative EPS with shrinking losses: Trend = Improving, Dynamic Score = 72 (87.5% loss reduction)", () => {
+    it("3. Negative EPS with shrinking losses: Trend = Improving, Dynamic Score = 43 (loss reduction capped under 50)", () => {
       const statements: FinancialStatement[] = [
         { date: "2021-12-31", eps: -2.0 },
         { date: "2022-12-31", eps: -1.5 },
@@ -564,7 +565,7 @@ describe("calculateEPSGrowth", () => {
       const res = calculateEPSTrend(statements);
       expect(res.trend).toBe("Improving");
       expect(res.isProfitable).toBe(false);
-      expect(res.score).toBe(72);
+      expect(res.score).toBe(43);
     });
 
     it("4. Negative EPS with expanding losses: Trend = Declining, Score = 0", () => {
@@ -583,14 +584,14 @@ describe("calculateEPSGrowth", () => {
       expect(res.score).toBe(0);
     });
 
-    it("5. Negative EPS staying flat: Trend = Flat, Score = 40", () => {
+    it("5. Negative EPS staying flat: Trend = Flat, Score = 25", () => {
       const statements: FinancialStatement[] = [
         { date: "2020-12-31", eps: -0.5 },
         { date: "2025-12-31", eps: -0.5 },
       ];
       const res = calculateEPSTrend(statements);
       expect(res.trend).toBe("Flat");
-      expect(res.score).toBe(40);
+      expect(res.score).toBe(25);
     });
 
     it("6. Regression dataset verification: EPS CAGR = null, EPS TREND = Declining, EPS TREND Score = 0", () => {
@@ -628,6 +629,34 @@ describe("calculateEPSGrowth", () => {
       expect(res.trend).toBe("Improving");
       expect(res.isProfitable).toBe(true);
       expect(res.score).toBe(79);
+    });
+  });
+
+  describe("calculateEPSQualityScore Tests", () => {
+    it("1. Unprofitable shrinking losses (-111.70 -> -11.81) is capped under 50 (score = 43)", () => {
+      const score = calculateEPSQualityScore(-111.70, -11.81);
+      expect(score).toBeLessThan(50);
+      expect(score).toBe(43);
+    });
+
+    it("2. Profitable growing EPS (1.00 -> 2.00) achieves max tier score 100", () => {
+      expect(calculateEPSQualityScore(1.00, 2.00)).toBe(100);
+    });
+
+    it("3. Profitable declining EPS (5.00 -> 1.00) gets penalized to 16", () => {
+      expect(calculateEPSQualityScore(5.00, 1.00)).toBe(16);
+    });
+
+    it("4. Turnaround into profitability (-4.67 -> 2.19) gets good tier score 79", () => {
+      expect(calculateEPSQualityScore(-4.67, 2.19)).toBe(79);
+    });
+
+    it("5. Unprofitable expanding losses (-0.08 -> -0.37) gets score 0", () => {
+      expect(calculateEPSQualityScore(-0.08, -0.37)).toBe(0);
+    });
+
+    it("6. Unprofitable flat losses (-0.50 -> -0.50) gets capped score 25", () => {
+      expect(calculateEPSQualityScore(-0.50, -0.50)).toBe(25);
     });
   });
 

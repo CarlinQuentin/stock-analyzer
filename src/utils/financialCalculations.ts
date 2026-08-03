@@ -183,21 +183,69 @@ export function calculateEPSGrowth(
 }
 
 /**
+ * Calculate dynamic EPS Quality Score (0-100) based on starting EPS, ending EPS, and profitability.
+ * Profitability Rule: Unprofitable companies (endingEPS <= 0) are strictly capped below 50.
+ */
+export function calculateEPSQualityScore(
+  startingEPS: number,
+  endingEPS: number,
+): number {
+  const netChange = endingEPS - startingEPS;
+  const isFlat = Math.abs(netChange) <= 0.02;
+
+  if (startingEPS > 0 && endingEPS > 0) {
+    // Both positive (Profitable)
+    if (isFlat) return 50;
+    if (netChange > 0) {
+      // Growing profitable EPS: range 80 - 100
+      const pctGrowth = netChange / startingEPS;
+      return Math.min(100, Math.round(80 + Math.min(pctGrowth * 20, 20)));
+    } else {
+      // Declining profitable EPS: range 10 - 39
+      const pctDecline = Math.abs(netChange) / startingEPS;
+      return Math.max(10, Math.round(40 - Math.min(pctDecline * 30, 30)));
+    }
+  }
+
+  if (startingEPS <= 0 && endingEPS > 0) {
+    // Turnaround into profitability: range 70 - 90
+    const turnaroundRatio = endingEPS / Math.max(Math.abs(startingEPS), 0.1);
+    return Math.min(90, Math.round(70 + Math.min(turnaroundRatio * 20, 20)));
+  }
+
+  if (startingEPS > 0 && endingEPS <= 0) {
+    // Profit turned into loss (Deterioration): range 0 - 15
+    const lossSeverity = Math.abs(endingEPS) / startingEPS;
+    return Math.max(0, Math.round(15 - Math.min(lossSeverity * 15, 15)));
+  }
+
+  // Both non-positive (endingEPS <= 0) -> Strictly capped below 50
+  if (isFlat) return 25;
+
+  if (netChange > 0) {
+    // Shrinking losses: range 25 - 45
+    const lossReductionPct = (endingEPS - startingEPS) / Math.abs(startingEPS);
+    return Math.min(45, Math.round(25 + Math.min(lossReductionPct * 20, 20)));
+  } else {
+    // Expanding losses: range 0 - 15
+    const lossExpansion = Math.abs(netChange) / Math.max(Math.abs(startingEPS), 0.1);
+    return Math.max(0, Math.round(15 - Math.min(lossExpansion * 15, 15)));
+  }
+}
+
+/**
  * Calculate directional EPS Trend and dynamic EPS Quality Score when CAGR is unavailable or to supplement analysis.
  * Rules:
  * 1. Sort financial statements chronologically by fiscal date.
  * 2. Determine startingEPS, endingEPS, and isProfitable (endingEPS > 0).
  * 3. Categorize EPS Trend (Improving | Declining | Flat).
- * 4. Compute dynamic EPS Quality Score (0-100) based on:
- *    - EPS direction (Growing / Shrinking / Flat)
- *    - Improvement/Decline percentage & magnitude
- *    - Current profitability (endingEPS > 0 vs endingEPS <= 0)
+ * 4. Compute dynamic EPS Quality Score using calculateEPSQualityScore.
  */
 export function calculateEPSTrend(
   statements: FinancialStatement[] | null | undefined,
 ): EPSTrendResult {
   if (!statements || !Array.isArray(statements) || statements.length === 0) {
-    return { trend: "Flat", isProfitable: false, score: 40 };
+    return { trend: "Flat", isProfitable: false, score: 25 };
   }
 
   const validStatements = statements.filter(
@@ -210,7 +258,7 @@ export function calculateEPSTrend(
   );
 
   if (validStatements.length === 0) {
-    return { trend: "Flat", isProfitable: false, score: 40 };
+    return { trend: "Flat", isProfitable: false, score: 25 };
   }
 
   // 1. Sort financial statements chronologically by fiscal date
@@ -247,55 +295,16 @@ export function calculateEPSTrend(
   const isFlat = Math.abs(netChange) <= 0.02;
 
   let trend: "Improving" | "Declining" | "Flat" = "Flat";
-  let score = 40;
-
-  if (startingEPS > 0 && endingEPS > 0) {
-    // Positive EPS -> Positive EPS
-    if (isFlat) {
-      trend = "Flat";
-      score = 50;
-    } else if (netChange > 0) {
-      trend = "Improving";
-      // Dynamic score: Base 80 + bonus for growth percentage (range 80-100)
-      const pctGrowth = netChange / startingEPS;
-      score = Math.min(100, Math.round(80 + Math.min(pctGrowth * 20, 20)));
-    } else {
-      trend = "Declining";
-      // Dynamic score: Base 40 - penalty for decline percentage (range 10-39)
-      const pctDecline = Math.abs(netChange) / startingEPS;
-      score = Math.max(10, Math.round(40 - Math.min(pctDecline * 30, 30)));
-    }
-  } else if (startingEPS <= 0 && endingEPS > 0) {
-    // Negative EPS -> Positive EPS (Turnaround)
+  if (isFlat) {
+    trend = "Flat";
+  } else if (netChange > 0) {
     trend = "Improving";
-    // Dynamic score: Base 70 + bonus for positive EPS level achieved relative to initial loss (range 70-90)
-    const turnaroundRatio = endingEPS / Math.max(Math.abs(startingEPS), 0.1);
-    score = Math.min(90, Math.round(70 + Math.min(turnaroundRatio * 20, 20)));
-  } else if (startingEPS > 0 && endingEPS <= 0) {
-    // Positive EPS -> Negative EPS (Deterioration)
-    trend = "Declining";
-    // Dynamic score: Base 15 - penalty for loss severity relative to prior profit (range 0-15)
-    const lossSeverity = Math.abs(endingEPS) / startingEPS;
-    score = Math.max(0, Math.round(15 - Math.min(lossSeverity * 15, 15)));
   } else {
-    // Negative EPS -> Negative EPS (Unprofitable throughout)
-    if (isFlat) {
-      trend = "Flat";
-      score = 40;
-    } else if (netChange > 0) {
-      // Losses shrinking (e.g. -2.00 -> -0.25)
-      trend = "Improving";
-      // Dynamic score: Base 50 + bonus for loss reduction percentage (range 50-75)
-      const lossReductionPct = (endingEPS - startingEPS) / Math.abs(startingEPS);
-      score = Math.min(75, Math.round(50 + Math.min(lossReductionPct * 25, 25)));
-    } else {
-      // Losses expanding (e.g. -0.08 -> -0.37)
-      trend = "Declining";
-      // Dynamic score: Base 20 - penalty for loss expansion severity (range 0-20)
-      const lossExpansion = Math.abs(netChange) / Math.abs(startingEPS);
-      score = Math.max(0, Math.round(20 - Math.min(lossExpansion * 10, 20)));
-    }
+    trend = "Declining";
   }
+
+  // 4. Calculate dynamic EPS Quality Score using helper function
+  const score = calculateEPSQualityScore(startingEPS, endingEPS);
 
   return { trend, isProfitable, score };
 }
