@@ -179,20 +179,20 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
       expect(scoreFCFGrowth(null, statements)).toBe(0);
     });
 
-    it("3. Negative -> Positive: should return null (N/A) for potential turnaround", () => {
+    it("3. Negative -> Positive: should reward turnaround with score 75", () => {
       const statements: FinancialStatement[] = [
         { date: "2015-12-31", operatingCashFlow: -100000000, capitalExpenditure: 0 },
         { date: "2025-12-31", operatingCashFlow: 200000000, capitalExpenditure: 0 },
       ];
-      expect(scoreFCFGrowth(null, statements)).toBeNull();
+      expect(scoreFCFGrowth(null, statements)).toBe(75);
     });
 
-    it("4. Negative -> Negative: should return null (N/A) when all/ending FCF are <= 0 without prior positive", () => {
+    it("4. Negative -> Negative: should give partial credit (e.g. 35) when cash burn is shrinking", () => {
       const statements: FinancialStatement[] = [
         { date: "2015-12-31", operatingCashFlow: -100000000, capitalExpenditure: 0 },
         { date: "2025-12-31", operatingCashFlow: -50000000, capitalExpenditure: 0 },
       ];
-      expect(scoreFCFGrowth(null, statements)).toBeNull();
+      expect(scoreFCFGrowth(null, statements)).toBe(35);
     });
   });
 

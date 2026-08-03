@@ -7,6 +7,7 @@ import {
   calculateEPSQualityScore,
   calculateFCF,
   calculateFCFGrowth,
+  calculateFCFTrend,
   calculateDividendCAGR,
   calculateROIC,
   calculateAverageROIC,
@@ -961,6 +962,87 @@ describe("calculateFCFGrowth", () => {
     expect(calculateFCFGrowth([])).toBeNull();
     expect(calculateFCFGrowth(zeroBeginning)).toBeNull();
     expect(calculateFCFGrowth(negativeEnding)).toBeNull();
+  });
+
+  describe("calculateFCFTrend & Fallback Handling", () => {
+    it("Test 1: Positive FCF growth (100M -> 200M) uses CAGR and returns Improving trend", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2015-12-31", operatingCashFlow: 100, capitalExpenditure: 0 },
+        { date: "2025-12-31", operatingCashFlow: 200, capitalExpenditure: 0 },
+      ];
+      expect(calculateFCFGrowth(statements)).not.toBeNull();
+      const trendData = calculateFCFTrend(statements);
+      expect(trendData.trend).toBe("Improving");
+      expect(trendData.isPositive).toBe(true);
+      expect(trendData.score).toBeGreaterThanOrEqual(80);
+    });
+
+    it("Test 2: Negative FCF worsening (-50M -> -200M) does not use CAGR and returns deteriorating burn trend", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2015-12-31", operatingCashFlow: -50, capitalExpenditure: 0 },
+        { date: "2025-12-31", operatingCashFlow: -200, capitalExpenditure: 0 },
+      ];
+      expect(calculateFCFGrowth(statements)).toBeNull();
+      const trendData = calculateFCFTrend(statements);
+      expect(trendData.trend).toBe("Deteriorating");
+      expect(trendData.isPositive).toBe(false);
+      expect(trendData.score).toBe(0);
+      expect(trendData.burnChangePct).toBeCloseTo(-300, 1);
+    });
+
+    it("Test 3: Negative FCF improving (-200M -> -50M) returns improving burn trend (+75%)", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2015-12-31", operatingCashFlow: -200, capitalExpenditure: 0 },
+        { date: "2025-12-31", operatingCashFlow: -50, capitalExpenditure: 0 },
+      ];
+      expect(calculateFCFGrowth(statements)).toBeNull();
+      const trendData = calculateFCFTrend(statements);
+      expect(trendData.trend).toBe("Improving");
+      expect(trendData.isPositive).toBe(false);
+      expect(trendData.score).toBeGreaterThanOrEqual(25);
+      expect(trendData.burnChangePct).toBeCloseTo(75, 1);
+    });
+
+    it("Test 4: Negative to positive FCF (-100M -> 50M) returns turnaround classification", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2015-12-31", operatingCashFlow: -100, capitalExpenditure: 0 },
+        { date: "2025-12-31", operatingCashFlow: 50, capitalExpenditure: 0 },
+      ];
+      expect(calculateFCFGrowth(statements)).toBeNull();
+      const trendData = calculateFCFTrend(statements);
+      expect(trendData.trend).toBe("Turnaround");
+      expect(trendData.isPositive).toBe(true);
+      expect(trendData.score).toBe(75);
+    });
+
+    it("Test 5: Positive to negative FCF (100M -> -50M) returns deterioration classification", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2015-12-31", operatingCashFlow: 100, capitalExpenditure: 0 },
+        { date: "2025-12-31", operatingCashFlow: -50, capitalExpenditure: 0 },
+      ];
+      expect(calculateFCFGrowth(statements)).toBeNull();
+      const trendData = calculateFCFTrend(statements);
+      expect(trendData.trend).toBe("Deteriorating");
+      expect(trendData.isPositive).toBe(false);
+      expect(trendData.score).toBe(0);
+    });
+
+    it("Verifies prompt example (-45.9M -> -321.8M = -601.09% cash burn deterioration)", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2019-12-31", operatingCashFlow: -45.9, capitalExpenditure: 0 },
+        { date: "2020-12-31", operatingCashFlow: -52.9, capitalExpenditure: 0 },
+        { date: "2021-12-31", operatingCashFlow: -97.5, capitalExpenditure: 0 },
+        { date: "2022-12-31", operatingCashFlow: -148.9, capitalExpenditure: 0 },
+        { date: "2023-12-31", operatingCashFlow: -153.6, capitalExpenditure: 0 },
+        { date: "2024-12-31", operatingCashFlow: -116.0, capitalExpenditure: 0 },
+        { date: "2025-12-31", operatingCashFlow: -321.8, capitalExpenditure: 0 },
+      ];
+      expect(calculateFCFGrowth(statements)).toBeNull();
+      const trendData = calculateFCFTrend(statements);
+      expect(trendData.trend).toBe("Deteriorating");
+      expect(trendData.score).toBe(0);
+      expect(trendData.burnChangePct).toBeCloseTo(-601.09, 1);
+    });
   });
 });
 

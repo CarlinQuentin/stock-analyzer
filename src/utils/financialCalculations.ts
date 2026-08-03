@@ -2,6 +2,7 @@ import {
   FinancialStatement,
   FinancialMetrics,
   DividendMetrics,
+  FCFTrendResult,
 } from "../types";
 
 /**
@@ -323,12 +324,14 @@ export function calculateFCF(
 }
 
 /**
- * Calculate FCF Growth from cash flow statements
+ * Calculate FCF Growth from cash flow statements.
+ * Business Rule: FCF CAGR is only calculated when BOTH beginning FCF and ending FCF are strictly positive (> 0).
+ * If beginning FCF <= 0 or ending FCF <= 0, returns null (deferring evaluation to calculateFCFTrend).
  */
 export function calculateFCFGrowth(
-  cashFlowStatements: FinancialStatement[],
+  cashFlowStatements: FinancialStatement[] | null | undefined,
 ): number | null {
-  if (!cashFlowStatements || cashFlowStatements.length < 2) {
+  if (!cashFlowStatements || !Array.isArray(cashFlowStatements) || cashFlowStatements.length < 2) {
     return null;
   }
 
@@ -336,38 +339,120 @@ export function calculateFCFGrowth(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
   );
 
-  const lastStatement = sortedByDate[sortedByDate.length - 1];
-  const lastFCF = calculateFCF(
-    lastStatement.operatingCashFlow,
-    lastStatement.capitalExpenditure,
+  const statementsWithFCF = sortedByDate
+    .map((statement) => ({
+      statement,
+      fcf: calculateFCF(statement.operatingCashFlow, statement.capitalExpenditure),
+    }))
+    .filter((item): item is { statement: FinancialStatement; fcf: number } => item.fcf !== null);
+
+  if (statementsWithFCF.length < 2) {
+    return null;
+  }
+
+  const firstFCF = statementsWithFCF[0].fcf;
+  const lastFCF = statementsWithFCF[statementsWithFCF.length - 1].fcf;
+
+  // FCF CAGR is only mathematically valid and meaningful when BOTH starting & ending FCF are strictly positive (> 0)
+  if (firstFCF <= 0 || lastFCF <= 0) {
+    return null;
+  }
+
+  const years = statementsWithFCF.length - 1;
+  return calculateCAGR(firstFCF, lastFCF, years);
+}
+
+/**
+ * Calculate FCF Trend and dynamic Quality Score when CAGR is invalid or misleading.
+ */
+export function calculateFCFTrend(
+  cashFlowStatements: FinancialStatement[] | null | undefined,
+): FCFTrendResult {
+  if (!cashFlowStatements || !Array.isArray(cashFlowStatements) || cashFlowStatements.length === 0) {
+    return { trend: "Flat", isPositive: false, score: 25, burnChangePct: null };
+  }
+
+  const sortedByDate = [...cashFlowStatements].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
   );
 
-  // Return null if ending FCF is missing or <= 0
-  if (lastFCF === null || lastFCF <= 0) {
-    return null;
+  const statementsWithFCF = sortedByDate
+    .map((statement) => ({
+      statement,
+      fcf: calculateFCF(statement.operatingCashFlow, statement.capitalExpenditure),
+    }))
+    .filter((item): item is { statement: FinancialStatement; fcf: number } => item.fcf !== null);
+
+  if (statementsWithFCF.length === 0) {
+    return { trend: "Flat", isPositive: false, score: 25, burnChangePct: null };
   }
 
-  const statementsWithFCF = sortedByDate.map((statement) => ({
-    statement,
-    fcf: calculateFCF(statement.operatingCashFlow, statement.capitalExpenditure),
-  }));
+  const startingFCF = statementsWithFCF[0].fcf;
+  const endingFCF = statementsWithFCF[statementsWithFCF.length - 1].fcf;
+  const isPositive = endingFCF > 0;
 
-  const firstPositiveIndex = statementsWithFCF.findIndex(
-    (item) => item.fcf !== null && item.fcf > 0,
-  );
-
-  if (firstPositiveIndex === -1 || firstPositiveIndex === statementsWithFCF.length - 1) {
-    return null;
+  if (statementsWithFCF.length === 1) {
+    return {
+      trend: "Flat",
+      isPositive,
+      score: isPositive ? 50 : 20,
+      burnChangePct: null,
+    };
   }
 
-  const firstPositiveFCF = statementsWithFCF[firstPositiveIndex].fcf!;
-  const years = statementsWithFCF.length - 1 - firstPositiveIndex;
+  const netChange = endingFCF - startingFCF;
+  const isFlat = startingFCF !== 0
+    ? Math.abs(netChange) <= 0.01 * Math.abs(startingFCF)
+    : Math.abs(netChange) <= 0.01;
 
-  if (years <= 0) {
-    return null;
+  // Scenario 1: Positive FCF -> Positive FCF
+  if (startingFCF > 0 && endingFCF > 0) {
+    const trend = isFlat ? "Flat" : netChange > 0 ? "Improving" : "Deteriorating";
+    const pctGrowth = netChange / startingFCF;
+    const score = netChange > 0
+      ? Math.min(100, Math.round(80 + Math.min(pctGrowth * 20, 20)))
+      : Math.max(10, Math.round(40 - Math.min(Math.abs(netChange / startingFCF) * 30, 30)));
+    return { trend, isPositive, score, burnChangePct: (netChange / startingFCF) * 100 };
   }
 
-  return calculateCAGR(firstPositiveFCF, lastFCF, years);
+  // Scenario 2: Negative FCF -> Positive FCF (Turnaround)
+  if (startingFCF <= 0 && endingFCF > 0) {
+    return {
+      trend: "Turnaround",
+      isPositive: true,
+      score: 75,
+      burnChangePct: null,
+    };
+  }
+
+  // Scenario 3: Positive FCF -> Negative FCF (Deterioration)
+  if (startingFCF > 0 && endingFCF <= 0) {
+    return {
+      trend: "Deteriorating",
+      isPositive: false,
+      score: 0,
+      burnChangePct: null,
+    };
+  }
+
+  // Scenario 4: Negative FCF -> Negative FCF (Both Negative / Cash Burn)
+  // Formula: ((ABS(startingFCF) - ABS(endingFCF)) / ABS(startingFCF)) * 100
+  const absStart = Math.abs(startingFCF);
+  const absEnd = Math.abs(endingFCF);
+  const burnChangePct = ((absStart - absEnd) / absStart) * 100;
+
+  if (isFlat) {
+    return { trend: "Flat", isPositive: false, score: 25, burnChangePct };
+  }
+
+  if (endingFCF > startingFCF) {
+    // Cash burn shrinking (e.g. -200M -> -50M, burnChangePct = +75%)
+    const score = Math.min(45, Math.round(25 + Math.min((burnChangePct / 100) * 20, 20)));
+    return { trend: "Improving", isPositive: false, score, burnChangePct };
+  } else {
+    // Cash burn worsening (e.g. -45.9M -> -321.8M, burnChangePct = -601.09%)
+    return { trend: "Deteriorating", isPositive: false, score: 0, burnChangePct };
+  }
 }
 
 export function calculateDividendCAGR(
@@ -583,12 +668,16 @@ export function calculateAllMetrics(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
   const epsTrendData = calculateEPSTrend(incomeStatements);
+  const fcfTrendData = calculateFCFTrend(cashFlowStatements);
   return {
     revenueCAGR: calculateRevenueCAGR(incomeStatements),
     epsGrowth: calculateEPSGrowth(incomeStatements),
     epsTrend: epsTrendData.trend,
     epsTrendScore: epsTrendData.score,
     fcfGrowth: calculateFCFGrowth(cashFlowStatements),
+    fcfTrend: fcfTrendData.trend,
+    fcfTrendScore: fcfTrendData.score,
+    fcfBurnChangePct: fcfTrendData.burnChangePct,
     roic: calculateAverageROIC(incomeStatements, balanceSheets),
     debtToEquity: calculateDebtToEquity(
       sortedBalance[0]?.totalDebt,

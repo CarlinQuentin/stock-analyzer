@@ -1,5 +1,5 @@
 import { FinancialMetrics, MetricScores, FinancialStatement } from "../types";
-import { calculateFCF, calculateEPSTrend } from "./financialCalculations";
+import { calculateEPSTrend, calculateFCFTrend } from "./financialCalculations";
 
 export const SCORE_WEIGHTS = {
   revenue: 0.2, // 20%
@@ -118,28 +118,8 @@ export function scoreFCFGrowth(
     ]);
   }
 
-  if (cashFlowStatements && cashFlowStatements.length >= 2) {
-    const sortedByDate = [...cashFlowStatements].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-    );
-
-    const lastStatement = sortedByDate[sortedByDate.length - 1];
-    const endingFCF = calculateFCF(
-      lastStatement.operatingCashFlow,
-      lastStatement.capitalExpenditure,
-    );
-
-    if (endingFCF !== null && endingFCF <= 0) {
-      // Check if any prior statement had positive FCF (Beginning FCF > 0)
-      const hasPriorPositive = sortedByDate.slice(0, -1).some((s) => {
-        const fcf = calculateFCF(s.operatingCashFlow, s.capitalExpenditure);
-        return fcf !== null && fcf > 0;
-      });
-
-      if (hasPriorPositive) {
-        return 0;
-      }
-    }
+  if (cashFlowStatements && cashFlowStatements.length >= 1) {
+    return calculateFCFTrend(cashFlowStatements).score;
   }
 
   return null;
@@ -249,10 +229,21 @@ export function calculateMetricScores(
     epsScore = null;
   }
 
+  let fcfScore: number | null = null;
+  if (metrics.fcfGrowth !== null) {
+    fcfScore = scoreFCFGrowth(metrics.fcfGrowth, cashFlowStatements);
+  } else if (metrics.fcfTrendScore !== undefined && metrics.fcfTrendScore !== null) {
+    fcfScore = metrics.fcfTrendScore;
+  } else if (cashFlowStatements) {
+    fcfScore = calculateFCFTrend(cashFlowStatements).score;
+  } else {
+    fcfScore = null;
+  }
+
   return {
     revenue: scoreRevenueGrowth(metrics.revenueCAGR),
     eps: epsScore,
-    fcf: scoreFCFGrowth(metrics.fcfGrowth, cashFlowStatements),
+    fcf: fcfScore,
     roic: scoreROIC(metrics.roic),
     debt: scoreDebtToEquity(metrics.debtToEquity),
     profitability: scoreProfitability(

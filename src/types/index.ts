@@ -106,12 +106,22 @@ export interface AnalysisResult {
   valuationPremiumHistory?: { label: string; value: number }[];
 }
 
+export interface FCFTrendResult {
+  trend: "Improving" | "Deteriorating" | "Flat" | "Turnaround";
+  isPositive: boolean;
+  score: number;
+  burnChangePct: number | null;
+}
+
 export interface FinancialMetrics {
   revenueCAGR: number | null;
   epsGrowth: number | null;
   epsTrend?: "Improving" | "Declining" | "Flat";
   epsTrendScore?: number | null;
   fcfGrowth: number | null;
+  fcfTrend?: "Improving" | "Deteriorating" | "Flat" | "Turnaround";
+  fcfTrendScore?: number | null;
+  fcfBurnChangePct?: number | null;
   roic: number | null;
   debtToEquity: number | null;
   dividendYield: number | null;
