@@ -965,6 +965,27 @@ describe("calculateFCFGrowth", () => {
     expect(calculateFCFGrowth(negativeEnding)).toBeNull();
   });
 
+  it("5. Baseline selection strategy: uses first positive FCF year (2020: 100M to 2025: 600M over 5 years = ~43.10%)", () => {
+    const statements: FinancialStatement[] = [
+      { date: "2019-12-31", operatingCashFlow: -500, capitalExpenditure: 0 },
+      { date: "2020-12-31", operatingCashFlow: 100, capitalExpenditure: 0 },
+      { date: "2025-12-31", operatingCashFlow: 600, capitalExpenditure: 0 },
+    ];
+    const cagr = calculateFCFGrowth(statements);
+    expect(cagr).not.toBeNull();
+    expect(cagr!).toBeCloseTo(0.43096, 4); // (600 / 100)^(1/5) - 1 = 43.10%
+  });
+
+  it("6. Insufficient positive FCF history (< 3 years): returns null", () => {
+    const statements: FinancialStatement[] = [
+      { date: "2023-12-31", operatingCashFlow: -500, capitalExpenditure: 0 },
+      { date: "2024-12-31", operatingCashFlow: 100, capitalExpenditure: 0 },
+      { date: "2025-12-31", operatingCashFlow: 200, capitalExpenditure: 0 },
+    ];
+    const cagr = calculateFCFGrowth(statements);
+    expect(cagr).toBeNull(); // period is 2024 -> 2025 (1 year) < 3 years
+  });
+
   describe("calculateFCFTrend & Fallback Handling", () => {
     it("Test 1: Positive FCF growth (100M -> 200M) uses CAGR and returns Improving trend", () => {
       const statements: FinancialStatement[] = [

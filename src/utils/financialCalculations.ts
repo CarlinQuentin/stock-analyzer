@@ -346,9 +346,13 @@ export function calculateFCF(
 }
 
 /**
- * Calculate FCF Growth from cash flow statements.
- * Business Rule: FCF CAGR is only calculated when BOTH beginning FCF and ending FCF are strictly positive (> 0).
- * If beginning FCF <= 0 or ending FCF <= 0, returns null (deferring evaluation to calculateFCFTrend).
+ * Calculate FCF Growth (CAGR) from cash flow statements.
+ * Rules:
+ * 1. Search chronologically for the earliest fiscal year in history where FCF > 0.
+ * 2. Use that year as beginning FCF baseline value.
+ * 3. Use the latest available fiscal year FCF as ending FCF value.
+ * 4. Calculate CAGR if ending FCF > 0 and endingYear - beginningYear >= 3.
+ * 5. Returns null (N/A) if no positive FCF baseline exists, ending FCF <= 0, or positive FCF period is < 3 years.
  */
 export function calculateFCFGrowth(
   cashFlowStatements: FinancialStatement[] | null | undefined,
@@ -357,7 +361,19 @@ export function calculateFCFGrowth(
     return null;
   }
 
-  const sortedByDate = [...cashFlowStatements].sort(
+  const validStatements = cashFlowStatements.filter(
+    (s) =>
+      s &&
+      s.date &&
+      typeof s.operatingCashFlow === "number" &&
+      typeof s.capitalExpenditure === "number",
+  );
+
+  if (validStatements.length < 2) {
+    return null;
+  }
+
+  const sortedByDate = [...validStatements].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
   );
 
@@ -372,16 +388,38 @@ export function calculateFCFGrowth(
     return null;
   }
 
-  const firstFCF = statementsWithFCF[0].fcf;
-  const lastFCF = statementsWithFCF[statementsWithFCF.length - 1].fcf;
+  // Use up to 10 years of FCF history (up to 11 statement entries)
+  const windowStatements =
+    statementsWithFCF.length > 11 ? statementsWithFCF.slice(-11) : statementsWithFCF;
 
-  // FCF CAGR is only mathematically valid and meaningful when BOTH starting & ending FCF are strictly positive (> 0)
-  if (firstFCF <= 0 || lastFCF <= 0) {
+  const lastStatement = windowStatements[windowStatements.length - 1];
+  const lastFCF = lastStatement.fcf;
+
+  // Business rule: ending FCF must be positive (> 0)
+  if (lastFCF <= 0) {
     return null;
   }
 
-  const years = statementsWithFCF.length - 1;
-  return calculateCAGR(firstFCF, lastFCF, years);
+  // Search chronologically from oldest to newest for the first positive FCF statement (> 0)
+  const firstPositiveIdx = windowStatements.findIndex((item) => item.fcf > 0);
+  if (firstPositiveIdx === -1 || firstPositiveIdx === windowStatements.length - 1) {
+    return null;
+  }
+
+  const firstPositiveItem = windowStatements[firstPositiveIdx];
+  const firstPositiveFCF = firstPositiveItem.fcf;
+
+  const firstYear = new Date(firstPositiveItem.statement.date).getFullYear();
+  const lastYear = new Date(lastStatement.statement.date).getFullYear();
+  const yearDiff = lastYear - firstYear;
+  const years = yearDiff > 0 ? yearDiff : windowStatements.length - 1 - firstPositiveIdx;
+
+  // Requirement: positive FCF period must be >= 3 years
+  if (years < 3) {
+    return null;
+  }
+
+  return calculateCAGR(firstPositiveFCF, lastFCF, years);
 }
 
 /**
