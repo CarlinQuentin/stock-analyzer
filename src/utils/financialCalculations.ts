@@ -175,7 +175,23 @@ export function calculateEPSGrowth(
 }
 
 /**
- * Calculate directional EPS Trend and Score when CAGR is unavailable or for trend evaluation.
+ * Calculate directional EPS Trend and Score when CAGR is unavailable or to supplement analysis.
+ * Rules:
+ * 1. Sort financial statements chronologically by fiscal date.
+ * 2. Determine startingEPS, endingEPS, and isProfitable (endingEPS > 0).
+ * 3. Categorize EPS Trend:
+ *    - Positive EPS -> Positive EPS:
+ *      - endingEPS > startingEPS: trend = "Improving", score = 100
+ *      - endingEPS < startingEPS: trend = "Declining", score = 20
+ *      - within tolerance (<= 0.02): trend = "Flat", score = 40
+ *    - Negative EPS -> Positive EPS (Turnaround):
+ *      - trend = "Improving", score = 80
+ *    - Positive EPS -> Negative EPS (Deterioration):
+ *      - trend = "Declining", score = 0
+ *    - Negative EPS -> Negative EPS:
+ *      - losses shrinking (endingEPS > startingEPS): trend = "Improving", score = 60
+ *      - losses expanding (endingEPS < startingEPS): trend = "Declining", score = 0
+ *      - within tolerance (<= 0.02): trend = "Flat", score = 40
  */
 export function calculateEPSTrend(
   statements: FinancialStatement[] | null | undefined,
@@ -197,6 +213,7 @@ export function calculateEPSTrend(
     return { trend: "Flat", isProfitable: false, score: 40 };
   }
 
+  // 1. Sort financial statements chronologically by fiscal date
   const sortedByDate = [...validStatements].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
   );
@@ -211,10 +228,11 @@ export function calculateEPSTrend(
     }
   }
 
+  // 2. Determine startingEPS, endingEPS, and isProfitable
   const epsValues = uniqueByDate.map((s) => s.eps!);
-  const firstEPS = epsValues[0];
-  const lastEPS = epsValues[epsValues.length - 1];
-  const isProfitable = lastEPS > 0;
+  const startingEPS = epsValues[0];
+  const endingEPS = epsValues[epsValues.length - 1];
+  const isProfitable = endingEPS > 0;
 
   if (epsValues.length === 1) {
     return {
@@ -224,34 +242,46 @@ export function calculateEPSTrend(
     };
   }
 
-  const netChange = lastEPS - firstEPS;
+  // 3. Determine EPS trend using transition rules
+  const netChange = endingEPS - startingEPS;
+  const isFlat = Math.abs(netChange) <= 0.02;
 
   let trend: "Improving" | "Declining" | "Flat" = "Flat";
-  if (Math.abs(netChange) <= 0.02) {
-    trend = "Flat";
-  } else if (netChange > 0) {
-    trend = "Improving";
-  } else {
-    trend = "Declining";
-  }
-
   let score = 40;
-  if (isProfitable) {
-    if (trend === "Improving") {
+
+  if (startingEPS > 0 && endingEPS > 0) {
+    // Positive EPS -> Positive EPS
+    if (isFlat) {
+      trend = "Flat";
+      score = 40;
+    } else if (netChange > 0) {
+      trend = "Improving";
       score = 100;
-    } else if (trend === "Declining") {
+    } else {
+      trend = "Declining";
       score = 20;
-    } else {
-      score = 40;
     }
+  } else if (startingEPS <= 0 && endingEPS > 0) {
+    // Negative EPS -> Positive EPS (Turnaround)
+    trend = "Improving";
+    score = 80;
+  } else if (startingEPS > 0 && endingEPS <= 0) {
+    // Positive EPS -> Negative EPS (Deterioration)
+    trend = "Declining";
+    score = 0;
   } else {
-    // Unprofitable (lastEPS <= 0)
-    if (trend === "Improving") {
-      score = 60; // Losses shrinking
-    } else if (trend === "Declining") {
-      score = 0; // Losses increasing
-    } else {
+    // Negative EPS -> Negative EPS (Unprofitable)
+    if (isFlat) {
+      trend = "Flat";
       score = 40;
+    } else if (netChange > 0) {
+      // Losses shrinking (e.g. -2.00 -> -0.25)
+      trend = "Improving";
+      score = 60;
+    } else {
+      // Losses expanding (e.g. -0.08 -> -0.37)
+      trend = "Declining";
+      score = 0;
     }
   }
 
