@@ -871,7 +871,9 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                   {config.value !== null ? (
                     <>
                       {config.unit === "%"
-                        ? (config.value * 100).toFixed(2)
+                        ? config.title.toLowerCase().includes("roic")
+                          ? config.value.toFixed(2)
+                          : (config.value * 100).toFixed(2)
                         : config.value.toFixed(2)}
                       <span className="text-lg text-slate-500 font-semibold ml-1">{config.unit}</span>
                     </>

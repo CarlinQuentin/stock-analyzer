@@ -18,11 +18,17 @@ export const SCORE_RANGES = {
 };
 
 /**
- * Format a percentage metric value for UI display (e.g. 1.58 -> "158.00%", 0.125 -> "12.50%", -0.1525 -> "-15.25%", 0 -> "0.00%")
+ * Format a percentage metric value for UI display.
+ * If isAlreadyPercentage is true (e.g. ROIC = 25.0 or -166.45), formats without multiplying by 100.
+ * If false/omitted (e.g. CAGR = 1.58 or 0.125), converts decimal rate to percentage by multiplying by 100.
  */
-export function formatPercentageMetric(value: number | null | undefined): string {
+export function formatPercentageMetric(
+  value: number | null | undefined,
+  isAlreadyPercentage: boolean = false,
+): string {
   if (value === null || value === undefined || isNaN(value)) return "N/A";
-  return `${(value * 100).toFixed(2)}%`;
+  const numVal = isAlreadyPercentage ? value : value * 100;
+  return `${numVal.toFixed(2)}%`;
 }
 
 /**

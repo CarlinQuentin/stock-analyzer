@@ -50,6 +50,18 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
       expect(scoreRevenueGrowth(-0.1525)).toBe(0);
       expect(scoreRevenueGrowth(0)).toBe(30);
     });
+
+    it("7. ROIC = 25 displays as 25.00%", () => {
+      expect(formatPercentageMetric(25, true)).toBe("25.00%");
+    });
+
+    it("8. ROIC = -166.45 displays as -166.45%", () => {
+      expect(formatPercentageMetric(-166.45, true)).toBe("-166.45%");
+    });
+
+    it("9. ROIC = 0 displays as 0.00%", () => {
+      expect(formatPercentageMetric(0, true)).toBe("0.00%");
+    });
   });
 
   describe("scoreRevenueGrowth Stock Scoring Integration", () => {

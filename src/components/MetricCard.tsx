@@ -79,10 +79,13 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     return (isNegative ? "-" : "") + "$" + text;
   };
 
+  const isAlreadyPercentage = title.toLowerCase().includes("roic");
   const formattedValue =
     typeof value === "number"
       ? unit === "%"
-        ? (value * 100).toFixed(2)
+        ? isAlreadyPercentage
+          ? value.toFixed(2)
+          : (value * 100).toFixed(2)
         : value % 1 !== 0
         ? value.toFixed(2)
         : value

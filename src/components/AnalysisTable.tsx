@@ -27,8 +27,8 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
     return String(value);
   };
 
-  const formatPercentage = (value: number | null): string => {
-    return formatPercentageMetric(value);
+  const formatPercentage = (value: number | null, isAlreadyPercentage: boolean = false): string => {
+    return formatPercentageMetric(value, isAlreadyPercentage);
   };
 
   const renderPerformanceBadge = (score: number | null) => {
@@ -176,7 +176,7 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
                 </div>
               </td>
               <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200">
-                {formatPercentage(metrics.roic)}
+                {formatPercentage(metrics.roic, true)}
               </td>
               <td className="text-center px-6 py-4">
                 {metrics.roic !== null ? (
