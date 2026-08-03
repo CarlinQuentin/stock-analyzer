@@ -62,7 +62,7 @@ describe("calculateRevenueCAGR", () => {
       expect(cagr).toBeCloseTo(0.1487, 4);
     });
 
-    it("should calculate CAGR correctly with more than 6 years of data by using the most recent 6 fiscal years", () => {
+    it("should calculate CAGR correctly across all available historical years (e.g. 2018 to 2025 = 7 periods)", () => {
       const statements: FinancialStatement[] = [
         { date: "2018-12-31", revenue: 50 },
         { date: "2019-12-31", revenue: 60 },
@@ -73,9 +73,9 @@ describe("calculateRevenueCAGR", () => {
         { date: "2024-12-31", revenue: 180 },
         { date: "2025-12-31", revenue: 200 },
       ];
-      // Uses 2020-2025 (100 -> 200 over 5 years): ~14.87%
+      // 50 (2018) -> 200 (2025) over 7 periods: (200/50)^(1/7) - 1 ≈ 21.90%
       const cagr = calculateRevenueCAGR(statements);
-      expect(cagr).toBeCloseTo(0.1487, 4);
+      expect(cagr).toBeCloseTo(0.2190, 4);
     });
 
     it("should calculate CAGR correctly when revenue increases every year", () => {
@@ -135,7 +135,7 @@ describe("calculateRevenueCAGR", () => {
       expect(cagr).toBeCloseTo(-0.1294, 4);
     });
 
-    it("should verify 2020-2025 CAGR for the provided 7-year validation dataset (48.4M in 2019, 35.2M in 2020 to 601.8M in 2025)", () => {
+    it("should verify 2019-2025 CAGR for the provided 7-year validation dataset (48.4M in 2019 to 601.8M in 2025 = 52.21%)", () => {
       const statements: FinancialStatement[] = [
         { date: "2019-12-31", revenue: 48400000 },
         { date: "2020-12-31", revenue: 35200000 },
@@ -145,10 +145,10 @@ describe("calculateRevenueCAGR", () => {
         { date: "2024-12-31", revenue: 436200000 },
         { date: "2025-12-31", revenue: 601800000 },
       ];
-      // 5-year CAGR window uses recent 6 years: 2020 (35.2M) to 2025 (601.8M)
-      // (601.8 / 35.2)^(1/5) - 1 ≈ 76.43%
+      // Beginning (2019): 48.4M, Ending (2025): 601.8M, Periods: 6
+      // (601.8 / 48.4)^(1/6) - 1 = 0.5221 (52.21%)
       const cagr = calculateRevenueCAGR(statements);
-      expect(cagr).toBeCloseTo(0.7643, 4);
+      expect(cagr).toBeCloseTo(0.5221, 4);
     });
   });
 

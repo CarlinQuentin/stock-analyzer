@@ -21,7 +21,11 @@ export function calculateCAGR(
 
 /**
  * Calculate Revenue CAGR from income statements.
- * Uses the most recent 6 fiscal years (5-year CAGR period) if more than 6 years are provided.
+ * Formula: CAGR = (Ending Revenue / Beginning Revenue) ^ (1 / n) - 1
+ * Where:
+ * - Beginning Revenue = revenue from the starting fiscal year (first statement)
+ * - Ending Revenue = revenue from the ending fiscal year (last statement)
+ * - n = number of growth periods (Ending Fiscal Year - Beginning Fiscal Year)
  * Returns 0 whenever CAGR cannot be calculated due to zero/negative values or invalid data.
  */
 export function calculateRevenueCAGR(
@@ -65,22 +69,21 @@ export function calculateRevenueCAGR(
     return 0;
   }
 
-  // If more than 6 fiscal years are provided, use the 6 most recent fiscal years (5-year CAGR)
-  const windowStatements =
-    uniqueByDate.length > 6 ? uniqueByDate.slice(-6) : uniqueByDate;
+  const firstStatement = uniqueByDate[0];
+  const lastStatement = uniqueByDate[uniqueByDate.length - 1];
 
-  const firstRevenue = windowStatements[0].revenue!;
-  const lastRevenue = windowStatements[windowStatements.length - 1].revenue!;
+  const firstRevenue = firstStatement.revenue!;
+  const lastRevenue = lastStatement.revenue!;
 
   // Business rule: return 0 if starting or ending revenue <= 0
   if (firstRevenue <= 0 || lastRevenue <= 0) {
     return 0;
   }
 
-  const firstDate = new Date(windowStatements[0].date);
-  const lastDate = new Date(windowStatements[windowStatements.length - 1].date);
-  const yearDiff = lastDate.getFullYear() - firstDate.getFullYear();
-  const years = yearDiff > 0 ? yearDiff : windowStatements.length - 1;
+  const firstYear = new Date(firstStatement.date).getFullYear();
+  const lastYear = new Date(lastStatement.date).getFullYear();
+  const yearDiff = lastYear - firstYear;
+  const years = yearDiff > 0 ? yearDiff : uniqueByDate.length - 1;
 
   if (years <= 0) {
     return 0;
