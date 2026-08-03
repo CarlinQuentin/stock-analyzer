@@ -370,40 +370,26 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       ];
     }
 
-    const firstPositiveIndex = data.findIndex((d) => d.value > 0);
-
-    if (firstPositiveIndex === -1 || firstPositiveIndex === data.length - 1) {
+    if (first.value <= 0) {
       return [
-        `1. Initial Historical Value (${first.label}): ${formatChartValue(first.value, type)}`,
+        `1. Beginning Value (${first.label}): ${formatChartValue(first.value, type)}`,
         `2. Ending Value (${last.label}): ${formatChartValue(last.value, type)}`,
-        `3. Note: CAGR cannot be calculated because no positive starting baseline value exists in the historical series.`,
+        `3. Note: CAGR cannot be calculated when the starting baseline value is zero or negative.`,
       ];
     }
 
-    const startItem = data[firstPositiveIndex];
-    const n = data.length - 1 - firstPositiveIndex;
-    const ratio = last.value / startItem.value;
+    const n = data.length - 1;
+    const ratio = last.value / first.value;
     const finalPct = actualCAGR !== null ? (actualCAGR * 100).toFixed(2) : ((Math.pow(ratio, 1 / n) - 1) * 100).toFixed(2);
 
     const lines: string[] = [];
-    if (firstPositiveIndex > 0) {
-      lines.push(`1. Baseline Starting Year (${startItem.label}): ${formatChartValue(startItem.value, type)} (First positive year)`);
-      lines.push(`2. Ending Year (${last.label}): ${formatChartValue(last.value, type)}`);
-      lines.push(`3. Measured Period (n): ${n} ${n === 1 ? "year" : "years"} (from ${startItem.label} to ${last.label})`);
-      lines.push(`4. Note: Initial year (${first.label}) had non-positive value (${formatChartValue(first.value, type)}). Baseline automatically shifted to ${startItem.label} (${formatChartValue(startItem.value, type)}).`);
-      lines.push(`5. Division Ratio: ${formatChartValue(last.value, type)} / ${formatChartValue(startItem.value, type)} = ${ratio.toFixed(4)}`);
-      lines.push(`6. CAGR Formula: (${ratio.toFixed(4)}) ^ (1 / ${n}) - 1`);
-      lines.push(`7. Final Result: ${finalPct}% CAGR`);
-    } else {
-      lines.push(`1. Beginning Value (${first.label}): ${formatChartValue(first.value, type)}`);
-      lines.push(`2. Ending Value (${last.label}): ${formatChartValue(last.value, type)}`);
-      lines.push(`3. Period (n): ${n} years (from ${first.label} to ${last.label})`);
-      lines.push(`4. Division Ratio: ${formatChartValue(last.value, type)} / ${formatChartValue(first.value, type)} = ${ratio.toFixed(4)}`);
-      lines.push(`5. CAGR formula: (${ratio.toFixed(4)}) ^ (1 / ${n}) - 1`);
-      lines.push(`6. Growth Factor: ${Math.pow(ratio, 1 / n).toFixed(4)}`);
-      lines.push(`7. Final Result: ${finalPct}% CAGR`);
-    }
-
+    lines.push(`1. Beginning Value (${first.label}): ${formatChartValue(first.value, type)}`);
+    lines.push(`2. Ending Value (${last.label}): ${formatChartValue(last.value, type)}`);
+    lines.push(`3. Period (n): ${n} years (from ${first.label} to ${last.label})`);
+    lines.push(`4. Division Ratio: ${formatChartValue(last.value, type)} / ${formatChartValue(first.value, type)} = ${ratio.toFixed(4)}`);
+    lines.push(`5. CAGR formula: (${ratio.toFixed(4)}) ^ (1 / ${n}) - 1`);
+    lines.push(`6. Growth Factor: ${Math.pow(ratio, 1 / n).toFixed(4)}`);
+    lines.push(`7. Final Result: ${finalPct}% CAGR`);
     return lines;
   }
 
