@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { AnalysisResult, FinancialMetrics } from "../types";
+import { getFCFFormula } from "../utils/financialCalculations";
 
 const getScoreCategory = (score: number): { label: string; color: string } => {
   if (score >= 85) return { label: "Excellent", color: "green" };
@@ -140,9 +141,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           description: result.metrics.fcfGrowth !== null
             ? (fcfYears > 0 ? `${fcfYears}-Year Compound Annual Growth Rate (CAGR) of Free Cash Flow (FCF).` : "Compound Annual Growth Rate (CAGR) of Free Cash Flow (FCF).")
             : `Free Cash Flow evaluated via Cash Burn Trend (${result.metrics.fcfTrend || "Trend"}).`,
-          formula: result.metrics.fcfGrowth !== null
-            ? "CAGR = (Ending FCF / Beginning FCF) ^ (1 / n) - 1"
-            : "Cash Burn Change % = ((ABS(Start FCF) - ABS(End FCF)) / ABS(Start FCF)) * 100",
+          formula: getFCFFormula(result.fcfHistory, result.metrics.fcfGrowth),
           mathExplanation: getFCFMathExplanation(result.fcfHistory || [], result.metrics.fcfGrowth, result.metrics),
           whyItMatters: "Free Cash Flow represents the actual cash a company generates after accounting for cash outflows to support operations and maintain capital assets. Consistent FCF growth gives a company the flexibility to pay dividends, buy back shares, reduce debt, or reinvest in growth.",
           tiers: [
@@ -443,39 +442,43 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
 
     let reason = "starting or ending Free Cash Flow is non-positive";
     if (first.value > 0 && last.value <= 0) {
-      reason = "the Free Cash Flow changed from positive to negative";
+      reason = "Free Cash Flow changed from positive to negative";
     } else if (first.value <= 0 && last.value > 0) {
-      reason = "the Free Cash Flow changed from negative to positive";
+      reason = "Free Cash Flow changed from negative to positive";
     } else if (first.value <= 0 && last.value <= 0) {
       reason = "both starting and ending Free Cash Flow values are negative";
     }
+
+    const fcfTrend = metrics?.fcfTrend || (last.value > first.value ? (first.value <= 0 && last.value > 0 ? "Turnaround" : "Improving") : "Deteriorating");
+    const pctVal = metrics?.fcfBurnChangePct !== undefined && metrics?.fcfBurnChangePct !== null ? metrics.fcfBurnChangePct : null;
+    const formattedPct = pctVal !== null ? `${pctVal >= 0 ? "+" : ""}${pctVal.toFixed(2)}%` : null;
 
     const lines: string[] = [
       `1. Beginning Year (${first.label}): ${formatChartValue(first.value, "currency")}`,
       `2. Ending Year (${last.label}): ${formatChartValue(last.value, "currency")}`,
       `3. Note: CAGR was not calculated because ${reason}. The metric was evaluated using the FCF Trend methodology.`,
+      `4. FCF Trend: ${fcfTrend}`,
     ];
 
-    const fcfTrend = metrics?.fcfTrend || (last.value > first.value ? (first.value <= 0 && last.value > 0 ? "Turnaround" : "Improving") : "Deteriorating");
-    lines.push(`4. FCF Trend: ${fcfTrend}`);
-
-    if (first.value <= 0 && last.value <= 0) {
-      const startBurn = Math.abs(first.value);
-      const endBurn = Math.abs(last.value);
-      const burnPct = metrics?.fcfBurnChangePct !== undefined && metrics?.fcfBurnChangePct !== null
-        ? metrics.fcfBurnChangePct
-        : ((startBurn - endBurn) / startBurn) * 100;
-      
-      if (last.value < first.value) {
-        lines.push(`5. Cash burn increased from ${formatChartValue(first.value, "currency")} to ${formatChartValue(last.value, "currency")}`);
-      } else {
-        lines.push(`5. Cash burn decreased from ${formatChartValue(first.value, "currency")} to ${formatChartValue(last.value, "currency")}`);
-      }
-      lines.push(`6. Change in cash burn: ${burnPct >= 0 ? "+" : ""}${burnPct.toFixed(2)}%`);
-    } else if (first.value <= 0 && last.value > 0) {
+    if (first.value <= 0 && last.value > 0) {
       lines.push(`5. Classification: Turnaround / Improved from cash burn of ${formatChartValue(first.value, "currency")} to positive FCF of ${formatChartValue(last.value, "currency")}`);
+      if (formattedPct) {
+        lines.push(`6. FCF Improvement: ${formattedPct}`);
+      }
     } else if (first.value > 0 && last.value <= 0) {
       lines.push(`5. Classification: FCF turned negative from positive ${formatChartValue(first.value, "currency")} to cash burn of ${formatChartValue(last.value, "currency")}`);
+      if (formattedPct) {
+        lines.push(`6. FCF Deterioration: ${formattedPct}`);
+      }
+    } else if (first.value <= 0 && last.value <= 0) {
+      if (last.value < first.value) {
+        lines.push(`5. Classification: Cash burn increased from ${formatChartValue(first.value, "currency")} to ${formatChartValue(last.value, "currency")}`);
+      } else {
+        lines.push(`5. Classification: Cash burn decreased from ${formatChartValue(first.value, "currency")} to ${formatChartValue(last.value, "currency")}`);
+      }
+      if (formattedPct) {
+        lines.push(`6. Change in Cash Burn: ${formattedPct}`);
+      }
     }
 
     return lines;

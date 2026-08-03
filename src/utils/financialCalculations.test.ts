@@ -8,6 +8,7 @@ import {
   calculateFCF,
   calculateFCFGrowth,
   calculateFCFTrend,
+  getFCFFormula,
   calculateDividendCAGR,
   calculateROIC,
   calculateAverageROIC,
@@ -1056,6 +1057,42 @@ describe("calculateFCFGrowth", () => {
       expect(trendData.trend).toBe("Deteriorating");
       expect(trendData.score).toBe(0);
       expect(trendData.burnChangePct).toBeCloseTo(-601.09, 1);
+    });
+
+    it("Test 1 (Formula): Positive -> Positive FCF uses FCF CAGR formula", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2015-12-31", operatingCashFlow: 100, capitalExpenditure: 0 },
+        { date: "2025-12-31", operatingCashFlow: 200, capitalExpenditure: 0 },
+      ];
+      const formula = getFCFFormula(statements, 0.0718);
+      expect(formula).toBe("FCF CAGR = (Ending FCF / Beginning FCF) ^ (1 / n) - 1");
+    });
+
+    it("Test 2 (Formula): Negative -> Negative FCF uses Cash Burn Change % formula", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2015-12-31", operatingCashFlow: -50, capitalExpenditure: 0 },
+        { date: "2025-12-31", operatingCashFlow: -200, capitalExpenditure: 0 },
+      ];
+      const formula = getFCFFormula(statements, null);
+      expect(formula).toBe("Cash Burn Change % = ((ABS(Beginning FCF) - ABS(Ending FCF)) / ABS(Beginning FCF)) * 100");
+    });
+
+    it("Test 3 (Formula): Negative -> Positive FCF uses FCF Improvement % formula (-2.2B -> +6.2B = +381.82%)", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2015-12-31", operatingCashFlow: -2200000000, capitalExpenditure: 0 },
+        { date: "2025-12-31", operatingCashFlow: 6200000000, capitalExpenditure: 0 },
+      ];
+      const formula = getFCFFormula(statements, null);
+      expect(formula).toBe("FCF Improvement % = ((Ending FCF - Beginning FCF) / ABS(Beginning FCF)) * 100");
+    });
+
+    it("Test 4 (Formula): Positive -> Negative FCF uses FCF Deterioration % formula", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2015-12-31", operatingCashFlow: 100, capitalExpenditure: 0 },
+        { date: "2025-12-31", operatingCashFlow: -50, capitalExpenditure: 0 },
+      ];
+      const formula = getFCFFormula(statements, null);
+      expect(formula).toBe("FCF Deterioration % = ((Ending FCF - Beginning FCF) / Beginning FCF) * 100");
     });
   });
 });

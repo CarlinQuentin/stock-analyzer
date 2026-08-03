@@ -483,6 +483,47 @@ export function calculateFCFTrend(
   }
 }
 
+/**
+ * Return dynamic FCF formula string based on starting and ending FCF values.
+ */
+export function getFCFFormula(
+  data: { label?: string; value?: number; operatingCashFlow?: number; capitalExpenditure?: number }[] | null | undefined,
+  actualCAGR: number | null,
+): string {
+  if (actualCAGR !== null) {
+    return "FCF CAGR = (Ending FCF / Beginning FCF) ^ (1 / n) - 1";
+  }
+  if (!data || !Array.isArray(data) || data.length < 2) {
+    return "FCF Growth Formula";
+  }
+
+  const getFCFVal = (item: { value?: number; operatingCashFlow?: number; capitalExpenditure?: number }): number | null => {
+    if (typeof item.value === "number") return item.value;
+    if (typeof item.operatingCashFlow === "number" && typeof item.capitalExpenditure === "number") {
+      return item.operatingCashFlow - item.capitalExpenditure;
+    }
+    return null;
+  };
+
+  const first = getFCFVal(data[0]);
+  const last = getFCFVal(data[data.length - 1]);
+
+  if (first === null || last === null) {
+    return "FCF Growth Formula";
+  }
+
+  if (first <= 0 && last > 0) {
+    return "FCF Improvement % = ((Ending FCF - Beginning FCF) / ABS(Beginning FCF)) * 100";
+  }
+  if (first > 0 && last <= 0) {
+    return "FCF Deterioration % = ((Ending FCF - Beginning FCF) / Beginning FCF) * 100";
+  }
+  if (first <= 0 && last <= 0) {
+    return "Cash Burn Change % = ((ABS(Beginning FCF) - ABS(Ending FCF)) / ABS(Beginning FCF)) * 100";
+  }
+  return "FCF CAGR = (Ending FCF / Beginning FCF) ^ (1 / n) - 1";
+}
+
 export function calculateDividendCAGR(
   dividends: FinancialStatement[],
 ): number | null {
