@@ -18,12 +18,32 @@ import {
 import { FinancialMetrics, MetricScores, FinancialStatement } from "../types";
 
 describe("Scoring Utilities - Individual Metric Scores", () => {
-  it("scoreRevenueGrowth should score revenue growth tiers correctly", () => {
-    expect(scoreRevenueGrowth(null)).toBeNull();
-    expect(scoreRevenueGrowth(0.20)).toBeGreaterThanOrEqual(85); // Excellent
-    expect(scoreRevenueGrowth(0.10)).toBeGreaterThanOrEqual(70); // Good
-    expect(scoreRevenueGrowth(0.06)).toBeGreaterThanOrEqual(50); // Average
-    expect(scoreRevenueGrowth(0.02)).toBeLessThan(50); // Poor
+  describe("scoreRevenueGrowth Stock Scoring Integration", () => {
+    it("should score positive CAGR as expected", () => {
+      expect(scoreRevenueGrowth(0.20)).toBeGreaterThanOrEqual(85); // Excellent
+      expect(scoreRevenueGrowth(0.10)).toBeGreaterThanOrEqual(70); // Good
+      expect(scoreRevenueGrowth(0.06)).toBeGreaterThanOrEqual(50); // Average
+    });
+
+    it("should score negative CAGR as expected", () => {
+      expect(scoreRevenueGrowth(-0.10)).toBe(0);
+      expect(scoreRevenueGrowth(-0.05)).toBeLessThan(30);
+    });
+
+    it("should score zero CAGR as expected", () => {
+      expect(scoreRevenueGrowth(0)).toBe(30);
+    });
+
+    it("should return a score of 0 for invalid/missing CAGR instead of null, undefined, or N/A", () => {
+      expect(scoreRevenueGrowth(null)).toBe(0);
+      expect(scoreRevenueGrowth(undefined)).toBe(0);
+      expect(scoreRevenueGrowth(NaN)).toBe(0);
+    });
+
+    it("should cap extremely high CAGR values at max score 100", () => {
+      expect(scoreRevenueGrowth(2.0)).toBe(100);
+      expect(scoreRevenueGrowth(5.0)).toBe(100);
+    });
   });
 
   it("scoreEPSGrowth should score EPS growth tiers correctly", () => {

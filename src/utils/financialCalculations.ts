@@ -20,42 +20,73 @@ export function calculateCAGR(
 }
 
 /**
- * Calculate Revenue CAGR from income statements
+ * Calculate Revenue CAGR from income statements.
+ * Uses the most recent 6 fiscal years (5-year CAGR period) if more than 6 years are provided.
+ * Returns 0 whenever CAGR cannot be calculated due to zero/negative values or invalid data.
  */
 export function calculateRevenueCAGR(
-  statements: FinancialStatement[],
-): number | null {
-  if (!statements || statements.length < 2) {
-    return null;
+  statements: FinancialStatement[] | null | undefined,
+): number {
+  if (!statements || !Array.isArray(statements) || statements.length < 2) {
+    return 0;
   }
 
-  const sortedByDate = [...statements].sort(
+  // Filter out invalid statement objects or missing/non-numeric revenue
+  const validStatements = statements.filter(
+    (s) =>
+      s &&
+      s.date &&
+      typeof s.revenue === "number" &&
+      !isNaN(s.revenue) &&
+      isFinite(s.revenue),
+  );
+
+  if (validStatements.length < 2) {
+    return 0;
+  }
+
+  // Clone to prevent mutating input array and sort chronologically by date
+  const sortedByDate = [...validStatements].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
   );
 
-  const lastStatement = sortedByDate[sortedByDate.length - 1];
-  const lastRevenue = lastStatement.revenue;
-
-  if (!lastRevenue || lastRevenue <= 0) {
-    return null;
+  // Handle duplicate dates by keeping the latest occurrence
+  const uniqueByDate: FinancialStatement[] = [];
+  const seenDates = new Set<string>();
+  for (let i = sortedByDate.length - 1; i >= 0; i--) {
+    const dateStr = new Date(sortedByDate[i].date).toISOString().split("T")[0];
+    if (!seenDates.has(dateStr)) {
+      seenDates.add(dateStr);
+      uniqueByDate.unshift(sortedByDate[i]);
+    }
   }
 
-  const firstPositiveIndex = sortedByDate.findIndex(
-    (s) => s.revenue !== undefined && s.revenue !== null && s.revenue > 0,
-  );
-
-  if (firstPositiveIndex === -1 || firstPositiveIndex === sortedByDate.length - 1) {
-    return null;
+  if (uniqueByDate.length < 2) {
+    return 0;
   }
 
-  const firstPositiveRevenue = sortedByDate[firstPositiveIndex].revenue!;
-  const years = sortedByDate.length - 1 - firstPositiveIndex;
+  // If more than 6 fiscal years are provided, use the 6 most recent fiscal years (5-year CAGR)
+  const windowStatements =
+    uniqueByDate.length > 6 ? uniqueByDate.slice(-6) : uniqueByDate;
+
+  const firstRevenue = windowStatements[0].revenue!;
+  const lastRevenue = windowStatements[windowStatements.length - 1].revenue!;
+
+  // Business rule: return 0 if starting or ending revenue <= 0
+  if (firstRevenue <= 0 || lastRevenue <= 0) {
+    return 0;
+  }
+
+  const firstDate = new Date(windowStatements[0].date);
+  const lastDate = new Date(windowStatements[windowStatements.length - 1].date);
+  const yearDiff = lastDate.getFullYear() - firstDate.getFullYear();
+  const years = yearDiff > 0 ? yearDiff : windowStatements.length - 1;
 
   if (years <= 0) {
-    return null;
+    return 0;
   }
 
-  return calculateCAGR(firstPositiveRevenue, lastRevenue, years);
+  return calculateCAGR(firstRevenue, lastRevenue, years);
 }
 
 /**

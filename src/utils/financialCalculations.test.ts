@@ -47,30 +47,333 @@ describe("calculateCAGR", () => {
 });
 
 describe("calculateRevenueCAGR", () => {
-  it("should return null for insufficient statement data", () => {
-    expect(calculateRevenueCAGR([])).toBeNull();
-    expect(calculateRevenueCAGR([{ date: "2024-12-31", revenue: 1000 }])).toBeNull();
+  describe("Happy Path Tests", () => {
+    it("should calculate CAGR correctly with exactly 6 years of revenue data (5-year CAGR)", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: 100 },
+        { date: "2021-12-31", revenue: 120 },
+        { date: "2022-12-31", revenue: 140 },
+        { date: "2023-12-31", revenue: 160 },
+        { date: "2024-12-31", revenue: 180 },
+        { date: "2025-12-31", revenue: 200 },
+      ];
+      // 100 -> 200 over 5 years: (200/100)^(1/5) - 1 = 2^0.2 - 1 ≈ 14.87%
+      const cagr = calculateRevenueCAGR(statements);
+      expect(cagr).toBeCloseTo(0.1487, 4);
+    });
+
+    it("should calculate CAGR correctly with more than 6 years of data by using the most recent 6 fiscal years", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2018-12-31", revenue: 50 },
+        { date: "2019-12-31", revenue: 60 },
+        { date: "2020-12-31", revenue: 100 },
+        { date: "2021-12-31", revenue: 120 },
+        { date: "2022-12-31", revenue: 140 },
+        { date: "2023-12-31", revenue: 160 },
+        { date: "2024-12-31", revenue: 180 },
+        { date: "2025-12-31", revenue: 200 },
+      ];
+      // Uses 2020-2025 (100 -> 200 over 5 years): ~14.87%
+      const cagr = calculateRevenueCAGR(statements);
+      expect(cagr).toBeCloseTo(0.1487, 4);
+    });
+
+    it("should calculate CAGR correctly when revenue increases every year", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: 100 },
+        { date: "2021-12-31", revenue: 110 },
+        { date: "2022-12-31", revenue: 125 },
+        { date: "2023-12-31", revenue: 140 },
+        { date: "2024-12-31", revenue: 160 },
+        { date: "2025-12-31", revenue: 180 },
+      ];
+      const cagr = calculateRevenueCAGR(statements);
+      expect(cagr).toBeGreaterThan(0);
+      expect(cagr).toBeCloseTo(0.1247, 4);
+    });
+
+    it("should calculate CAGR correctly when revenue decreases every year", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: 200 },
+        { date: "2021-12-31", revenue: 180 },
+        { date: "2022-12-31", revenue: 160 },
+        { date: "2023-12-31", revenue: 140 },
+        { date: "2024-12-31", revenue: 120 },
+        { date: "2025-12-31", revenue: 100 },
+      ];
+      // 200 -> 100 over 5 years: (100/200)^(1/5) - 1 = 0.5^0.2 - 1 ≈ -12.94%
+      const cagr = calculateRevenueCAGR(statements);
+      expect(cagr).toBeLessThan(0);
+      expect(cagr).toBeCloseTo(-0.1294, 4);
+    });
+
+    it("should calculate CAGR correctly when revenue fluctuates year-over-year but overall CAGR is positive", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: 100 },
+        { date: "2021-12-31", revenue: 80 },
+        { date: "2022-12-31", revenue: 120 },
+        { date: "2023-12-31", revenue: 110 },
+        { date: "2024-12-31", revenue: 150 },
+        { date: "2025-12-31", revenue: 200 },
+      ];
+      const cagr = calculateRevenueCAGR(statements);
+      expect(cagr).toBeGreaterThan(0);
+      expect(cagr).toBeCloseTo(0.1487, 4);
+    });
+
+    it("should calculate CAGR correctly when revenue fluctuates year-over-year but overall CAGR is negative", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: 200 },
+        { date: "2021-12-31", revenue: 250 },
+        { date: "2022-12-31", revenue: 180 },
+        { date: "2023-12-31", revenue: 190 },
+        { date: "2024-12-31", revenue: 120 },
+        { date: "2025-12-31", revenue: 100 },
+      ];
+      const cagr = calculateRevenueCAGR(statements);
+      expect(cagr).toBeLessThan(0);
+      expect(cagr).toBeCloseTo(-0.1294, 4);
+    });
+
+    it("should verify 2020-2025 CAGR for the provided 7-year validation dataset (48.4M in 2019, 35.2M in 2020 to 601.8M in 2025)", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2019-12-31", revenue: 48400000 },
+        { date: "2020-12-31", revenue: 35200000 },
+        { date: "2021-12-31", revenue: 62200000 },
+        { date: "2022-12-31", revenue: 211000000 },
+        { date: "2023-12-31", revenue: 244600000 },
+        { date: "2024-12-31", revenue: 436200000 },
+        { date: "2025-12-31", revenue: 601800000 },
+      ];
+      // 5-year CAGR window uses recent 6 years: 2020 (35.2M) to 2025 (601.8M)
+      // (601.8 / 35.2)^(1/5) - 1 ≈ 76.43%
+      const cagr = calculateRevenueCAGR(statements);
+      expect(cagr).toBeCloseTo(0.7643, 4);
+    });
   });
 
-  it("should calculate revenue CAGR across chronological dates", () => {
-    const statements: FinancialStatement[] = [
-      { date: "2020-12-31", revenue: 1000 },
-      { date: "2021-12-31", revenue: 1200 },
-      { date: "2022-12-31", revenue: 1400 },
-      { date: "2023-12-31", revenue: 1600 },
-      { date: "2024-12-31", revenue: 2000 },
-    ];
-    // 1000 -> 2000 over 4 years: (2000/1000)^(1/4) - 1 = 2^0.25 - 1 ≈ 18.92%
-    const cagr = calculateRevenueCAGR(statements);
-    expect(cagr).toBeCloseTo(0.1892, 4);
+  describe("Zero Revenue Handling", () => {
+    it("should return 0 when starting revenue is 0", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: 0 },
+        { date: "2025-12-31", revenue: 100 },
+      ];
+      expect(calculateRevenueCAGR(statements)).toBe(0);
+    });
+
+    it("should return 0 when ending revenue is 0", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: 100 },
+        { date: "2025-12-31", revenue: 0 },
+      ];
+      expect(calculateRevenueCAGR(statements)).toBe(0);
+    });
+
+    it("should return 0 when both starting and ending revenue are 0", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: 0 },
+        { date: "2025-12-31", revenue: 0 },
+      ];
+      expect(calculateRevenueCAGR(statements)).toBe(0);
+    });
+
+    it("should calculate CAGR correctly when intermediate years contain 0 revenue", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: 100 },
+        { date: "2021-12-31", revenue: 0 },
+        { date: "2022-12-31", revenue: 120 },
+        { date: "2023-12-31", revenue: 140 },
+        { date: "2024-12-31", revenue: 160 },
+        { date: "2025-12-31", revenue: 200 },
+      ];
+      const cagr = calculateRevenueCAGR(statements);
+      expect(cagr).toBeCloseTo(0.1487, 4);
+    });
   });
 
-  it("should return null if first or last revenue is <= 0 or missing", () => {
-    const statements: FinancialStatement[] = [
-      { date: "2020-12-31", revenue: 0 },
-      { date: "2024-12-31", revenue: 2000 },
-    ];
-    expect(calculateRevenueCAGR(statements)).toBeNull();
+  describe("Negative Revenue Handling", () => {
+    it("should return 0 when starting revenue is negative", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: -50 },
+        { date: "2025-12-31", revenue: 100 },
+      ];
+      expect(calculateRevenueCAGR(statements)).toBe(0);
+    });
+
+    it("should return 0 when ending revenue is negative", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: 100 },
+        { date: "2025-12-31", revenue: -50 },
+      ];
+      expect(calculateRevenueCAGR(statements)).toBe(0);
+    });
+
+    it("should return 0 when both starting and ending revenue are negative", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: -100 },
+        { date: "2025-12-31", revenue: -50 },
+      ];
+      expect(calculateRevenueCAGR(statements)).toBe(0);
+    });
+
+    it("should return 0 for transition from negative revenue to positive revenue", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: -20 },
+        { date: "2021-12-31", revenue: -10 },
+        { date: "2025-12-31", revenue: 100 },
+      ];
+      expect(calculateRevenueCAGR(statements)).toBe(0);
+    });
+
+    it("should return 0 for transition from positive revenue to negative revenue", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: 100 },
+        { date: "2024-12-31", revenue: 50 },
+        { date: "2025-12-31", revenue: -20 },
+      ];
+      expect(calculateRevenueCAGR(statements)).toBe(0);
+    });
+  });
+
+  describe("Missing or Invalid Data", () => {
+    it("should return 0 for empty revenue array", () => {
+      expect(calculateRevenueCAGR([])).toBe(0);
+    });
+
+    it("should return 0 for null input", () => {
+      expect(calculateRevenueCAGR(null as any)).toBe(0);
+    });
+
+    it("should return 0 for undefined input", () => {
+      expect(calculateRevenueCAGR(undefined as any)).toBe(0);
+    });
+
+    it("should return 0 for fewer than required fiscal years (1 statement)", () => {
+      expect(calculateRevenueCAGR([{ date: "2025-12-31", revenue: 100 }])).toBe(0);
+    });
+
+    it("should handle missing fiscal years in the middle of dataset", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: 100 },
+        { date: "2025-12-31", revenue: 200 },
+      ];
+      // 100 -> 200 over 5 years (2020 to 2025 = 5 years)
+      const cagr = calculateRevenueCAGR(statements);
+      expect(cagr).toBeCloseTo(0.1487, 4);
+    });
+
+    it("should handle revenue values containing null gracefully", () => {
+      const statements: any[] = [
+        { date: "2020-12-31", revenue: 100 },
+        { date: "2021-12-31", revenue: null },
+        { date: "2025-12-31", revenue: 200 },
+      ];
+      const cagr = calculateRevenueCAGR(statements);
+      expect(cagr).toBeCloseTo(0.1487, 4);
+    });
+
+    it("should handle revenue values containing undefined gracefully", () => {
+      const statements: any[] = [
+        { date: "2020-12-31", revenue: 100 },
+        { date: "2021-12-31", revenue: undefined },
+        { date: "2025-12-31", revenue: 200 },
+      ];
+      const cagr = calculateRevenueCAGR(statements);
+      expect(cagr).toBeCloseTo(0.1487, 4);
+    });
+
+    it("should handle revenue values containing NaN gracefully", () => {
+      const statements: any[] = [
+        { date: "2020-12-31", revenue: 100 },
+        { date: "2021-12-31", revenue: NaN },
+        { date: "2025-12-31", revenue: 200 },
+      ];
+      const cagr = calculateRevenueCAGR(statements);
+      expect(cagr).toBeCloseTo(0.1487, 4);
+    });
+
+    it("should sort fiscal years provided out of chronological order", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2025-12-31", revenue: 200 },
+        { date: "2020-12-31", revenue: 100 },
+        { date: "2022-12-31", revenue: 140 },
+      ];
+      const cagr = calculateRevenueCAGR(statements);
+      expect(cagr).toBeCloseTo(0.1487, 4);
+    });
+  });
+
+  describe("Data Validation", () => {
+    it("should calculate CAGR correctly with decimal revenue values", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: 100.5 },
+        { date: "2025-12-31", revenue: 201.0 },
+      ];
+      const cagr = calculateRevenueCAGR(statements);
+      expect(cagr).toBeCloseTo(0.1487, 4);
+    });
+
+    it("should calculate CAGR correctly with very large revenue values", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: 100000000000 },
+        { date: "2025-12-31", revenue: 200000000000 },
+      ];
+      const cagr = calculateRevenueCAGR(statements);
+      expect(cagr).toBeCloseTo(0.1487, 4);
+    });
+
+    it("should calculate CAGR correctly with very small positive revenue values", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: 0.0001 },
+        { date: "2025-12-31", revenue: 0.0002 },
+      ];
+      const cagr = calculateRevenueCAGR(statements);
+      expect(cagr).toBeCloseTo(0.1487, 4);
+    });
+
+    it("should handle duplicate fiscal years safely", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: 100 },
+        { date: "2020-12-31", revenue: 100 },
+        { date: "2025-12-31", revenue: 200 },
+      ];
+      const cagr = calculateRevenueCAGR(statements);
+      expect(cagr).toBeCloseTo(0.1487, 4);
+    });
+
+    it("should not mutate the input array", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2025-12-31", revenue: 200 },
+        { date: "2020-12-31", revenue: 100 },
+      ];
+      const originalFirstDate = statements[0].date;
+      calculateRevenueCAGR(statements);
+      expect(statements[0].date).toBe(originalFirstDate);
+    });
+  });
+
+  describe("Mathematical Accuracy", () => {
+    it("should return 0% CAGR when beginning and ending revenue are equal", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: 100 },
+        { date: "2025-12-31", revenue: 100 },
+      ];
+      expect(calculateRevenueCAGR(statements)).toBe(0);
+    });
+
+    it("should verify correct number of periods is used (5 periods for 6 fiscal years)", () => {
+      const statements: FinancialStatement[] = [
+        { date: "2020-12-31", revenue: 100 },
+        { date: "2021-12-31", revenue: 120 },
+        { date: "2022-12-31", revenue: 140 },
+        { date: "2023-12-31", revenue: 160 },
+        { date: "2024-12-31", revenue: 180 },
+        { date: "2025-12-31", revenue: 200 },
+      ];
+      const cagr = calculateRevenueCAGR(statements);
+      const expected = Math.pow(200 / 100, 1 / 5) - 1;
+      expect(cagr).toBeCloseTo(expected, 6);
+    });
   });
 });
 
