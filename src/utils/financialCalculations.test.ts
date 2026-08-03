@@ -543,7 +543,7 @@ describe("calculateEPSGrowth", () => {
       expect(res.score).toBe(100);
     });
 
-    it("2. Positive EPS declining: Trend = Declining, Score = 20", () => {
+    it("2. Positive EPS declining: Trend = Declining, Dynamic Score = 16", () => {
       const statements: FinancialStatement[] = [
         { date: "2020-12-31", eps: 5.0 },
         { date: "2025-12-31", eps: 1.0 },
@@ -551,10 +551,10 @@ describe("calculateEPSGrowth", () => {
       const res = calculateEPSTrend(statements);
       expect(res.trend).toBe("Declining");
       expect(res.isProfitable).toBe(true);
-      expect(res.score).toBe(20);
+      expect(res.score).toBe(16);
     });
 
-    it("3. Negative EPS with shrinking losses: Trend = Improving, Score = 60", () => {
+    it("3. Negative EPS with shrinking losses: Trend = Improving, Dynamic Score = 72 (87.5% loss reduction)", () => {
       const statements: FinancialStatement[] = [
         { date: "2021-12-31", eps: -2.0 },
         { date: "2022-12-31", eps: -1.5 },
@@ -564,7 +564,7 @@ describe("calculateEPSGrowth", () => {
       const res = calculateEPSTrend(statements);
       expect(res.trend).toBe("Improving");
       expect(res.isProfitable).toBe(false);
-      expect(res.score).toBe(60);
+      expect(res.score).toBe(72);
     });
 
     it("4. Negative EPS with expanding losses: Trend = Declining, Score = 0", () => {
@@ -610,7 +610,7 @@ describe("calculateEPSGrowth", () => {
       expect(trendRes.score).toBe(0);
     });
 
-    it("7. Negative EPS to Positive EPS turnaround: Trend = Improving, isProfitable = true, Score = 80 (CAGR null due to n=1)", () => {
+    it("7. Negative EPS to Positive EPS turnaround: Trend = Improving, isProfitable = true, Dynamic Score = 79", () => {
       const statements: FinancialStatement[] = [
         { date: "2018-12-31", eps: -4.67 },
         { date: "2019-12-31", eps: -15.44 },
@@ -627,7 +627,7 @@ describe("calculateEPSGrowth", () => {
       const res = calculateEPSTrend(statements);
       expect(res.trend).toBe("Improving");
       expect(res.isProfitable).toBe(true);
-      expect(res.score).toBe(80);
+      expect(res.score).toBe(79);
     });
   });
 

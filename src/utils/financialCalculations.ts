@@ -183,23 +183,15 @@ export function calculateEPSGrowth(
 }
 
 /**
- * Calculate directional EPS Trend and Score when CAGR is unavailable or to supplement analysis.
+ * Calculate directional EPS Trend and dynamic EPS Quality Score when CAGR is unavailable or to supplement analysis.
  * Rules:
  * 1. Sort financial statements chronologically by fiscal date.
  * 2. Determine startingEPS, endingEPS, and isProfitable (endingEPS > 0).
- * 3. Categorize EPS Trend:
- *    - Positive EPS -> Positive EPS:
- *      - endingEPS > startingEPS: trend = "Improving", score = 100
- *      - endingEPS < startingEPS: trend = "Declining", score = 20
- *      - within tolerance (<= 0.02): trend = "Flat", score = 40
- *    - Negative EPS -> Positive EPS (Turnaround):
- *      - trend = "Improving", score = 80
- *    - Positive EPS -> Negative EPS (Deterioration):
- *      - trend = "Declining", score = 0
- *    - Negative EPS -> Negative EPS:
- *      - losses shrinking (endingEPS > startingEPS): trend = "Improving", score = 60
- *      - losses expanding (endingEPS < startingEPS): trend = "Declining", score = 0
- *      - within tolerance (<= 0.02): trend = "Flat", score = 40
+ * 3. Categorize EPS Trend (Improving | Declining | Flat).
+ * 4. Compute dynamic EPS Quality Score (0-100) based on:
+ *    - EPS direction (Growing / Shrinking / Flat)
+ *    - Improvement/Decline percentage & magnitude
+ *    - Current profitability (endingEPS > 0 vs endingEPS <= 0)
  */
 export function calculateEPSTrend(
   statements: FinancialStatement[] | null | undefined,
@@ -261,35 +253,47 @@ export function calculateEPSTrend(
     // Positive EPS -> Positive EPS
     if (isFlat) {
       trend = "Flat";
-      score = 40;
+      score = 50;
     } else if (netChange > 0) {
       trend = "Improving";
-      score = 100;
+      // Dynamic score: Base 80 + bonus for growth percentage (range 80-100)
+      const pctGrowth = netChange / startingEPS;
+      score = Math.min(100, Math.round(80 + Math.min(pctGrowth * 20, 20)));
     } else {
       trend = "Declining";
-      score = 20;
+      // Dynamic score: Base 40 - penalty for decline percentage (range 10-39)
+      const pctDecline = Math.abs(netChange) / startingEPS;
+      score = Math.max(10, Math.round(40 - Math.min(pctDecline * 30, 30)));
     }
   } else if (startingEPS <= 0 && endingEPS > 0) {
     // Negative EPS -> Positive EPS (Turnaround)
     trend = "Improving";
-    score = 80;
+    // Dynamic score: Base 70 + bonus for positive EPS level achieved relative to initial loss (range 70-90)
+    const turnaroundRatio = endingEPS / Math.max(Math.abs(startingEPS), 0.1);
+    score = Math.min(90, Math.round(70 + Math.min(turnaroundRatio * 20, 20)));
   } else if (startingEPS > 0 && endingEPS <= 0) {
     // Positive EPS -> Negative EPS (Deterioration)
     trend = "Declining";
-    score = 0;
+    // Dynamic score: Base 15 - penalty for loss severity relative to prior profit (range 0-15)
+    const lossSeverity = Math.abs(endingEPS) / startingEPS;
+    score = Math.max(0, Math.round(15 - Math.min(lossSeverity * 15, 15)));
   } else {
-    // Negative EPS -> Negative EPS (Unprofitable)
+    // Negative EPS -> Negative EPS (Unprofitable throughout)
     if (isFlat) {
       trend = "Flat";
       score = 40;
     } else if (netChange > 0) {
       // Losses shrinking (e.g. -2.00 -> -0.25)
       trend = "Improving";
-      score = 60;
+      // Dynamic score: Base 50 + bonus for loss reduction percentage (range 50-75)
+      const lossReductionPct = (endingEPS - startingEPS) / Math.abs(startingEPS);
+      score = Math.min(75, Math.round(50 + Math.min(lossReductionPct * 25, 25)));
     } else {
       // Losses expanding (e.g. -0.08 -> -0.37)
       trend = "Declining";
-      score = 0;
+      // Dynamic score: Base 20 - penalty for loss expansion severity (range 0-20)
+      const lossExpansion = Math.abs(netChange) / Math.abs(startingEPS);
+      score = Math.max(0, Math.round(20 - Math.min(lossExpansion * 10, 20)));
     }
   }
 
