@@ -451,7 +451,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
 
     const fcfTrend = metrics?.fcfTrend || (last.value > first.value ? (first.value <= 0 && last.value > 0 ? "Turnaround" : "Improving") : "Deteriorating");
     const pctVal = metrics?.fcfBurnChangePct !== undefined && metrics?.fcfBurnChangePct !== null ? metrics.fcfBurnChangePct : null;
-    const formattedPct = pctVal !== null ? `${pctVal >= 0 ? "+" : ""}${pctVal.toFixed(2)}%` : null;
+    const formattedPct = pctVal !== null ? `${pctVal >= 0 ? "+" : ""}${pctVal.toFixed(2)}` : null;
 
     const lines: string[] = [
       `1. Beginning Year (${first.label}): ${formatChartValue(first.value, "currency")}`,
@@ -477,7 +477,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
         lines.push(`5. Classification: Cash burn decreased from ${formatChartValue(first.value, "currency")} to ${formatChartValue(last.value, "currency")}`);
       }
       if (formattedPct) {
-        lines.push(`6. Change in Cash Burn: ${formattedPct}`);
+        lines.push(`6. Cash Burn Change: ${formattedPct}`);
       }
     }
 
@@ -946,7 +946,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                   ) : config.changePct !== undefined && config.changePct !== null ? (
                     <div>
                       <span>
-                        {config.changePct >= 0 ? "+" : ""}{config.changePct.toFixed(2)}%
+                        {config.changePct >= 0 ? "+" : ""}{config.changePct.toFixed(2)}
                       </span>
                       {config.statusText && (
                         <span className="block text-xs font-bold text-slate-500 dark:text-slate-400 mt-0.5 font-sans">

@@ -126,7 +126,7 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
                   formatPercentage(metrics.epsGrowth)
                 ) : metrics.epsChangePct !== undefined && metrics.epsChangePct !== null ? (
                   <span>
-                    {metrics.epsChangePct >= 0 ? "+" : ""}{metrics.epsChangePct.toFixed(2)}%{" "}
+                    {metrics.epsChangePct >= 0 ? "+" : ""}{metrics.epsChangePct.toFixed(2)}{" "}
                     <span className="text-xs text-slate-500 font-normal">({metrics.epsTrend})</span>
                   </span>
                 ) : (
@@ -161,7 +161,7 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
                   formatPercentage(metrics.fcfGrowth)
                 ) : metrics.fcfBurnChangePct !== undefined && metrics.fcfBurnChangePct !== null ? (
                   <span>
-                    {metrics.fcfBurnChangePct >= 0 ? "+" : ""}{metrics.fcfBurnChangePct.toFixed(2)}%{" "}
+                    {metrics.fcfBurnChangePct >= 0 ? "+" : ""}{metrics.fcfBurnChangePct.toFixed(2)}{" "}
                     <span className="text-xs text-slate-500 font-normal">({metrics.fcfTrend})</span>
                   </span>
                 ) : (

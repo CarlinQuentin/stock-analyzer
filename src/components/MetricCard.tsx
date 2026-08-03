@@ -293,7 +293,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           ) : changePct !== undefined && changePct !== null ? (
             <div>
               <p className="text-3xl font-extrabold text-slate-900 dark:text-white">
-                {changePct >= 0 ? "+" : ""}{changePct.toFixed(2)}%
+                {changePct >= 0 ? "+" : ""}{changePct.toFixed(2)}
               </p>
               {statusText && (
                 <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-1">
