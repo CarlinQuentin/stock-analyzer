@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  SCORE_WEIGHTS,
   SCORE_RANGES,
   formatPercentageMetric,
   scoreRevenueGrowth,
@@ -302,6 +303,25 @@ describe("calculateMetricScores & calculateOverallScore", () => {
     // Weight sum = 1.00
     // Round(87.5 / 1.00) = 88
     expect(calculateOverallScore(scores)).toBe(88);
+  });
+
+  it("SCORE_WEIGHTS total sum must equal exactly 1.00 (100%)", () => {
+    const totalWeight = Object.values(SCORE_WEIGHTS).reduce((sum, w) => sum + w, 0);
+    expect(totalWeight).toBeCloseTo(1.0, 5);
+  });
+
+  it("calculateOverallScore should calculate exact point contributions and total score matching prompt example", () => {
+    const exampleScores: MetricScores = {
+      revenue: 100,       // (100/100) * 15 = 15.00 pts
+      eps: 100,           // (100/100) * 15 = 15.00 pts
+      fcf: 100,           // (100/100) * 10 = 10.00 pts
+      fcfMargin: 76,      // (76/100)  * 10 = 7.60 pts
+      roic: 100,          // (100/100) * 20 = 20.00 pts
+      debt: 98,           // (98/100)  * 10 = 9.80 pts
+      profitability: 100, // (100/100) * 20 = 20.00 pts
+    };
+    // Sum = 15 + 15 + 10 + 7.6 + 20 + 9.8 + 20 = 97.40 pts
+    expect(calculateOverallScore(exampleScores)).toBe(97);
   });
 
   it("calculateOverallScore should return 0 if all scores are null", () => {

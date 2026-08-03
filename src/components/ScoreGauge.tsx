@@ -32,16 +32,24 @@ export const ScoreGauge = ({
 
   const gradientClass = colorMap[category.color] || "from-gray-500 to-gray-600";
 
-  // Business Quality Score Considerations
+  const METRIC_LABELS: Record<string, string> = {
+    revenue: "Revenue Growth",
+    eps: "EPS Growth",
+    fcf: "FCF Growth",
+    fcfMargin: "FCF Margin",
+    roic: "ROIC",
+    debt: "Debt-to-Equity",
+    profitability: "Profitability Margins",
+  };
+
+  // Business Quality Score Considerations - dynamically derived from SCORE_WEIGHTS configuration
   const businessQualityItems = scores
-    ? [
-        { key: "revenue", label: "Revenue Growth", weight: SCORE_WEIGHTS.revenue, score: scores.revenue },
-        { key: "eps", label: "EPS Growth", weight: SCORE_WEIGHTS.eps, score: scores.eps },
-        { key: "fcf", label: "FCF Growth", weight: SCORE_WEIGHTS.fcf, score: scores.fcf },
-        { key: "roic", label: "ROIC", weight: SCORE_WEIGHTS.roic, score: scores.roic },
-        { key: "debt", label: "Debt-to-Equity", weight: SCORE_WEIGHTS.debt, score: scores.debt },
-        { key: "profitability", label: "Profitability Margins", weight: SCORE_WEIGHTS.profitability, score: scores.profitability },
-      ]
+    ? (Object.keys(SCORE_WEIGHTS) as (keyof MetricScores)[]).map((key) => ({
+        key,
+        label: METRIC_LABELS[key] || key,
+        weight: SCORE_WEIGHTS[key],
+        score: scores[key],
+      }))
     : [];
 
   // Stock Valuation Score Considerations
