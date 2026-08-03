@@ -943,17 +943,6 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                         : config.value.toFixed(2)}
                       <span className="text-lg text-slate-500 font-semibold ml-1">{config.unit}</span>
                     </>
-                  ) : config.changePct !== undefined && config.changePct !== null ? (
-                    <div>
-                      <span>
-                        {config.changePct >= 0 ? "+" : ""}{config.changePct.toFixed(2)}
-                      </span>
-                      {config.statusText && (
-                        <span className="block text-xs font-bold text-slate-500 dark:text-slate-400 mt-0.5 font-sans">
-                          Trend: <span className="text-slate-800 dark:text-slate-200">{config.statusText}</span>
-                        </span>
-                      )}
-                    </div>
                   ) : config.statusText ? (
                     <span className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">
                       {config.statusText}

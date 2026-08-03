@@ -124,11 +124,6 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
               <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200 font-semibold">
                 {metrics.epsGrowth !== null ? (
                   formatPercentage(metrics.epsGrowth)
-                ) : metrics.epsChangePct !== undefined && metrics.epsChangePct !== null ? (
-                  <span>
-                    {metrics.epsChangePct >= 0 ? "+" : ""}{metrics.epsChangePct.toFixed(2)}{" "}
-                    <span className="text-xs text-slate-500 font-normal">({metrics.epsTrend})</span>
-                  </span>
                 ) : (
                   <span className="text-slate-500 dark:text-slate-400 font-normal">
                     {metrics.epsTrend || "N/A"}
@@ -159,11 +154,6 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
               <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200 font-semibold">
                 {metrics.fcfGrowth !== null ? (
                   formatPercentage(metrics.fcfGrowth)
-                ) : metrics.fcfBurnChangePct !== undefined && metrics.fcfBurnChangePct !== null ? (
-                  <span>
-                    {metrics.fcfBurnChangePct >= 0 ? "+" : ""}{metrics.fcfBurnChangePct.toFixed(2)}{" "}
-                    <span className="text-xs text-slate-500 font-normal">({metrics.fcfTrend})</span>
-                  </span>
                 ) : (
                   <span className="text-slate-500 dark:text-slate-400 font-normal">
                     {metrics.fcfTrend || "N/A"}
