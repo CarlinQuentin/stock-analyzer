@@ -176,6 +176,81 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           ],
           getInsights: () => analyzeEfficiencyHistory(result.fcfMarginHistory || [], "FCF Margin", 20),
         };
+      case "fcfConsistency":
+        return {
+          ...defaultData,
+          title: "FCF Consistency",
+          icon: "🛡️",
+          score: result.scores.fcfConsistency,
+          value: result.metrics.fcfConsistency,
+          unit: "%",
+          chartData: [],
+          chartValueType: "percent" as const,
+          description: "Measures the reliability and consistency of positive free cash flow generation over history.",
+          formula: "FCF Consistency = Weighted (Positive FCF Years % + Count + Low Volatility)",
+          mathExplanation: [
+            `1. FCF Consistency Score: ${result.metrics.fcfConsistency !== null ? result.metrics.fcfConsistency : "N/A"}%`,
+            `2. Evaluates the ratio of profitable free cash flow years and low volatility.`,
+          ],
+          whyItMatters: "Consistent free cash flow generation ensures a company can reliably fund capital investments, pay dividends, pay down debt, and weather macroeconomic downcycles.",
+          tiers: [
+            { label: "Excellent", range: "85 - 100%", color: "text-green-500" },
+            { label: "Good", range: "70 - 84%", color: "text-blue-500" },
+            { label: "Average", range: "50 - 69%", color: "text-amber-500" },
+            { label: "Poor", range: "< 50%", color: "text-red-500" },
+          ],
+          getInsights: () => ["Reliable cash flow generation reduces downside risk and supports long-term growth."],
+        };
+      case "fcfConversion":
+        return {
+          ...defaultData,
+          title: "FCF Conversion",
+          icon: "🔄",
+          score: result.scores.fcfConversion,
+          value: result.metrics.fcfConversion,
+          unit: "%",
+          chartData: result.fcfConversionHistory || [],
+          chartValueType: "percent" as const,
+          description: "Measures the proportion of Net Income converted into Free Cash Flow.",
+          formula: "FCF Conversion = (Free Cash Flow / Net Income) * 100",
+          mathExplanation: [
+            `1. Latest FCF Conversion Ratio: ${result.metrics.fcfConversion !== null ? result.metrics.fcfConversion.toFixed(2) : "N/A"}%`,
+            `2. Conversion above 100% indicates earnings are backed by strong cash flow.`,
+          ],
+          whyItMatters: "FCF conversion evaluates earnings quality. Companies converting >100% of reported accounting net income into true cash flow possess strong cash generation capabilities.",
+          tiers: [
+            { label: "Excellent", range: ">= 100%", color: "text-green-500" },
+            { label: "Good", range: "80% - 100%", color: "text-blue-500" },
+            { label: "Average", range: "50% - 80%", color: "text-amber-500" },
+            { label: "Poor", range: "< 50%", color: "text-red-500" },
+          ],
+          getInsights: () => ["High FCF conversion indicates high-quality earnings backed by real cash flow."],
+        };
+      case "marginStability":
+        return {
+          ...defaultData,
+          title: "Margin Stability",
+          icon: "📊",
+          score: result.scores.marginStability,
+          value: result.metrics.marginStability,
+          unit: "%",
+          chartData: result.marginStabilityHistory || [],
+          chartValueType: "percent" as const,
+          description: "Measures whether operating profitability is improving, stable, or deteriorating over time.",
+          formula: "Margin Stability = Standard Deviation of Operating Margins + Trend Adjustment",
+          mathExplanation: [
+            `1. Margin Stability Score: ${result.metrics.marginStability !== null ? result.metrics.marginStability : "N/A"}%`,
+            `2. Measures low variation and positive direction in operating profit margins over time.`,
+          ],
+          whyItMatters: "Stable or expanding operating margins demonstrate pricing power, cost control discipline, and a strong competitive moat against inflation.",
+          tiers: [
+            { label: "Excellent", range: "85 - 100%", color: "text-green-500" },
+            { label: "Good", range: "70 - 84%", color: "text-blue-500" },
+            { label: "Average", range: "50 - 69%", color: "text-amber-500" },
+            { label: "Poor", range: "< 50%", color: "text-red-500" },
+          ],
+          getInsights: () => analyzeEfficiencyHistory(result.marginStabilityHistory || [], "Operating Margin", 15),
+        };
       case "roic":
         return {
           ...defaultData,

@@ -21,6 +21,7 @@ interface MetricCardProps {
   isExpanded?: boolean;
   onClick?: () => void;
   directionStrategy?: "higherIsBetter" | "lowerIsBetter";
+  isInformational?: boolean;
 }
 
 export const MetricCard: React.FC<MetricCardProps> = ({
@@ -37,6 +38,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   isExpanded = false,
   onClick,
   directionStrategy,
+  isInformational = false,
 }) => {
   const getScoreColor = (score: number | null) => {
     if (score === null) return "bg-slate-100 text-slate-500 border-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
@@ -316,6 +318,12 @@ export const MetricCard: React.FC<MetricCardProps> = ({
             style={{ width: `${score !== null ? Math.min(score, 100) : 0}%` }}
           ></div>
         </div>
+
+        {isInformational && (
+          <div className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900/60 px-2.5 py-1 rounded border border-slate-200/80 dark:border-slate-700/60 font-medium text-center">
+            Informational Metric - Not included in Universal Score
+          </div>
+        )}
       </div>
 
       {chartData && chartData.length > 0 && isExpanded && (

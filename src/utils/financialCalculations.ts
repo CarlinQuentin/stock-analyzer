@@ -850,6 +850,195 @@ export function calculateFCFMarginHistory(
 }
 
 /**
+ * Calculate FCF Consistency score (0-100) measuring reliability of free cash flow generation.
+ * Includes:
+ * - Number of profitable FCF years
+ * - Percentage of years with positive FCF
+ * - FCF volatility/trend
+ */
+export function calculateFCFConsistency(
+  cashFlowStatements: FinancialStatement[] | null | undefined,
+): number | null {
+  if (!cashFlowStatements || !Array.isArray(cashFlowStatements) || cashFlowStatements.length === 0) {
+    return null;
+  }
+
+  const validStatements = cashFlowStatements.filter(
+    (s) =>
+      s &&
+      s.date &&
+      typeof s.operatingCashFlow === "number" &&
+      typeof s.capitalExpenditure === "number",
+  );
+
+  if (validStatements.length === 0) {
+    return null;
+  }
+
+  const fcfValues: number[] = [];
+  for (const s of validStatements) {
+    const fcf = calculateFCF(s.operatingCashFlow, s.capitalExpenditure);
+    if (fcf !== null) {
+      fcfValues.push(fcf);
+    }
+  }
+
+  if (fcfValues.length === 0) {
+    return null;
+  }
+
+  const totalYears = fcfValues.length;
+  const positiveYears = fcfValues.filter((val) => val > 0).length;
+  const positivePct = positiveYears / totalYears;
+
+  const ratioScore = positivePct * 100;
+  const countScore = Math.min(100, (positiveYears / Math.min(5, Math.max(totalYears, 1))) * 100);
+
+  let volatilityScore = 50;
+  const mean = fcfValues.reduce((sum, val) => sum + val, 0) / totalYears;
+
+  if (mean > 0 && totalYears >= 2) {
+    const variance =
+      fcfValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / totalYears;
+    const stdDev = Math.sqrt(variance);
+    const cv = stdDev / mean;
+
+    if (cv <= 0.3) {
+      volatilityScore = 100;
+    } else if (cv <= 0.8) {
+      volatilityScore = Math.round(100 - ((cv - 0.3) / 0.5) * 30);
+    } else if (cv <= 1.5) {
+      volatilityScore = Math.round(70 - ((cv - 0.8) / 0.7) * 40);
+    } else {
+      volatilityScore = Math.max(0, Math.round(30 - (cv - 1.5) * 15));
+    }
+  } else if (positiveYears === totalYears) {
+    volatilityScore = 85;
+  } else if (positiveYears === 0) {
+    volatilityScore = 0;
+  }
+
+  const finalConsistency = Math.round(
+    0.5 * ratioScore + 0.25 * countScore + 0.25 * volatilityScore,
+  );
+
+  return Math.min(100, Math.max(0, finalConsistency));
+}
+
+/**
+ * Calculate FCF Conversion = (Free Cash Flow / Net Income) * 100
+ * Handles negative net income, missing values, and invalid calculations.
+ */
+export function calculateFCFConversion(
+  incomeStatements: FinancialStatement[] | null | undefined,
+  cashFlowStatements: FinancialStatement[] | null | undefined,
+): number | null {
+  if (!incomeStatements || !cashFlowStatements || incomeStatements.length === 0 || cashFlowStatements.length === 0) {
+    return null;
+  }
+
+  const sortedIncome = [...incomeStatements]
+    .filter((s) => s && s.date && typeof s.netIncome === "number" && !isNaN(s.netIncome) && isFinite(s.netIncome))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const sortedCashFlow = [...cashFlowStatements]
+    .filter((s) => s && s.date && s.operatingCashFlow !== undefined && s.capitalExpenditure !== undefined)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  if (sortedIncome.length === 0 || sortedCashFlow.length === 0) {
+    return null;
+  }
+
+  const latestIncome = sortedIncome[0];
+  const netIncome = latestIncome.netIncome;
+
+  if (netIncome === undefined || netIncome === null || isNaN(netIncome) || netIncome <= 0) {
+    return null;
+  }
+
+  const latestYear = new Date(latestIncome.date).getFullYear();
+  let matchingCashFlow = sortedCashFlow.find(
+    (c) => new Date(c.date).getFullYear() === latestYear,
+  );
+
+  if (!matchingCashFlow) {
+    matchingCashFlow = sortedCashFlow[0];
+  }
+
+  const fcf = calculateFCF(matchingCashFlow.operatingCashFlow, matchingCashFlow.capitalExpenditure);
+  if (fcf === null) {
+    return null;
+  }
+
+  return (fcf / netIncome) * 100;
+}
+
+/**
+ * Calculate Margin Stability score (0-100) measuring whether operating profitability is improving, stable, or deteriorating over time.
+ */
+export function calculateMarginStability(
+  incomeStatements: FinancialStatement[] | null | undefined,
+): number | null {
+  if (!incomeStatements || !Array.isArray(incomeStatements) || incomeStatements.length < 2) {
+    return null;
+  }
+
+  const validStatements = incomeStatements
+    .filter(
+      (s) =>
+        s &&
+        s.date &&
+        typeof s.revenue === "number" &&
+        s.revenue > 0 &&
+        typeof s.operatingIncome === "number",
+    )
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  if (validStatements.length < 2) {
+    return null;
+  }
+
+  const opMargins = validStatements.map(
+    (s) => (s.operatingIncome! / s.revenue!) * 100,
+  );
+
+  const total = opMargins.length;
+  const mean = opMargins.reduce((a, b) => a + b, 0) / total;
+  const variance =
+    opMargins.reduce((sum, m) => sum + Math.pow(m - mean, 2), 0) / total;
+  const stdDev = Math.sqrt(variance);
+
+  let baseStability = 100;
+  if (stdDev <= 1.0) {
+    baseStability = 100;
+  } else if (stdDev <= 3.0) {
+    baseStability = Math.round(100 - ((stdDev - 1.0) / 2.0) * 15);
+  } else if (stdDev <= 5.0) {
+    baseStability = Math.round(85 - ((stdDev - 3.0) / 2.0) * 15);
+  } else if (stdDev <= 10.0) {
+    baseStability = Math.round(70 - ((stdDev - 5.0) / 5.0) * 20);
+  } else {
+    baseStability = Math.max(10, Math.round(50 - (stdDev - 10.0) * 3));
+  }
+
+  const netChange = opMargins[opMargins.length - 1] - opMargins[0];
+  let trendAdjustment = 0;
+  if (netChange > 1.0) {
+    trendAdjustment = 10;
+  } else if (netChange < -3.0) {
+    trendAdjustment = -15;
+  }
+
+  let score = baseStability + trendAdjustment;
+
+  if (mean < 0) {
+    score = Math.min(40, score);
+  }
+
+  return Math.min(100, Math.max(0, score));
+}
+
+/**
  * Calculate all financial metrics
  */
 export function calculateAllMetrics(
@@ -874,6 +1063,9 @@ export function calculateAllMetrics(
     fcfTrendScore: fcfTrendData.score,
     fcfBurnChangePct: fcfTrendData.burnChangePct,
     fcfMargin: calculateFCFMargin(incomeStatements, cashFlowStatements),
+    fcfConsistency: calculateFCFConsistency(cashFlowStatements),
+    fcfConversion: calculateFCFConversion(incomeStatements, cashFlowStatements),
+    marginStability: calculateMarginStability(incomeStatements),
     roic: calculateAverageROIC(incomeStatements, balanceSheets),
     debtToEquity: calculateDebtToEquity(
       sortedBalance[0]?.totalDebt,

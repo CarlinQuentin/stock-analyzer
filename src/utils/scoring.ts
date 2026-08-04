@@ -1,14 +1,32 @@
-import { FinancialMetrics, MetricScores, FinancialStatement } from "../types";
+import { FinancialMetrics, MetricScores, FinancialStatement, ScoringConfig } from "../types";
 import { calculateEPSTrend, calculateFCFTrend } from "./financialCalculations";
 
-export const SCORE_WEIGHTS = {
-  revenue: 0.15, // 15%
-  eps: 0.15, // 15%
-  fcf: 0.10, // 10%
-  fcfMargin: 0.10, // 10%
-  roic: 0.20, // 20%
-  debt: 0.10, // 10%
-  profitability: 0.20, // 20%
+export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
+  universalScoreMetrics: {
+    roic: { name: "ROIC", weight: 0.20, description: "Return on Invested Capital" },
+    fcfMargin: { name: "FCF Margin", weight: 0.20, description: "Free Cash Flow Margin" },
+    fcfConsistency: { name: "FCF Consistency", weight: 0.15, description: "Reliability of FCF generation" },
+    fcfConversion: { name: "FCF Conversion", weight: 0.15, description: "Free Cash Flow to Net Income ratio" },
+    marginStability: { name: "Margin Stability", weight: 0.10, description: "Operating profitability trend stability" },
+    revenue: { name: "Revenue Growth", weight: 0.10, description: "Compound annual revenue growth rate" },
+    eps: { name: "EPS Growth", weight: 0.10, description: "Earnings per share growth" },
+  },
+  informationalMetrics: {
+    fcf: { name: "FCF Growth", weight: 0, description: "Free cash flow growth" },
+    debt: { name: "Debt-to-Equity", weight: 0, description: "Financial leverage ratio" },
+    profitability: { name: "Profitability Margins", weight: 0, description: "Overall profit margins" },
+  },
+  industryScoreMetrics: {},
+};
+
+export const SCORE_WEIGHTS: Record<string, number> = {
+  roic: 0.20,
+  fcfMargin: 0.20,
+  fcfConsistency: 0.15,
+  fcfConversion: 0.15,
+  marginStability: 0.10,
+  revenue: 0.10,
+  eps: 0.10,
 };
 
 export const SCORE_RANGES = {
@@ -211,6 +229,32 @@ export function scoreProfitability(
   return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
 }
 
+export function scoreFCFConsistency(val: number | null | undefined): number | null {
+  if (val === null || val === undefined || isNaN(val)) return null;
+  return Math.min(100, Math.max(0, Math.round(val)));
+}
+
+export function scoreFCFConversion(conversion: number | null | undefined): number | null {
+  if (conversion === null || conversion === undefined || isNaN(conversion)) return null;
+  if (conversion <= 0) return 0;
+  if (conversion >= 120) return 100;
+  if (conversion >= 100) {
+    return Math.round(85 + ((conversion - 100) / 20) * 15);
+  }
+  if (conversion >= 80) {
+    return Math.round(70 + ((conversion - 80) / 20) * 15);
+  }
+  if (conversion >= 50) {
+    return Math.round(50 + ((conversion - 50) / 30) * 20);
+  }
+  return Math.round((conversion / 50) * 50);
+}
+
+export function scoreMarginStability(val: number | null | undefined): number | null {
+  if (val === null || val === undefined || isNaN(val)) return null;
+  return Math.min(100, Math.max(0, Math.round(val)));
+}
+
 /**
  * Calculate all metric scores
  */
@@ -220,7 +264,7 @@ export function calculateMetricScores(
   incomeStatements?: FinancialStatement[],
 ): MetricScores {
   let epsScore: number | null = null;
-  if (metrics.epsGrowth !== null) {
+  if (metrics.epsGrowth !== null && metrics.epsGrowth !== undefined) {
     epsScore = scoreEPSGrowth(metrics.epsGrowth);
   } else if (metrics.epsTrendScore !== undefined && metrics.epsTrendScore !== null) {
     epsScore = metrics.epsTrendScore;
@@ -231,7 +275,7 @@ export function calculateMetricScores(
   }
 
   let fcfScore: number | null = null;
-  if (metrics.fcfGrowth !== null) {
+  if (metrics.fcfGrowth !== null && metrics.fcfGrowth !== undefined) {
     fcfScore = scoreFCFGrowth(metrics.fcfGrowth, cashFlowStatements);
   } else if (metrics.fcfTrendScore !== undefined && metrics.fcfTrendScore !== null) {
     fcfScore = metrics.fcfTrendScore;
@@ -246,6 +290,9 @@ export function calculateMetricScores(
     eps: epsScore,
     fcf: fcfScore,
     fcfMargin: scoreFCFMargin(metrics.fcfMargin),
+    fcfConsistency: scoreFCFConsistency(metrics.fcfConsistency),
+    fcfConversion: scoreFCFConversion(metrics.fcfConversion),
+    marginStability: scoreMarginStability(metrics.marginStability),
     roic: scoreROIC(metrics.roic),
     debt: scoreDebtToEquity(metrics.debtToEquity),
     profitability: scoreProfitability(
@@ -288,28 +335,23 @@ export function scoreFCFMargin(fcfMargin: number | null): number | null {
 }
 
 /**
- * Calculate weighted overall score (0-100)
- * Only includes available metrics in calculation
+ * Calculate Universal Business Quality Score (0-100) using only configured universal metrics.
  */
-export function calculateOverallScore(scores: MetricScores): number {
+export function calculateUniversalBusinessScore(
+  scores: MetricScores,
+  config: ScoringConfig = DEFAULT_SCORING_CONFIG,
+): number {
   let weightedSum = 0;
   let weightSum = 0;
 
-  const keys: (keyof MetricScores)[] = [
-    "revenue",
-    "eps",
-    "fcf",
-    "fcfMargin",
-    "roic",
-    "debt",
-    "profitability",
-  ];
+  const universalMetrics = config.universalScoreMetrics;
 
-  for (const key of keys) {
+  for (const key of Object.keys(universalMetrics)) {
     const score = scores[key];
-    if (score !== null) {
-      weightedSum += score * SCORE_WEIGHTS[key];
-      weightSum += SCORE_WEIGHTS[key];
+    const weight = universalMetrics[key].weight;
+    if (score !== null && score !== undefined) {
+      weightedSum += score * weight;
+      weightSum += weight;
     }
   }
 
@@ -321,46 +363,73 @@ export function calculateOverallScore(scores: MetricScores): number {
 }
 
 /**
- * Get list of names of unavailable metrics
+ * Industry-specific score placeholder pipeline for future expansion.
  */
-export function getUnavailableMetrics(scores: MetricScores): string[] {
-  const mapping: Record<keyof MetricScores, string> = {
-    revenue: "Revenue Growth",
-    eps: "EPS Growth",
-    fcf: "FCF Growth",
-    fcfMargin: "FCF Margin",
-    roic: "ROIC",
-    debt: "Debt-to-Equity",
-    profitability: "Profitability",
-  };
+export function calculateIndustryScore(
+  scores: MetricScores,
+  industryConfig?: Record<string, { name: string; weight: number }>,
+): number | null {
+  if (!industryConfig || Object.keys(industryConfig).length === 0) {
+    return null;
+  }
 
-  const unavailable: string[] = [];
-  (Object.keys(mapping) as (keyof MetricScores)[]).forEach((key) => {
-    if (scores[key] === null) {
-      unavailable.push(mapping[key]);
+  let weightedSum = 0;
+  let weightSum = 0;
+
+  for (const key of Object.keys(industryConfig)) {
+    const score = scores[key];
+    const weight = industryConfig[key].weight;
+    if (score !== null && score !== undefined) {
+      weightedSum += score * weight;
+      weightSum += weight;
     }
-  });
+  }
+
+  if (weightSum === 0) return null;
+  return Math.round(weightedSum / weightSum);
+}
+
+/**
+ * Primary Business Quality Score calculation (alias to Universal Business Quality Score)
+ */
+export function calculateOverallScore(
+  scores: MetricScores,
+  config: ScoringConfig = DEFAULT_SCORING_CONFIG,
+): number {
+  return calculateUniversalBusinessScore(scores, config);
+}
+
+/**
+ * Get list of names of unavailable universal metrics
+ */
+export function getUnavailableMetrics(
+  scores: MetricScores,
+  config: ScoringConfig = DEFAULT_SCORING_CONFIG,
+): string[] {
+  const unavailable: string[] = [];
+  const universalMetrics = config.universalScoreMetrics;
+
+  for (const key of Object.keys(universalMetrics)) {
+    if (scores[key] === null || scores[key] === undefined) {
+      unavailable.push(universalMetrics[key].name);
+    }
+  }
 
   return unavailable;
 }
 
 /**
- * Calculate data confidence score based on available metrics
+ * Calculate data confidence score based on available universal score metrics
  */
-export function calculateDataConfidenceScore(scores: MetricScores): number {
-  const keys: (keyof MetricScores)[] = [
-    "revenue",
-    "eps",
-    "fcf",
-    "roic",
-    "debt",
-    "profitability",
-  ];
+export function calculateDataConfidenceScore(
+  scores: MetricScores,
+  config: ScoringConfig = DEFAULT_SCORING_CONFIG,
+): number {
+  const keys = Object.keys(config.universalScoreMetrics);
+  if (keys.length === 0) return 0;
+  const valid = keys.filter((key) => scores[key] !== null && scores[key] !== undefined).length;
 
-  const total = keys.length;
-  const valid = keys.filter((key) => scores[key] !== null).length;
-
-  return Math.round((valid / total) * 100);
+  return Math.round((valid / keys.length) * 100);
 }
 
 /**

@@ -592,6 +592,76 @@ function App() {
                 )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Universal Business Score Metrics */}
+                <MetricCard
+                  title="ROIC"
+                  value={result.metrics.roic}
+                  unit="%"
+                  score={result.scores.roic}
+                  description="Return on Invested Capital"
+                  tooltip="Measures the return a company earns on the capital invested in its business. Companies with consistently high ROIC often have strong competitive advantages and effective management."
+                  icon="🎯"
+                  chartData={result.roicHistory}
+                  chartValueType="percent"
+                  isExpanded={showAllCharts}
+                  onClick={() => setSelectedMetric("roic")}
+                  directionStrategy="higherIsBetter"
+                />
+                <MetricCard
+                  title="FCF Margin"
+                  value={result.metrics.fcfMargin}
+                  unit="%"
+                  score={result.scores.fcfMargin}
+                  description="Free Cash Flow Margin"
+                  tooltip="Measures how efficiently a company converts top-line revenue into bottom-line free cash flow. Higher margins indicate superior cash conversion."
+                  icon="💵"
+                  chartData={result.fcfMarginHistory}
+                  chartValueType="percent"
+                  isExpanded={showAllCharts}
+                  onClick={() => setSelectedMetric("fcfMargin")}
+                  directionStrategy="higherIsBetter"
+                />
+                <MetricCard
+                  title="FCF Consistency"
+                  value={result.metrics.fcfConsistency}
+                  unit="%"
+                  score={result.scores.fcfConsistency}
+                  description="Reliability of FCF generation"
+                  tooltip="Measures the consistency and reliability of positive free cash flow generation over historical years."
+                  icon="🛡️"
+                  chartValueType="percent"
+                  isExpanded={showAllCharts}
+                  onClick={() => setSelectedMetric("fcfConsistency")}
+                  directionStrategy="higherIsBetter"
+                />
+                <MetricCard
+                  title="FCF Conversion"
+                  value={result.metrics.fcfConversion}
+                  unit="%"
+                  score={result.scores.fcfConversion}
+                  description="FCF / Net Income Ratio"
+                  tooltip="Measures the percentage of net income converted into real cash flow (FCF / Net Income). Ratios near or above 100% indicate high earnings quality."
+                  icon="🔄"
+                  chartData={result.fcfConversionHistory}
+                  chartValueType="percent"
+                  isExpanded={showAllCharts}
+                  onClick={() => setSelectedMetric("fcfConversion")}
+                  directionStrategy="higherIsBetter"
+                />
+                <MetricCard
+                  title="Margin Stability"
+                  value={result.metrics.marginStability}
+                  unit="%"
+                  score={result.scores.marginStability}
+                  description="Operating profitability stability"
+                  tooltip="Measures whether operating margins are stable, improving, or volatile over time."
+                  icon="📊"
+                  chartData={result.marginStabilityHistory}
+                  chartValueType="percent"
+                  isExpanded={showAllCharts}
+                  onClick={() => setSelectedMetric("marginStability")}
+                  directionStrategy="higherIsBetter"
+                />
                 <MetricCard
                   title="Revenue Growth"
                   value={result.metrics.revenueCAGR}
@@ -599,7 +669,7 @@ function App() {
                   score={result.scores.revenue}
                   description={result.revenueHistory && result.revenueHistory.length > 1 ? `${result.revenueHistory.length - 1}-year CAGR` : "CAGR"}
                   tooltip="The average yearly growth rate of the company's sales over the historical period. Consistent revenue growth can indicate increasing demand and a growing business."
-                  icon="📊"
+                  icon="📈"
                   chartData={result.revenueHistory}
                   chartValueType="currency"
                   isExpanded={showAllCharts}
@@ -622,6 +692,8 @@ function App() {
                   onClick={() => setSelectedMetric("eps")}
                   directionStrategy="higherIsBetter"
                 />
+
+                {/* Informational Financial Metrics */}
                 <MetricCard
                   title="FCF Growth"
                   value={result.metrics.fcfGrowth}
@@ -630,54 +702,28 @@ function App() {
                   unit="%"
                   score={result.scores.fcf}
                   description={result.fcfHistory && result.fcfHistory.length > 1 ? `${result.fcfHistory.length - 1}-year CAGR` : "CAGR"}
-                  tooltip="The average yearly growth rate of the company's free cash flow over the historical period. Free cash flow shows how much cash the business generates after paying for expenses and investments needed to keep growing."
+                  tooltip="The average yearly growth rate of the company's free cash flow over the historical period."
                   icon="💰"
                   chartData={result.fcfHistory}
                   chartValueType="currency"
                   isExpanded={showAllCharts}
                   onClick={() => setSelectedMetric("fcf")}
                   directionStrategy="higherIsBetter"
-                />
-                <MetricCard
-                  title="FCF Margin"
-                  value={result.metrics.fcfMargin}
-                  unit="%"
-                  score={result.scores.fcfMargin}
-                  description="Free Cash Flow Margin"
-                  tooltip="Measures how efficiently a company converts top-line revenue into bottom-line free cash flow. Higher margins indicate superior cash conversion."
-                  icon="💵"
-                  chartData={result.fcfMarginHistory}
-                  chartValueType="percent"
-                  isExpanded={showAllCharts}
-                  onClick={() => setSelectedMetric("fcfMargin")}
-                  directionStrategy="higherIsBetter"
-                />
-                <MetricCard
-                  title="ROIC"
-                  value={result.metrics.roic}
-                  unit="%"
-                  score={result.scores.roic}
-                  description="Return on Invested Capital"
-                  tooltip="Measures the return a company earns on the capital invested in its business. Companies with consistently high ROIC often have strong competitive advantages and effective management."
-                  icon="🎯"
-                  chartData={result.roicHistory}
-                  chartValueType="percent"
-                  isExpanded={showAllCharts}
-                  onClick={() => setSelectedMetric("roic")}
-                  directionStrategy="higherIsBetter"
+                  isInformational={true}
                 />
                 <MetricCard
                   title="Debt-to-Equity"
                   value={result.metrics.debtToEquity}
                   score={result.scores.debt}
                   description="Financial leverage"
-                  tooltip="Shows how much the company relies on debt compared to its own money to fund the business. Lower debt levels generally indicate a more financially stable company"
+                  tooltip="Shows how much the company relies on debt compared to its own money to fund the business."
                   icon="⚖️"
                   chartData={result.debtEquityHistory}
                   chartValueType="number"
                   isExpanded={showAllCharts}
                   onClick={() => setSelectedMetric("debt")}
                   directionStrategy="lowerIsBetter"
+                  isInformational={true}
                 />
                 <MetricCard
                   title="Profitability"
@@ -685,13 +731,14 @@ function App() {
                   unit="%"
                   score={result.scores.profitability}
                   description="Net profit margin"
-                  tooltip="Shows how much profit the company keeps from each dollar of revenue after all expenses are paid. Higher margins often indicate a more efficient and profitable business."
-                  icon="📈"
+                  tooltip="Shows how much profit the company keeps from each dollar of revenue after all expenses are paid."
+                  icon="🏛️"
                   chartData={result.profitabilityHistory}
                   chartValueType="percent"
                   isExpanded={showAllCharts}
                   onClick={() => setSelectedMetric("profitability")}
                   directionStrategy="higherIsBetter"
+                  isInformational={true}
                 />
               </div>
             </div>

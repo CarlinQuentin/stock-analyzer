@@ -68,203 +68,311 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-transparent dark:border-slate-700/50 overflow-hidden transition-colors duration-300">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
-              <th className="text-left px-6 py-4 font-semibold text-slate-900 dark:text-slate-200">
-                Metric
-              </th>
-              <th className="text-right px-6 py-4 font-semibold text-slate-900 dark:text-slate-200">
-                Value
-              </th>
-              <th className="text-center px-6 py-4 font-semibold text-slate-900 dark:text-slate-200">
-                Performance
-              </th>
-              <th className="text-right px-6 py-4 font-semibold text-slate-900 dark:text-slate-200">
-                Score
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-              <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
-                <div>{revenueYears ? `${revenueYears}-Year` : "Historical"} Revenue CAGR</div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">
-                  Compound annual growth rate
-                </div>
-              </td>
-              <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200">
-                {formatPercentage(metrics.revenueCAGR)}
-              </td>
-              <td className="text-center px-6 py-4">
-                {metrics.revenueCAGR !== null ? (
-                  renderPerformanceBadge(scores.revenue)
-                ) : (
-                  <span className="text-slate-500 dark:text-slate-400">N/A</span>
-                )}
-              </td>
-              <td className="text-right px-6 py-4">
-                <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.revenue)}`}>
-                  {scores.revenue !== null ? scores.revenue : "N/A"}
-                </span>
-              </td>
-            </tr>
-
-            <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-              <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
-                <div>{epsYears ? `${epsYears}-Year` : "Historical"} EPS Growth</div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">
-                  {metrics.epsGrowth !== null
-                    ? "Earnings per share growth"
-                    : `EPS Trend: ${metrics.epsTrend || "N/A"}`}
-                </div>
-              </td>
-              <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200 font-semibold">
-                {metrics.epsGrowth !== null ? (
-                  formatPercentage(metrics.epsGrowth)
-                ) : (
-                  <span className="text-slate-500 dark:text-slate-400 font-normal">
-                    {metrics.epsTrend || "N/A"}
+    <div className="space-y-8">
+      {/* Universal Business Quality Score Section */}
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-transparent dark:border-slate-700/50 overflow-hidden transition-colors duration-300">
+        <div className="bg-blue-50/70 dark:bg-slate-900 px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span>⭐</span>
+              <span>Universal Business Quality Score Metrics</span>
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Metrics that apply broadly across industries and contribute directly to the Business Quality Score.
+            </p>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-slate-100 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-700">
+                <th className="text-left px-6 py-4 font-semibold text-slate-900 dark:text-slate-200">
+                  Metric
+                </th>
+                <th className="text-right px-6 py-4 font-semibold text-slate-900 dark:text-slate-200">
+                  Value
+                </th>
+                <th className="text-center px-6 py-4 font-semibold text-slate-900 dark:text-slate-200">
+                  Performance
+                </th>
+                <th className="text-right px-6 py-4 font-semibold text-slate-900 dark:text-slate-200">
+                  Score
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* ROIC */}
+              <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
+                  <div>Return on Invested Capital (ROIC)</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">Capital efficiency metric</div>
+                </td>
+                <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200 font-semibold">
+                  {formatPercentage(metrics.roic, true)}
+                </td>
+                <td className="text-center px-6 py-4">
+                  {metrics.roic !== null ? (
+                    renderPerformanceBadge(scores.roic)
+                  ) : (
+                    <span className="text-slate-500 dark:text-slate-400">N/A</span>
+                  )}
+                </td>
+                <td className="text-right px-6 py-4">
+                  <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.roic)}`}>
+                    {scores.roic !== null ? scores.roic : "N/A"}
                   </span>
-                )}
-              </td>
-              <td className="text-center px-6 py-4">
-                {scores.eps !== null ? (
-                  renderPerformanceBadge(scores.eps)
-                ) : (
-                  <span className="text-slate-500 dark:text-slate-400">N/A</span>
-                )}
-              </td>
-              <td className="text-right px-6 py-4">
-                <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.eps)}`}>
-                  {scores.eps !== null ? scores.eps : "N/A"}
-                </span>
-              </td>
-            </tr>
+                </td>
+              </tr>
 
-            <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-              <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
-                <div>{fcfYears ? `${fcfYears}-Year` : "Historical"} FCF Growth</div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">
-                  Free cash flow growth
-                </div>
-              </td>
-              <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200 font-semibold">
-                {metrics.fcfGrowth !== null ? (
-                  formatPercentage(metrics.fcfGrowth)
-                ) : (
-                  <span className="text-slate-500 dark:text-slate-400 font-normal">
-                    {metrics.fcfTrend || "N/A"}
+              {/* FCF Margin */}
+              <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
+                  <div>FCF Margin</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">Free cash flow efficiency</div>
+                </td>
+                <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200 font-semibold">
+                  {formatPercentage(metrics.fcfMargin, true)}
+                </td>
+                <td className="text-center px-6 py-4">
+                  {renderPerformanceBadge(scores.fcfMargin)}
+                </td>
+                <td className="text-right px-6 py-4">
+                  <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.fcfMargin)}`}>
+                    {scores.fcfMargin !== null ? scores.fcfMargin : "N/A"}
                   </span>
-                )}
-              </td>
-              <td className="text-center px-6 py-4">
-                {metrics.fcfGrowth !== null ? (
-                  renderPerformanceBadge(scores.fcf)
-                ) : (
-                  <span className="text-slate-500 dark:text-slate-400">N/A</span>
-                )}
-              </td>
-              <td className="text-right px-6 py-4">
-                <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.fcf)}`}>
-                  {scores.fcf !== null ? scores.fcf : "N/A"}
-                </span>
-              </td>
-            </tr>
+                </td>
+              </tr>
 
-            <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-              <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
-                <div>FCF Margin</div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">
-                  Free cash flow efficiency
-                </div>
-              </td>
-              <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200">
-                {formatPercentage(metrics.fcfMargin, true)}
-              </td>
-              <td className="text-center px-6 py-4">
-                {renderPerformanceBadge(scores.fcfMargin)}
-              </td>
-              <td className="text-right px-6 py-4">
-                <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.fcfMargin)}`}>
-                  {scores.fcfMargin !== null ? scores.fcfMargin : "N/A"}
-                </span>
-              </td>
-            </tr>
+              {/* FCF Consistency */}
+              <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
+                  <div>FCF Consistency</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">Reliability of free cash flow generation</div>
+                </td>
+                <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200 font-semibold">
+                  {formatPercentage(metrics.fcfConsistency, true)}
+                </td>
+                <td className="text-center px-6 py-4">
+                  {renderPerformanceBadge(scores.fcfConsistency)}
+                </td>
+                <td className="text-right px-6 py-4">
+                  <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.fcfConsistency)}`}>
+                    {scores.fcfConsistency !== null ? scores.fcfConsistency : "N/A"}
+                  </span>
+                </td>
+              </tr>
 
-            <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-              <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
-                <div>Return on Invested Capital</div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">
-                  ROIC - capital efficiency
-                </div>
-              </td>
-              <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200">
-                {formatPercentage(metrics.roic, true)}
-              </td>
-              <td className="text-center px-6 py-4">
-                {metrics.roic !== null ? (
-                  renderPerformanceBadge(scores.roic)
-                ) : (
-                  <span className="text-slate-500 dark:text-slate-400">N/A</span>
-                )}
-              </td>
-              <td className="text-right px-6 py-4">
-                <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.roic)}`}>
-                  {scores.roic !== null ? scores.roic : "N/A"}
-                </span>
-              </td>
-            </tr>
+              {/* FCF Conversion */}
+              <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
+                  <div>FCF Conversion</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">Free Cash Flow / Net Income ratio</div>
+                </td>
+                <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200 font-semibold">
+                  {formatPercentage(metrics.fcfConversion, true)}
+                </td>
+                <td className="text-center px-6 py-4">
+                  {renderPerformanceBadge(scores.fcfConversion)}
+                </td>
+                <td className="text-right px-6 py-4">
+                  <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.fcfConversion)}`}>
+                    {scores.fcfConversion !== null ? scores.fcfConversion : "N/A"}
+                  </span>
+                </td>
+              </tr>
 
-            <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-              <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
-                <div>Debt-to-Equity Ratio</div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">Financial leverage</div>
-              </td>
-              <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200">
-                {formatValue(metrics.debtToEquity)}
-              </td>
-              <td className="text-center px-6 py-4">
-                {metrics.debtToEquity !== null ? (
-                  renderPerformanceBadge(scores.debt)
-                ) : (
-                  <span className="text-slate-500 dark:text-slate-400">N/A</span>
-                )}
-              </td>
-              <td className="text-right px-6 py-4">
-                <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.debt)}`}>
-                  {scores.debt !== null ? scores.debt : "N/A"}
-                </span>
-              </td>
-            </tr>
+              {/* Margin Stability */}
+              <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
+                  <div>Margin Stability</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">Operating profitability stability over time</div>
+                </td>
+                <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200 font-semibold">
+                  {formatPercentage(metrics.marginStability, true)}
+                </td>
+                <td className="text-center px-6 py-4">
+                  {renderPerformanceBadge(scores.marginStability)}
+                </td>
+                <td className="text-right px-6 py-4">
+                  <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.marginStability)}`}>
+                    {scores.marginStability !== null ? scores.marginStability : "N/A"}
+                  </span>
+                </td>
+              </tr>
 
-            <tr className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-              <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
-                <div>Net Profit Margin</div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">
-                  Overall profitability
-                </div>
-              </td>
-              <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200">
-                {formatPercentage(metrics.netMargin, true)}
-              </td>
-              <td className="text-center px-6 py-4">
-                {metrics.netMargin !== null ? (
-                  renderPerformanceBadge(scores.profitability)
-                ) : (
-                  <span className="text-slate-500 dark:text-slate-400">N/A</span>
-                )}
-              </td>
-              <td className="text-right px-6 py-4">
-                <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.profitability)}`}>
-                  {scores.profitability !== null ? scores.profitability : "N/A"}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              {/* Revenue Growth */}
+              <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
+                  <div>{revenueYears ? `${revenueYears}-Year` : "Historical"} Revenue CAGR</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">Compound annual growth rate</div>
+                </td>
+                <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200 font-semibold">
+                  {formatPercentage(metrics.revenueCAGR)}
+                </td>
+                <td className="text-center px-6 py-4">
+                  {metrics.revenueCAGR !== null ? (
+                    renderPerformanceBadge(scores.revenue)
+                  ) : (
+                    <span className="text-slate-500 dark:text-slate-400">N/A</span>
+                  )}
+                </td>
+                <td className="text-right px-6 py-4">
+                  <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.revenue)}`}>
+                    {scores.revenue !== null ? scores.revenue : "N/A"}
+                  </span>
+                </td>
+              </tr>
+
+              {/* EPS Growth */}
+              <tr className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
+                  <div>{epsYears ? `${epsYears}-Year` : "Historical"} EPS Growth</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">
+                    {metrics.epsGrowth !== null
+                      ? "Earnings per share growth"
+                      : `EPS Trend: ${metrics.epsTrend || "N/A"}`}
+                  </div>
+                </td>
+                <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200 font-semibold">
+                  {metrics.epsGrowth !== null ? (
+                    formatPercentage(metrics.epsGrowth)
+                  ) : (
+                    <span className="text-slate-500 dark:text-slate-400 font-normal">
+                      {metrics.epsTrend || "N/A"}
+                    </span>
+                  )}
+                </td>
+                <td className="text-center px-6 py-4">
+                  {scores.eps !== null ? (
+                    renderPerformanceBadge(scores.eps)
+                  ) : (
+                    <span className="text-slate-500 dark:text-slate-400">N/A</span>
+                  )}
+                </td>
+                <td className="text-right px-6 py-4">
+                  <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.eps)}`}>
+                    {scores.eps !== null ? scores.eps : "N/A"}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Informational Financial Metrics Section */}
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-transparent dark:border-slate-700/50 overflow-hidden transition-colors duration-300">
+        <div className="bg-slate-100 dark:bg-slate-900 px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span>📊</span>
+              <span>Financial Metrics</span>
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Financial health and performance insights displayed for context. Metrics marked as informational are excluded from the main Business Quality Score.
+            </p>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-slate-100 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-700">
+                <th className="text-left px-6 py-4 font-semibold text-slate-900 dark:text-slate-200">
+                  Metric
+                </th>
+                <th className="text-right px-6 py-4 font-semibold text-slate-900 dark:text-slate-200">
+                  Value
+                </th>
+                <th className="text-center px-6 py-4 font-semibold text-slate-900 dark:text-slate-200">
+                  Performance / Status
+                </th>
+                <th className="text-right px-6 py-4 font-semibold text-slate-900 dark:text-slate-200">
+                  Scoring Contribution
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* FCF Growth (Informational) */}
+              <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
+                  <div>{fcfYears ? `${fcfYears}-Year` : "Historical"} FCF Growth</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">
+                    Free cash flow growth rate
+                  </div>
+                </td>
+                <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200 font-semibold">
+                  {metrics.fcfGrowth !== null ? (
+                    formatPercentage(metrics.fcfGrowth)
+                  ) : (
+                    <span className="text-slate-500 dark:text-slate-400 font-normal">
+                      {metrics.fcfTrend || "N/A"}
+                    </span>
+                  )}
+                </td>
+                <td className="text-center px-6 py-4">
+                  {metrics.fcfGrowth !== null ? (
+                    renderPerformanceBadge(scores.fcf)
+                  ) : (
+                    <span className="text-slate-500 dark:text-slate-400">N/A</span>
+                  )}
+                </td>
+                <td className="text-right px-6 py-4">
+                  <span className="inline-block bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 px-2.5 py-1 rounded text-xs font-semibold border border-slate-200 dark:border-slate-700">
+                    Informational Metric - Not included in Universal Score
+                  </span>
+                </td>
+              </tr>
+
+              {/* Debt-to-Equity (Informational) */}
+              <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
+                  <div>Debt-to-Equity Ratio</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">Financial leverage</div>
+                </td>
+                <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200 font-semibold">
+                  {formatValue(metrics.debtToEquity)}
+                </td>
+                <td className="text-center px-6 py-4">
+                  {metrics.debtToEquity !== null ? (
+                    renderPerformanceBadge(scores.debt)
+                  ) : (
+                    <span className="text-slate-500 dark:text-slate-400">N/A</span>
+                  )}
+                </td>
+                <td className="text-right px-6 py-4">
+                  <span className="inline-block bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 px-2.5 py-1 rounded text-xs font-semibold border border-slate-200 dark:border-slate-700">
+                    Informational Metric - Not included in Universal Score
+                  </span>
+                </td>
+              </tr>
+
+              {/* Profitability Margins (Informational) */}
+              <tr className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
+                  <div>Profitability Margins</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">
+                    Net Profit Margin ({formatPercentage(metrics.netMargin, true)})
+                  </div>
+                </td>
+                <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200 font-semibold">
+                  {formatPercentage(metrics.netMargin, true)}
+                </td>
+                <td className="text-center px-6 py-4">
+                  {metrics.netMargin !== null ? (
+                    renderPerformanceBadge(scores.profitability)
+                  ) : (
+                    <span className="text-slate-500 dark:text-slate-400">N/A</span>
+                  )}
+                </td>
+                <td className="text-right px-6 py-4">
+                  <span className="inline-block bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 px-2.5 py-1 rounded text-xs font-semibold border border-slate-200 dark:border-slate-700">
+                    Informational Metric - Not included in Universal Score
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

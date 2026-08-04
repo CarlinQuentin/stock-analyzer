@@ -10,6 +10,9 @@ import {
   calculateFCFTrend,
   getFCFFormula,
   calculateFCFMargin,
+  calculateFCFConsistency,
+  calculateFCFConversion,
+  calculateMarginStability,
   calculateDividendCAGR,
   calculateROIC,
   calculateAverageROIC,
@@ -1261,8 +1264,66 @@ describe("calculateFCFMargin", () => {
   });
 });
 
+describe("calculateFCFConsistency", () => {
+  it("should calculate high FCF consistency score for consistently positive free cash flow", () => {
+    const cashFlow: FinancialStatement[] = [
+      { date: "2020-12-31", operatingCashFlow: 100, capitalExpenditure: 10 },
+      { date: "2021-12-31", operatingCashFlow: 110, capitalExpenditure: 10 },
+      { date: "2022-12-31", operatingCashFlow: 120, capitalExpenditure: 10 },
+      { date: "2023-12-31", operatingCashFlow: 130, capitalExpenditure: 10 },
+      { date: "2024-12-31", operatingCashFlow: 140, capitalExpenditure: 10 },
+    ];
+    const score = calculateFCFConsistency(cashFlow);
+    expect(score).not.toBeNull();
+    expect(score!).toBeGreaterThanOrEqual(85);
+  });
+
+  it("should return null for empty cash flow history", () => {
+    expect(calculateFCFConsistency([])).toBeNull();
+    expect(calculateFCFConsistency(null)).toBeNull();
+  });
+});
+
+describe("calculateFCFConversion", () => {
+  it("should calculate FCF / Net Income ratio accurately", () => {
+    const income: FinancialStatement[] = [{ date: "2024-12-31", netIncome: 200 }];
+    const cashFlow: FinancialStatement[] = [
+      { date: "2024-12-31", operatingCashFlow: 250, capitalExpenditure: 50 },
+    ];
+    // FCF = 200. Conversion = 200/200 * 100 = 100%
+    const conversion = calculateFCFConversion(income, cashFlow);
+    expect(conversion).toBe(100);
+  });
+
+  it("should return null if net income <= 0 or missing", () => {
+    const income: FinancialStatement[] = [{ date: "2024-12-31", netIncome: -50 }];
+    const cashFlow: FinancialStatement[] = [
+      { date: "2024-12-31", operatingCashFlow: 100, capitalExpenditure: 10 },
+    ];
+    expect(calculateFCFConversion(income, cashFlow)).toBeNull();
+  });
+});
+
+describe("calculateMarginStability", () => {
+  it("should calculate margin stability score for operating margins", () => {
+    const income: FinancialStatement[] = [
+      { date: "2020-12-31", revenue: 1000, operatingIncome: 150 },
+      { date: "2021-12-31", revenue: 1100, operatingIncome: 165 },
+      { date: "2022-12-31", revenue: 1200, operatingIncome: 180 },
+    ];
+    const stability = calculateMarginStability(income);
+    expect(stability).not.toBeNull();
+    expect(stability!).toBeGreaterThanOrEqual(85);
+  });
+
+  it("should return null if fewer than 2 valid income statements exist", () => {
+    expect(calculateMarginStability([])).toBeNull();
+    expect(calculateMarginStability([{ date: "2024-12-31", revenue: 1000, operatingIncome: 100 }])).toBeNull();
+  });
+});
+
 describe("calculateAllMetrics", () => {
-  it("should compile all financial metrics into an object", () => {
+  it("should compile all financial metrics into an object including universal metrics", () => {
     const income: FinancialStatement[] = [
       { date: "2024-12-31", revenue: 2000, eps: 2.0, grossProfit: 800, operatingIncome: 400, netIncome: 300 },
       { date: "2020-12-31", revenue: 1000, eps: 1.0, grossProfit: 400, operatingIncome: 200, netIncome: 150 },
@@ -1285,6 +1346,9 @@ describe("calculateAllMetrics", () => {
     expect(metrics.revenueCAGR).toBeGreaterThan(0);
     expect(metrics.epsGrowth).toBeGreaterThan(0);
     expect(metrics.fcfGrowth).toBeGreaterThan(0);
+    expect(metrics.fcfConsistency).not.toBeNull();
+    expect(metrics.fcfConversion).not.toBeNull();
+    expect(metrics.marginStability).not.toBeNull();
     expect(metrics.debtToEquity).toBe(0.5);
     expect(metrics.dividendYield).toBe(0.02);
   });

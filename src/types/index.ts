@@ -76,6 +76,23 @@ export interface HistoricalPricePoint {
   changePercent?: number;
 }
 
+export type MetricCategory = "universalScoreMetrics" | "informationalMetrics" | "industryScoreMetrics";
+
+export interface MetricConfig {
+  id: string;
+  name: string;
+  category: MetricCategory;
+  weight: number;
+  description?: string;
+  isPercentage?: boolean;
+}
+
+export interface ScoringConfig {
+  universalScoreMetrics: Record<string, { name: string; weight: number; description?: string }>;
+  informationalMetrics: Record<string, { name: string; weight: number; description?: string }>;
+  industryScoreMetrics?: Record<string, { name: string; weight: number; description?: string }>;
+}
+
 export interface AnalysisResult {
   ticker: string;
   companyProfile: CompanyProfile;
@@ -93,6 +110,9 @@ export interface AnalysisResult {
   debtEquityHistory?: { label: string; value: number }[];
   profitabilityHistory?: { label: string; value: number }[];
   fcfMarginHistory?: { label: string; value: number }[];
+  fcfConsistencyHistory?: { label: string; value: number }[];
+  fcfConversionHistory?: { label: string; value: number }[];
+  marginStabilityHistory?: { label: string; value: number }[];
   
   // Valuation fields
   valuationMetrics: ValuationMetrics;
@@ -125,6 +145,9 @@ export interface FinancialMetrics {
   fcfTrendScore?: number | null;
   fcfBurnChangePct?: number | null;
   fcfMargin: number | null;
+  fcfConsistency: number | null;
+  fcfConversion: number | null;
+  marginStability: number | null;
   roic: number | null;
   debtToEquity: number | null;
   dividendYield: number | null;
@@ -132,6 +155,7 @@ export interface FinancialMetrics {
   grossMargin: number | null;
   operatingMargin: number | null;
   netMargin: number | null;
+  [key: string]: any;
 }
 
 export interface MetricScores {
@@ -139,9 +163,13 @@ export interface MetricScores {
   eps: number | null;
   fcf: number | null;
   fcfMargin: number | null;
+  fcfConsistency: number | null;
+  fcfConversion: number | null;
+  marginStability: number | null;
   roic: number | null;
   debt: number | null;
   profitability: number | null;
+  [key: string]: number | null | undefined;
 }
 
 export interface ApiError {

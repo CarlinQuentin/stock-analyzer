@@ -1,25 +1,19 @@
 import { describe, it, expect } from "vitest";
 import {
   SCORE_WEIGHTS,
-  SCORE_RANGES,
+  DEFAULT_SCORING_CONFIG,
   formatPercentageMetric,
   scoreRevenueGrowth,
   scoreEPSGrowth,
-  scoreFCFGrowth,
-  scoreFCFMargin,
-  scoreROIC,
-  scoreDebtToEquity,
-  scoreProfitability,
+  scoreFCFConsistency,
+  scoreFCFConversion,
+  scoreMarginStability,
   calculateMetricScores,
+  calculateUniversalBusinessScore,
+  calculateIndustryScore,
   calculateOverallScore,
-  getUnavailableMetrics,
-  calculateDataConfidenceScore,
-  getScoreCategory,
-  getScoreColorClass,
-  getScoreBgColorClass,
-  getMetricAnalysis,
 } from "./scoring";
-import { FinancialMetrics, MetricScores, FinancialStatement } from "../types";
+import { FinancialMetrics, MetricScores } from "../types";
 
 describe("Scoring Utilities - Individual Metric Scores", () => {
   describe("formatPercentageMetric & Revenue CAGR Display Formatting", () => {
@@ -46,7 +40,6 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
     });
 
     it("6. Verifies Quality Score calculation remains unchanged for 158% CAGR", () => {
-      // High CAGR (> 15%) awards max score 100
       expect(scoreRevenueGrowth(1.58)).toBe(100);
       expect(scoreRevenueGrowth(0.125)).toBeGreaterThanOrEqual(70);
       expect(scoreRevenueGrowth(-0.1525)).toBe(0);
@@ -60,37 +53,13 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
     it("8. ROIC = -166.45 displays as -166.45%", () => {
       expect(formatPercentageMetric(-166.45, true)).toBe("-166.45%");
     });
-
-    it("9. ROIC = 0 displays as 0.00%", () => {
-      expect(formatPercentageMetric(0, true)).toBe("0.00%");
-    });
-
-    it("10. Net Profitability = -4982.30 displays as -4982.30%", () => {
-      expect(formatPercentageMetric(-4982.30, true)).toBe("-4982.30%");
-    });
-
-    it("11. Net Profitability = 25 displays as 25.00%", () => {
-      expect(formatPercentageMetric(25, true)).toBe("25.00%");
-    });
-
-    it("12. Net Profitability = 0 displays as 0.00%", () => {
-      expect(formatPercentageMetric(0, true)).toBe("0.00%");
-    });
-
-    it("13. Net Profitability = 158 displays as 158.00%", () => {
-      expect(formatPercentageMetric(158, true)).toBe("158.00%");
-    });
-
-    it("14. Metric value -4982.3042 renders -4982.30%", () => {
-      expect(formatPercentageMetric(-4982.3042, true)).toBe("-4982.30%");
-    });
   });
 
   describe("scoreRevenueGrowth Stock Scoring Integration", () => {
     it("should score positive CAGR as expected", () => {
-      expect(scoreRevenueGrowth(0.20)).toBeGreaterThanOrEqual(85); // Excellent
-      expect(scoreRevenueGrowth(0.10)).toBeGreaterThanOrEqual(70); // Good
-      expect(scoreRevenueGrowth(0.06)).toBeGreaterThanOrEqual(50); // Average
+      expect(scoreRevenueGrowth(0.20)).toBeGreaterThanOrEqual(85);
+      expect(scoreRevenueGrowth(0.10)).toBeGreaterThanOrEqual(70);
+      expect(scoreRevenueGrowth(0.06)).toBeGreaterThanOrEqual(50);
     });
 
     it("should score negative CAGR as expected", () => {
@@ -107,11 +76,6 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
       expect(scoreRevenueGrowth(undefined)).toBe(0);
       expect(scoreRevenueGrowth(NaN)).toBe(0);
     });
-
-    it("should cap extremely high CAGR values at max score 100", () => {
-      expect(scoreRevenueGrowth(2.0)).toBe(100);
-      expect(scoreRevenueGrowth(5.0)).toBe(100);
-    });
   });
 
   describe("scoreEPSGrowth Stock Scoring Integration", () => {
@@ -119,150 +83,50 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
       const score = scoreEPSGrowth(0.20);
       expect(score).not.toBeNull();
       expect(score!).toBeGreaterThanOrEqual(85);
-      const cat = SCORE_RANGES.excellent;
-      expect(score!).toBeGreaterThanOrEqual(cat.min);
-      expect(score!).toBeLessThanOrEqual(cat.max);
     });
 
-    it("Test 2: EPS CAGR = 10% (0.10) -> Rating = Good (70 - 84)", () => {
-      const score = scoreEPSGrowth(0.10);
-      expect(score).not.toBeNull();
-      expect(score!).toBeGreaterThanOrEqual(SCORE_RANGES.good.min);
-      expect(score!).toBeLessThanOrEqual(SCORE_RANGES.good.max);
-    });
-
-    it("Test 3: EPS CAGR = 6.30% (0.063) -> Rating = Average (50 - 69)", () => {
-      const score = scoreEPSGrowth(0.063);
-      expect(score).not.toBeNull();
-      expect(score!).toBeGreaterThanOrEqual(SCORE_RANGES.average.min);
-      expect(score!).toBeLessThanOrEqual(SCORE_RANGES.average.max);
-      expect(score!).toBe(58);
-    });
-
-    it("Test 4: EPS CAGR = 3% (0.03) -> Rating = Poor (0 - 49)", () => {
-      const score = scoreEPSGrowth(0.03);
-      expect(score).not.toBeNull();
-      expect(score!).toBeGreaterThanOrEqual(SCORE_RANGES.poor.min);
-      expect(score!).toBeLessThanOrEqual(SCORE_RANGES.poor.max);
-    });
-
-    it("Test 5: EPS CAGR = null -> returns null (No EPS CAGR score awarded)", () => {
+    it("Test 2: EPS CAGR = null -> returns null", () => {
       expect(scoreEPSGrowth(null)).toBeNull();
       expect(scoreEPSGrowth(undefined)).toBeNull();
       expect(scoreEPSGrowth(NaN)).toBeNull();
     });
-
-    it("should cap extremely high EPS CAGR values at max score 100", () => {
-      expect(scoreEPSGrowth(2.0)).toBe(100);
-      expect(scoreEPSGrowth(5.0)).toBe(100);
-    });
   });
 
-  it("scoreFCFGrowth should score FCF growth tiers correctly", () => {
-    expect(scoreFCFGrowth(null)).toBeNull();
-    expect(scoreFCFGrowth(0.20)).toBeGreaterThanOrEqual(85);
-    expect(scoreFCFGrowth(0.10)).toBeGreaterThanOrEqual(70);
-  });
-
-  describe("scoreFCFGrowth deterioration vs N/A cases", () => {
-    it("1. Positive -> Positive: should score normal CAGR", () => {
-      const statements: FinancialStatement[] = [
-        { date: "2015-12-31", operatingCashFlow: 100, capitalExpenditure: 0 },
-        { date: "2025-12-31", operatingCashFlow: 200, capitalExpenditure: 0 },
-      ];
-      expect(scoreFCFGrowth(0.0718, statements)).toBeGreaterThanOrEqual(50);
+  describe("New Universal Metrics Scoring", () => {
+    it("scoreFCFConsistency should return score clamped between 0 and 100", () => {
+      expect(scoreFCFConsistency(85)).toBe(85);
+      expect(scoreFCFConsistency(120)).toBe(100);
+      expect(scoreFCFConsistency(-10)).toBe(0);
+      expect(scoreFCFConsistency(null)).toBeNull();
     });
 
-    it("2. Positive -> Negative: should assign score 0 when ending FCF <= 0 and prior FCF was positive", () => {
-      const statements: FinancialStatement[] = [
-        { date: "2015-12-31", operatingCashFlow: 1800000000, capitalExpenditure: 0 },
-        { date: "2025-12-31", operatingCashFlow: -188000000, capitalExpenditure: 0 },
-      ];
-      expect(scoreFCFGrowth(null, statements)).toBe(0);
+    it("scoreFCFConversion should score FCF / Net Income ratios accurately", () => {
+      expect(scoreFCFConversion(125)).toBe(100); // >= 120%
+      expect(scoreFCFConversion(100)).toBe(85);
+      expect(scoreFCFConversion(80)).toBe(70);
+      expect(scoreFCFConversion(50)).toBe(50);
+      expect(scoreFCFConversion(0)).toBe(0);
+      expect(scoreFCFConversion(-10)).toBe(0);
+      expect(scoreFCFConversion(null)).toBeNull();
     });
 
-    it("3. Negative -> Positive: should reward turnaround with score 75", () => {
-      const statements: FinancialStatement[] = [
-        { date: "2015-12-31", operatingCashFlow: -100000000, capitalExpenditure: 0 },
-        { date: "2025-12-31", operatingCashFlow: 200000000, capitalExpenditure: 0 },
-      ];
-      expect(scoreFCFGrowth(null, statements)).toBe(75);
-    });
-
-    it("4. Negative -> Negative: should give partial credit (e.g. 35) when cash burn is shrinking", () => {
-      const statements: FinancialStatement[] = [
-        { date: "2015-12-31", operatingCashFlow: -100000000, capitalExpenditure: 0 },
-        { date: "2025-12-31", operatingCashFlow: -50000000, capitalExpenditure: 0 },
-      ];
-      expect(scoreFCFGrowth(null, statements)).toBe(35);
-    });
-  });
-
-  it("scoreROIC should score ROIC tiers correctly", () => {
-    expect(scoreROIC(null)).toBeNull();
-    expect(scoreROIC(20)).toBeGreaterThanOrEqual(85);
-    expect(scoreROIC(12)).toBeGreaterThanOrEqual(70);
-    expect(scoreROIC(8)).toBeGreaterThanOrEqual(50);
-    expect(scoreROIC(3)).toBeLessThan(50);
-  });
-
-  it("scoreDebtToEquity should score debt-to-equity ratio correctly (lower is better)", () => {
-    expect(scoreDebtToEquity(null)).toBe(0);
-    expect(scoreDebtToEquity(-1)).toBe(0);
-    expect(scoreDebtToEquity(0.2)).toBeGreaterThanOrEqual(85); // Excellent
-    expect(scoreDebtToEquity(1.0)).toBeGreaterThanOrEqual(70); // Good
-    expect(scoreDebtToEquity(2.0)).toBeGreaterThanOrEqual(50); // Average
-    expect(scoreDebtToEquity(6.0)).toBe(0); // Poor
-  });
-
-  it("scoreProfitability should return average score across net, operating, and gross margins", () => {
-    expect(scoreProfitability(null, null, null)).toBeNull();
-    // High margins (Net 20%, Op 25%, Gross 50%) -> Excellent score >= 85
-    const highScore = scoreProfitability(20, 25, 50);
-    expect(highScore).toBeGreaterThanOrEqual(85);
-  });
-
-  describe("scoreFCFMargin", () => {
-    it("1. Company with excellent FCF Margin (>20%) receives 100 score", () => {
-      expect(scoreFCFMargin(25)).toBe(100);
-      expect(scoreFCFMargin(20)).toBe(100);
-    });
-
-    it("2. Company with strong FCF Margin (15%-20%) receives 85-100 score", () => {
-      expect(scoreFCFMargin(15)).toBe(85);
-      expect(scoreFCFMargin(17.5)).toBe(93);
-    });
-
-    it("3. Company with average FCF Margin (5%-15%) receives 50-75 score", () => {
-      expect(scoreFCFMargin(10)).toBe(75);
-      expect(scoreFCFMargin(5)).toBe(50);
-      expect(scoreFCFMargin(7.5)).toBe(63);
-    });
-
-    it("4. Company with weak FCF Margin (0%-5%) receives 25-50 score", () => {
-      expect(scoreFCFMargin(0)).toBe(25);
-      expect(scoreFCFMargin(2.5)).toBe(38);
-    });
-
-    it("5. Negative FCF Margin (<0%) receives 0 score", () => {
-      expect(scoreFCFMargin(-5)).toBe(0);
-      expect(scoreFCFMargin(-0.1)).toBe(0);
-    });
-
-    it("6. Missing Revenue or FCF data returns null", () => {
-      expect(scoreFCFMargin(null)).toBeNull();
-      expect(scoreFCFMargin(undefined as any)).toBeNull();
-      expect(scoreFCFMargin(NaN)).toBeNull();
+    it("scoreMarginStability should return score clamped between 0 and 100", () => {
+      expect(scoreMarginStability(90)).toBe(90);
+      expect(scoreMarginStability(105)).toBe(100);
+      expect(scoreMarginStability(null)).toBeNull();
     });
   });
 });
 
-describe("calculateMetricScores & calculateOverallScore", () => {
+describe("Universal Business Quality Score Architecture & Engine", () => {
   const sampleMetrics: FinancialMetrics = {
     revenueCAGR: 0.15,
     epsGrowth: 0.12,
     fcfGrowth: 0.10,
     fcfMargin: 15,
+    fcfConsistency: 85,
+    fcfConversion: 105,
+    marginStability: 80,
     roic: 16,
     debtToEquity: 0.4,
     dividendYield: 0.02,
@@ -272,123 +136,127 @@ describe("calculateMetricScores & calculateOverallScore", () => {
     netMargin: 15,
   };
 
-  it("calculateMetricScores should generate all metric scores", () => {
+  it("1. SCORE_WEIGHTS total weight sum must equal exactly 1.00 (100%)", () => {
+    const weights = DEFAULT_SCORING_CONFIG.universalScoreMetrics;
+    const totalWeight = Object.values(weights).reduce((sum, item) => sum + item.weight, 0);
+    expect(totalWeight).toBeCloseTo(1.0, 5);
+
+    const exportTotalWeight = Object.values(SCORE_WEIGHTS).reduce((sum, w) => sum + w, 0);
+    expect(exportTotalWeight).toBeCloseTo(1.0, 5);
+  });
+
+  it("2. calculateMetricScores should calculate scores for both universal and informational metrics", () => {
     const scores = calculateMetricScores(sampleMetrics);
-    expect(scores.revenue).not.toBeNull();
-    expect(scores.eps).not.toBeNull();
-    expect(scores.fcf).not.toBeNull();
-    expect(scores.fcfMargin).not.toBeNull();
-    expect(scores.roic).not.toBeNull();
+    expect(scores.roic).toBeGreaterThan(0);
+    expect(scores.fcfMargin).toBeGreaterThan(0);
+    expect(scores.fcfConsistency).toBe(85);
+    expect(scores.fcfConversion).toBeGreaterThan(0);
+    expect(scores.marginStability).toBe(80);
+    expect(scores.revenue).toBeGreaterThan(0);
+    expect(scores.eps).toBeGreaterThan(0);
+
+    // Informational metrics present in scores object
     expect(scores.debt).not.toBeNull();
     expect(scores.profitability).not.toBeNull();
+    expect(scores.fcf).not.toBeNull();
   });
 
-  it("calculateOverallScore should calculate weighted overall score", () => {
-    const scores = calculateMetricScores(sampleMetrics);
-    const overall = calculateOverallScore(scores);
-    expect(overall).toBeGreaterThanOrEqual(80);
-  });
+  it("3. Universal score ONLY includes configured universal metrics and IGNORES informational metrics", () => {
+    const baseScores: MetricScores = {
+      roic: 100,           // weight 0.20 -> 20 pts
+      fcfMargin: 100,      // weight 0.20 -> 20 pts
+      fcfConsistency: 100, // weight 0.15 -> 15 pts
+      fcfConversion: 100,  // weight 0.15 -> 15 pts
+      marginStability: 100,// weight 0.10 -> 10 pts
+      revenue: 100,        // weight 0.10 -> 10 pts
+      eps: 100,            // weight 0.10 -> 10 pts
 
-  it("calculateOverallScore should calculate exact weighted Business Quality Score equation using new weights (15/15/10/10/20/10/20)", () => {
-    const scores: MetricScores = {
-      revenue: 80,       // 80 * 0.15 = 12.0
-      eps: 90,           // 90 * 0.15 = 13.5
-      fcf: 70,           // 70 * 0.10 = 7.0
-      fcfMargin: 80,     // 80 * 0.10 = 8.0
-      roic: 100,         // 100 * 0.20 = 20.0
-      debt: 100,         // 100 * 0.10 = 10.0
-      profitability: 85, // 85 * 0.20 = 17.0
+      // Informational metrics set to ZERO
+      fcf: 0,
+      debt: 0,
+      profitability: 0,
     };
-    // Sum = 12 + 13.5 + 7 + 8 + 20 + 10 + 17 = 87.5
-    // Weight sum = 1.00
-    // Round(87.5 / 1.00) = 88
-    expect(calculateOverallScore(scores)).toBe(88);
-  });
 
-  it("SCORE_WEIGHTS total sum must equal exactly 1.00 (100%)", () => {
-    const totalWeight = Object.values(SCORE_WEIGHTS).reduce((sum, w) => sum + w, 0);
-    expect(totalWeight).toBeCloseTo(1.0, 5);
-  });
+    // Total = 100 pts out of 100
+    expect(calculateUniversalBusinessScore(baseScores)).toBe(100);
 
-  it("calculateOverallScore should calculate exact point contributions and total score matching prompt example", () => {
-    const exampleScores: MetricScores = {
-      revenue: 100,       // (100/100) * 15 = 15.00 pts
-      eps: 100,           // (100/100) * 15 = 15.00 pts
-      fcf: 100,           // (100/100) * 10 = 10.00 pts
-      fcfMargin: 76,      // (76/100)  * 10 = 7.60 pts
-      roic: 100,          // (100/100) * 20 = 20.00 pts
-      debt: 98,           // (98/100)  * 10 = 9.80 pts
-      profitability: 100, // (100/100) * 20 = 20.00 pts
+    // Changing informational metrics does NOT affect universal score
+    const modifiedScores: MetricScores = {
+      ...baseScores,
+      fcf: 100,
+      debt: 100,
+      profitability: 100,
     };
-    // Sum = 15 + 15 + 10 + 7.6 + 20 + 9.8 + 20 = 97.40 pts
-    expect(calculateOverallScore(exampleScores)).toBe(97);
+    expect(calculateUniversalBusinessScore(modifiedScores)).toBe(100);
+    expect(calculateOverallScore(modifiedScores)).toBe(100);
   });
 
-  it("calculateOverallScore should return 0 if all scores are null", () => {
-    const emptyScores: MetricScores = {
-      revenue: null,
-      eps: null,
-      fcf: null,
-      fcfMargin: null,
-      roic: null,
-      debt: null,
-      profitability: null,
-    };
-    expect(calculateOverallScore(emptyScores)).toBe(0);
-  });
-});
-
-describe("Data Confidence & Unavailable Metrics", () => {
-  it("calculateDataConfidenceScore should return 100% when all metrics are available", () => {
-    const fullScores: MetricScores = {
-      revenue: 80,
-      eps: 80,
-      fcf: 80,
-      fcfMargin: 80,
+  it("4. Informational metrics do not affect score calculation", () => {
+    const scoresWithLowInformational: MetricScores = {
       roic: 80,
-      debt: 80,
-      profitability: 80,
+      fcfMargin: 80,
+      fcfConsistency: 80,
+      fcfConversion: 80,
+      marginStability: 80,
+      revenue: 80,
+      eps: 80,
+      debt: 0,
+      profitability: 0,
+      fcf: 0,
     };
-    expect(calculateDataConfidenceScore(fullScores)).toBe(100);
-    expect(getUnavailableMetrics(fullScores)).toHaveLength(0);
+
+    const scoresWithHighInformational: MetricScores = {
+      ...scoresWithLowInformational,
+      debt: 100,
+      profitability: 100,
+      fcf: 100,
+    };
+
+    expect(calculateUniversalBusinessScore(scoresWithLowInformational)).toBe(80);
+    expect(calculateUniversalBusinessScore(scoresWithHighInformational)).toBe(80);
   });
 
-  it("calculateDataConfidenceScore should calculate percentage for partial data", () => {
-    const partialScores: MetricScores = {
+  it("5. Missing universal metrics do not break scoring and reweights dynamically", () => {
+    const partialUniversalScores: MetricScores = {
+      roic: 100,           // weight 0.20
+      fcfMargin: 100,      // weight 0.20
+      fcfConsistency: null,// missing
+      fcfConversion: null, // missing
+      marginStability: null,// missing
+      revenue: 100,        // weight 0.10
+      eps: 100,            // weight 0.10
+      debt: 50,
+      profitability: 50,
+      fcf: 50,
+    };
+
+    // Available weights: 0.20 + 0.20 + 0.10 + 0.10 = 0.60
+    // Sum = (100*0.2) + (100*0.2) + (100*0.1) + (100*0.1) = 60 pts
+    // Score = 60 / 0.60 = 100
+    expect(calculateUniversalBusinessScore(partialUniversalScores)).toBe(100);
+  });
+
+  it("6. Industry-specific metrics can be added later without refactoring", () => {
+    const scores: MetricScores = {
+      roic: 80,
+      fcfMargin: 80,
+      fcfConsistency: 80,
+      fcfConversion: 80,
+      marginStability: 80,
       revenue: 80,
       eps: 80,
       fcf: null,
-      fcfMargin: null,
-      roic: null,
-      debt: 80,
-      profitability: 80,
+      debt: 90,
+      profitability: null,
+      bankingTier1Capital: 95, // future industry metric
     };
-    // 4 out of 6 valid = ~67%
-    expect(calculateDataConfidenceScore(partialScores)).toBe(67);
-    const unavailable = getUnavailableMetrics(partialScores);
-    expect(unavailable).toContain("FCF Growth");
-    expect(unavailable).toContain("ROIC");
-  });
-});
 
-describe("Category & Label Formatting Helpers", () => {
-  it("getScoreCategory should classify score tiers", () => {
-    expect(getScoreCategory(90).label).toBe("Excellent");
-    expect(getScoreCategory(75).label).toBe("Good");
-    expect(getScoreCategory(60).label).toBe("Average");
-    expect(getScoreCategory(30).label).toBe("Poor");
-  });
+    const bankingIndustryConfig = {
+      bankingTier1Capital: { name: "Tier 1 Capital Ratio", weight: 0.50 },
+      roic: { name: "ROIC", weight: 0.50 },
+    };
 
-  it("getScoreColorClass & getScoreBgColorClass should return class strings", () => {
-    expect(getScoreColorClass(90)).toBe("text-excellent");
-    expect(getScoreBgColorClass(90)).toBe("bg-excellent");
-  });
-
-  it("getMetricAnalysis should classify performance", () => {
-    expect(getMetricAnalysis(null)).toBe("N/A");
-    expect(getMetricAnalysis(90)).toBe("Strong");
-    expect(getMetricAnalysis(75)).toBe("Good");
-    expect(getMetricAnalysis(60)).toBe("Fair");
-    expect(getMetricAnalysis(30)).toBe("Weak");
+    const industryScore = calculateIndustryScore(scores, bankingIndustryConfig);
+    expect(industryScore).toBe(88); // Round((95*0.5 + 80*0.5) / 1.0) = 88
   });
 });

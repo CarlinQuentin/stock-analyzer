@@ -33,13 +33,13 @@ export const ScoreGauge = ({
   const gradientClass = colorMap[category.color] || "from-gray-500 to-gray-600";
 
   const METRIC_LABELS: Record<string, string> = {
+    roic: "ROIC",
+    fcfMargin: "FCF Margin",
+    fcfConsistency: "FCF Consistency",
+    fcfConversion: "FCF Conversion",
+    marginStability: "Margin Stability",
     revenue: "Revenue Growth",
     eps: "EPS Growth",
-    fcf: "FCF Growth",
-    fcfMargin: "FCF Margin",
-    roic: "ROIC",
-    debt: "Debt-to-Equity",
-    profitability: "Profitability Margins",
   };
 
   // Business Quality Score Considerations - dynamically derived from SCORE_WEIGHTS configuration
@@ -70,7 +70,7 @@ export const ScoreGauge = ({
   let weightSum = 0;
 
   items.forEach((item) => {
-    if (item.score !== null) {
+    if (item.score !== null && item.score !== undefined) {
       weightedSum += item.score * item.weight;
       weightSum += item.weight;
     }
@@ -224,7 +224,7 @@ export const ScoreGauge = ({
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {items.map((item) => {
-                  const pts = item.score !== null ? item.score * item.weight : null;
+                  const pts = item.score !== null && item.score !== undefined ? item.score * item.weight : null;
                   return (
                     <tr key={item.key} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                       <td className="py-2 px-3 font-medium text-slate-900 dark:text-slate-100">
@@ -234,7 +234,7 @@ export const ScoreGauge = ({
                         {(item.weight * 100).toFixed(0)}% ({item.weight.toFixed(2)})
                       </td>
                       <td className="py-2 px-3 text-center font-bold">
-                        {item.score !== null ? (
+                        {item.score !== null && item.score !== undefined ? (
                           <span className={item.score >= 80 ? "text-green-600 dark:text-green-400" : item.score >= 50 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}>
                             {item.score} / 100
                           </span>
