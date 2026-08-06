@@ -59,7 +59,7 @@ export const UserHeader: React.FC<UserHeaderProps> = ({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-60 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700/80 shadow-xl py-2 z-50 transition-all duration-200 animate-in fade-in slide-in-from-top-2">
+        <div className="absolute left-0 mt-2 w-60 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700/80 shadow-xl py-2 z-50 transition-all duration-200 animate-in fade-in slide-in-from-top-2">
           {/* User Info Header */}
           <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700/60">
             <p className="text-xs font-bold text-slate-900 dark:text-white truncate">

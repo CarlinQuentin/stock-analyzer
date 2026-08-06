@@ -12,7 +12,8 @@ import { ErrorMessage } from "./components/ErrorMessage";
 import { MetricDetailModal } from "./components/MetricDetailModal";
 import { ProfileOnlyPage } from "./components/ProfileOnlyPage";
 import { AuthModal } from "./components/AuthModal";
-import { Navbar } from "./components/Navbar";
+import { UserHeader } from "./components/UserHeader";
+import { ThemeToggle } from "./components/ThemeToggle";
 import { SavedStocksPage } from "./components/SavedStocksPage";
 import { authService, UserProfile } from "./services/authService";
 import { fmpService } from "./services/financialModelingPrep";
@@ -522,16 +523,19 @@ function App() {
 
   if (isCheckingAuth) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
-        <Navbar
-          onViewChange={setCurrentView}
-          savedCount={savedStocks.length}
-          user={user}
-          onLogout={handleLogout}
-          onLoginRequest={() => setShowAuthModal(true)}
-        />
+      <>
+        <div className="fixed top-4 left-4 z-40">
+          <UserHeader
+            user={user}
+            savedCount={savedStocks.length}
+            onLogout={handleLogout}
+            onLoginRequest={() => setShowAuthModal(true)}
+            onOpenSavedStocks={() => setCurrentView("saved")}
+          />
+        </div>
+        <ThemeToggle />
         <LoadingSpinner message="Checking authentication..." />
-      </div>
+      </>
     );
   }
 
@@ -539,13 +543,16 @@ function App() {
   if (currentView === "saved") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 transition-colors duration-300">
-        <Navbar
-          onViewChange={setCurrentView}
-          savedCount={savedStocks.length}
-          user={user}
-          onLogout={handleLogout}
-          onLoginRequest={() => setShowAuthModal(true)}
-        />
+        <div className="fixed top-4 left-4 z-40">
+          <UserHeader
+            user={user}
+            savedCount={savedStocks.length}
+            onLogout={handleLogout}
+            onLoginRequest={() => setShowAuthModal(true)}
+            onOpenSavedStocks={() => setCurrentView("saved")}
+          />
+        </div>
+        <ThemeToggle />
         <SavedStocksPage
           savedStocks={savedStocks}
           onSelectStock={handleSelectSavedStock}
@@ -568,14 +575,17 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
-        <Navbar
-          onViewChange={setCurrentView}
-          savedCount={savedStocks.length}
-          user={user}
-          onLogout={handleLogout}
-          onLoginRequest={() => setShowAuthModal(true)}
-        />
+      <>
+        <div className="fixed top-4 left-4 z-40">
+          <UserHeader
+            user={user}
+            savedCount={savedStocks.length}
+            onLogout={handleLogout}
+            onLoginRequest={() => setShowAuthModal(true)}
+            onOpenSavedStocks={() => setCurrentView("saved")}
+          />
+        </div>
+        <ThemeToggle />
         <LoadingSpinner message="Analyzing company fundamentals..." />
         {showAuthModal && (
           <AuthModal
@@ -587,20 +597,23 @@ function App() {
             customPrompt={authPromptMessage}
           />
         )}
-      </div>
+      </>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
-        <Navbar
-          onViewChange={setCurrentView}
-          savedCount={savedStocks.length}
-          user={user}
-          onLogout={handleLogout}
-          onLoginRequest={() => setShowAuthModal(true)}
-        />
+      <>
+        <div className="fixed top-4 left-4 z-40">
+          <UserHeader
+            user={user}
+            savedCount={savedStocks.length}
+            onLogout={handleLogout}
+            onLoginRequest={() => setShowAuthModal(true)}
+            onOpenSavedStocks={() => setCurrentView("saved")}
+          />
+        </div>
+        <ThemeToggle />
         <ErrorMessage
           title="Analysis Failed"
           message={error}
@@ -616,20 +629,23 @@ function App() {
             customPrompt={authPromptMessage}
           />
         )}
-      </div>
+      </>
     );
   }
 
   if (!result && !profileOnly) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 transition-colors duration-300">
-        <Navbar
-          onViewChange={setCurrentView}
-          savedCount={savedStocks.length}
-          user={user}
-          onLogout={handleLogout}
-          onLoginRequest={() => setShowAuthModal(true)}
-        />
+      <>
+        <div className="fixed top-4 left-4 z-40">
+          <UserHeader
+            user={user}
+            savedCount={savedStocks.length}
+            onLogout={handleLogout}
+            onLoginRequest={() => setShowAuthModal(true)}
+            onOpenSavedStocks={() => setCurrentView("saved")}
+          />
+        </div>
+        <ThemeToggle />
         <StockSearch onSearch={handleSearch} isLoading={isLoading} />
         {showAuthModal && (
           <AuthModal
@@ -641,20 +657,23 @@ function App() {
             customPrompt={authPromptMessage}
           />
         )}
-      </div>
+      </>
     );
   }
 
   if (profileOnly) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 transition-colors duration-300">
-        <Navbar
-          onViewChange={setCurrentView}
-          savedCount={savedStocks.length}
-          user={user}
-          onLogout={handleLogout}
-          onLoginRequest={() => setShowAuthModal(true)}
-        />
+      <>
+        <div className="fixed top-4 left-4 z-40">
+          <UserHeader
+            user={user}
+            savedCount={savedStocks.length}
+            onLogout={handleLogout}
+            onLoginRequest={() => setShowAuthModal(true)}
+            onOpenSavedStocks={() => setCurrentView("saved")}
+          />
+        </div>
+        <ThemeToggle />
         <ProfileOnlyPage
           profile={profileOnly.profile}
           message={profileOnly.message}
@@ -673,7 +692,7 @@ function App() {
             customPrompt={authPromptMessage}
           />
         )}
-      </div>
+      </>
     );
   }
 
@@ -682,15 +701,18 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 transition-colors duration-300">
-      <Navbar
-        onViewChange={setCurrentView}
-        savedCount={savedStocks.length}
-        user={user}
-        onLogout={handleLogout}
-        onLoginRequest={() => setShowAuthModal(true)}
-      />
-      <div className="max-w-7xl mx-auto py-8 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 py-8 px-4 transition-colors duration-300">
+      <div className="fixed top-4 left-4 z-40">
+        <UserHeader
+          user={user}
+          savedCount={savedStocks.length}
+          onLogout={handleLogout}
+          onLoginRequest={() => setShowAuthModal(true)}
+          onOpenSavedStocks={() => setCurrentView("saved")}
+        />
+      </div>
+      <ThemeToggle />
+      <div className="max-w-7xl mx-auto">
         {/* Back button */}
         <button
           onClick={() => setResult(null)}
