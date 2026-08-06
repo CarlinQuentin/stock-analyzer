@@ -220,14 +220,14 @@ describe("Universal Business Quality Score Architecture & Engine", () => {
 
   it("3. Calculates Universal Business Quality Score correctly across 9 universal metrics", () => {
     const baseScores: MetricScores = {
-      roic: 100,           // 15%
-      fcfMargin: 100,      // 15%
-      fcfConsistency: 100, // 15%
+      roic: 100,           // 20%
+      fcfMargin: 100,      // 10%
+      fcfConsistency: 100, // 10%
       fcfConversion: 100,  // 10%
-      marginStability: 100,// 10%
+      marginStability: 100,// 15%
       netDebtToFCF: 100,   // 10%
-      shareDilution: 100,  // 10%
-      revenue: 100,        // 10%
+      shareDilution: 100,  // 5%
+      revenue: 100,        // 15%
       eps: 100,            // 5%
       fcf: 0,             // Informational (0%)
       debt: 0,            // Informational (0%)
@@ -277,27 +277,70 @@ describe("Universal Business Quality Score Architecture & Engine", () => {
 
   it("5. Missing universal metrics do not break scoring and reweights dynamically", () => {
     const partialUniversalScores: MetricScores = {
-      roic: 100,           // weight 0.15
-      fcfMargin: 100,      // weight 0.15
+      roic: 100,           // weight 0.20
+      fcfMargin: 100,      // weight 0.10
       fcfConsistency: null,// missing
       fcfConversion: null, // missing
       marginStability: null,// missing
       netDebtToFCF: 100,   // weight 0.10
-      shareDilution: 100,  // weight 0.10
-      revenue: 100,        // weight 0.10
+      shareDilution: 100,  // weight 0.05
+      revenue: 100,        // weight 0.15
       eps: 100,            // weight 0.05
       debt: 50,
       profitability: 50,
       fcf: 50,
     };
 
-    // Available weights: 0.15 + 0.15 + 0.10 + 0.10 + 0.10 + 0.05 = 0.65
-    // Sum = (100*0.15) + (100*0.15) + (100*0.1) + (100*0.1) + (100*0.1) + (100*0.05) = 65 pts
+    // Available weights: 0.20 + 0.10 + 0.10 + 0.05 + 0.15 + 0.05 = 0.65
+    // Sum = (100*0.20) + (100*0.10) + (100*0.10) + (100*0.05) + (100*0.15) + (100*0.05) = 65 pts
     // Score = 65 / 0.65 = 100
     expect(calculateUniversalBusinessScore(partialUniversalScores)).toBe(100);
   });
 
-  it("6. Industry-specific metrics can be added later without refactoring", () => {
+  it("6. Verify updated weighting rewards high-ROIC compounders over cash-heavy low-return businesses", () => {
+    // High-ROIC compounder profile (ROIC 100, Margin Stability 90, Revenue Growth 90, lower cash conversion 60)
+    const compounderScores: MetricScores = {
+      roic: 100,          // 20% -> 20 pts
+      fcfMargin: 60,      // 10% -> 6 pts
+      fcfConsistency: 60, // 10% -> 6 pts
+      fcfConversion: 60,  // 10% -> 6 pts
+      marginStability: 90,// 15% -> 13.5 pts
+      netDebtToFCF: 90,   // 10% -> 9 pts
+      shareDilution: 90,  // 5%  -> 4.5 pts
+      revenue: 90,        // 15% -> 13.5 pts
+      eps: 90,            // 5%  -> 4.5 pts
+      fcf: null,
+      debt: null,
+      profitability: null,
+    };
+    // Sum = 20 + 6 + 6 + 6 + 13.5 + 9 + 4.5 + 13.5 + 4.5 = 83 pts
+    const newCompounderScore = calculateUniversalBusinessScore(compounderScores);
+    expect(newCompounderScore).toBe(83);
+
+    // Cash-heavy low-ROIC profile (ROIC 40, Cash metrics 100, Growth 40)
+    const cashHeavyScores: MetricScores = {
+      roic: 40,           // 20% -> 8 pts
+      fcfMargin: 100,     // 10% -> 10 pts
+      fcfConsistency: 100,// 10% -> 10 pts
+      fcfConversion: 100, // 10% -> 10 pts
+      marginStability: 60,// 15% -> 9 pts
+      netDebtToFCF: 80,   // 10% -> 8 pts
+      shareDilution: 60,  // 5%  -> 3 pts
+      revenue: 40,        // 15% -> 6 pts
+      eps: 40,            // 5%  -> 2 pts
+      fcf: null,
+      debt: null,
+      profitability: null,
+    };
+    // Sum = 8 + 10 + 10 + 10 + 9 + 8 + 3 + 6 + 2 = 66 pts
+    const newCashHeavyScore = calculateUniversalBusinessScore(cashHeavyScores);
+    expect(newCashHeavyScore).toBe(66);
+
+    // Confirms compounder (high ROIC + stability + growth) outscores cash-heavy low-return profile
+    expect(newCompounderScore).toBeGreaterThan(newCashHeavyScore);
+  });
+
+  it("7. Industry-specific metrics can be added later without refactoring", () => {
     const scores: MetricScores = {
       roic: 80,
       fcfMargin: 80,

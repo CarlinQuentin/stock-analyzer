@@ -3,14 +3,14 @@ import { calculateEPSTrend, calculateFCFTrend } from "./financialCalculations";
 
 export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
   universalScoreMetrics: {
-    roic: { name: "ROIC", weight: 0.15, description: "Return on Invested Capital" },
-    fcfMargin: { name: "FCF Margin", weight: 0.15, description: "Free Cash Flow Margin" },
-    fcfConsistency: { name: "FCF Consistency", weight: 0.15, description: "Reliability of FCF generation" },
+    roic: { name: "ROIC", weight: 0.20, description: "Return on Invested Capital" },
+    fcfMargin: { name: "FCF Margin", weight: 0.10, description: "Free Cash Flow Margin" },
+    fcfConsistency: { name: "FCF Consistency", weight: 0.10, description: "Reliability of FCF generation" },
     fcfConversion: { name: "FCF Conversion", weight: 0.10, description: "Free Cash Flow to Net Income ratio" },
-    marginStability: { name: "Margin Stability", weight: 0.10, description: "Operating profitability trend stability" },
+    marginStability: { name: "Margin Stability", weight: 0.15, description: "Operating profitability trend stability" },
     netDebtToFCF: { name: "Net Debt / FCF", weight: 0.10, description: "Solvency & debt coverage by free cash flow" },
-    shareDilution: { name: "Share Dilution", weight: 0.10, description: "Shareholder ownership change over time" },
-    revenue: { name: "Revenue Growth", weight: 0.10, description: "Compound annual revenue growth rate" },
+    shareDilution: { name: "Share Dilution", weight: 0.05, description: "Shareholder ownership change over time" },
+    revenue: { name: "Revenue Growth", weight: 0.15, description: "Compound annual revenue growth rate" },
     eps: { name: "EPS Growth", weight: 0.05, description: "Earnings per share growth" },
   },
   informationalMetrics: {
@@ -22,14 +22,14 @@ export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
 };
 
 export const SCORE_WEIGHTS: Record<string, number> = {
-  roic: 0.15,
-  fcfMargin: 0.15,
-  fcfConsistency: 0.15,
+  roic: 0.20,
+  fcfMargin: 0.10,
+  fcfConsistency: 0.10,
   fcfConversion: 0.10,
-  marginStability: 0.10,
+  marginStability: 0.15,
   netDebtToFCF: 0.10,
-  shareDilution: 0.10,
-  revenue: 0.10,
+  shareDilution: 0.05,
+  revenue: 0.15,
   eps: 0.05,
 };
 
