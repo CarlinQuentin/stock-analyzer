@@ -16,15 +16,27 @@ import { AuthModal } from "./components/AuthModal";
 import { UserHeader } from "./components/UserHeader";
 import { authService, UserProfile } from "./services/authService";
 import { fmpService } from "./services/financialModelingPrep";
-import { calculateAllMetrics, calculateFCFMarginHistory, calculateFCFConversionHistory, calculateMarginStabilityHistory, calculateNetDebtToFCFHistory, calculateShareDilutionHistory } from "./utils/financialCalculations";
-import { calculateMetricScores, calculateOverallScore, calculateDataConfidenceScore, getUnavailableMetrics } from "./utils/scoring";
+import {
+  calculateAllMetrics,
+  calculateFCFMarginHistory,
+  calculateFCFConversionHistory,
+  calculateMarginStabilityHistory,
+  calculateNetDebtToFCFHistory,
+  calculateShareDilutionHistory,
+} from "./utils/financialCalculations";
+import {
+  calculateMetricScores,
+  calculateOverallScore,
+  calculateDataConfidenceScore,
+  getUnavailableMetrics,
+} from "./utils/scoring";
 import {
   calculateValuationMetrics,
   calculateValuationScores,
   calculateOverallValuationScore,
   calculateValuationConfidenceScore,
   getUnavailableValuationMetrics,
-  getValuationAnalysis
+  getValuationAnalysis,
 } from "./utils/valuationScoring";
 import { AnalysisResult } from "./types";
 
@@ -35,7 +47,9 @@ function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authPromptMessage, setAuthPromptMessage] = useState<string | null>(null);
+  const [authPromptMessage, setAuthPromptMessage] = useState<string | null>(
+    null,
+  );
   const [pendingTicker, setPendingTicker] = useState<string | null>(null);
 
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -46,7 +60,9 @@ function App() {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"fundamentals" | "valuation">("fundamentals");
+  const [activeTab, setActiveTab] = useState<"fundamentals" | "valuation">(
+    "fundamentals",
+  );
   const [showAllCharts, setShowAllCharts] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
@@ -110,43 +126,58 @@ function App() {
           balanceSheets,
           cashFlowStatements,
           keyMetrics,
-          financialRatios
+          financialRatios,
         );
         const valuationScores = calculateValuationScores(valuationMetrics);
-        const overallValuationScore = calculateOverallValuationScore(valuationScores);
-        const valuationConfidenceScore = calculateValuationConfidenceScore(valuationScores);
-        const unavailableValuationMetrics = getUnavailableValuationMetrics(valuationScores);
+        const overallValuationScore =
+          calculateOverallValuationScore(valuationScores);
+        const valuationConfidenceScore =
+          calculateValuationConfidenceScore(valuationScores);
+        const unavailableValuationMetrics =
+          getUnavailableValuationMetrics(valuationScores);
 
-        const fcfHistory = [...cashFlowStatements]
-          .reverse()
-          .map(s => {
-            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
-            const fcf = (s.operatingCashFlow || 0) - Math.abs(s.capitalExpenditure || 0);
-            return { label: year, value: fcf };
-          });
+        const fcfHistory = [...cashFlowStatements].reverse().map((s) => {
+          const year = s.date
+            ? new Date(s.date).getFullYear().toString()
+            : "N/A";
+          const fcf =
+            (s.operatingCashFlow || 0) - Math.abs(s.capitalExpenditure || 0);
+          return { label: year, value: fcf };
+        });
 
-        const revenueHistory = [...incomeStatements]
-          .reverse()
-          .map(s => {
-            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
-            return { label: year, value: s.revenue || 0 };
-          });
+        const revenueHistory = [...incomeStatements].reverse().map((s) => {
+          const year = s.date
+            ? new Date(s.date).getFullYear().toString()
+            : "N/A";
+          return { label: year, value: s.revenue || 0 };
+        });
 
-        const epsHistory = [...incomeStatements]
-          .reverse()
-          .map(s => {
-            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
-            return { label: year, value: s.eps || 0 };
-          });
+        const epsHistory = [...incomeStatements].reverse().map((s) => {
+          const year = s.date
+            ? new Date(s.date).getFullYear().toString()
+            : "N/A";
+          return { label: year, value: s.eps || 0 };
+        });
 
         const roicHistory = [...incomeStatements]
           .reverse()
-          .map(s => {
-            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
-            const matchBalance = balanceSheets.find(b => b.date && new Date(b.date).getFullYear().toString() === year);
+          .map((s) => {
+            const year = s.date
+              ? new Date(s.date).getFullYear().toString()
+              : "N/A";
+            const matchBalance = balanceSheets.find(
+              (b) =>
+                b.date && new Date(b.date).getFullYear().toString() === year,
+            );
             let roicVal = 0;
-            if (matchBalance && s.operatingIncome && matchBalance.totalEquity && matchBalance.totalDebt) {
-              const investedCapital = matchBalance.totalEquity + matchBalance.totalDebt;
+            if (
+              matchBalance &&
+              s.operatingIncome &&
+              matchBalance.totalEquity &&
+              matchBalance.totalDebt
+            ) {
+              const investedCapital =
+                matchBalance.totalEquity + matchBalance.totalDebt;
               let taxRate = 0.25;
               if (s.netIncome && s.operatingIncome > 0) {
                 taxRate = Math.max(0, 1 - s.netIncome / s.operatingIncome);
@@ -157,36 +188,63 @@ function App() {
             }
             return { label: year, value: roicVal };
           })
-          .filter(item => item.value !== 0);
+          .filter((item) => item.value !== 0);
 
-        const debtEquityHistory = [...balanceSheets]
-          .reverse()
-          .map(s => {
-            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
-            const debtToEquity = s.totalEquity ? (s.totalDebt || 0) / s.totalEquity : 0;
-            return { label: year, value: debtToEquity };
-          });
+        const debtEquityHistory = [...balanceSheets].reverse().map((s) => {
+          const year = s.date
+            ? new Date(s.date).getFullYear().toString()
+            : "N/A";
+          const debtToEquity = s.totalEquity
+            ? (s.totalDebt || 0) / s.totalEquity
+            : 0;
+          return { label: year, value: debtToEquity };
+        });
 
         const profitabilityHistory = [...incomeStatements]
           .reverse()
-          .map(s => {
-            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
-            const netMargin = s.revenue ? ((s.netIncome || 0) / s.revenue) * 100 : 0;
+          .map((s) => {
+            const year = s.date
+              ? new Date(s.date).getFullYear().toString()
+              : "N/A";
+            const netMargin = s.revenue
+              ? ((s.netIncome || 0) / s.revenue) * 100
+              : 0;
             return { label: year, value: netMargin };
           });
 
-        const fcfMarginHistory = calculateFCFMarginHistory(incomeStatements, cashFlowStatements);
-        const fcfConversionHistory = calculateFCFConversionHistory(incomeStatements, cashFlowStatements);
-        const marginStabilityHistory = calculateMarginStabilityHistory(incomeStatements);
-        const netDebtToFCFHistory = calculateNetDebtToFCFHistory(balanceSheets, cashFlowStatements);
-        const shareDilutionHistory = calculateShareDilutionHistory(incomeStatements, balanceSheets);
+        const fcfMarginHistory = calculateFCFMarginHistory(
+          incomeStatements,
+          cashFlowStatements,
+        );
+        const fcfConversionHistory = calculateFCFConversionHistory(
+          incomeStatements,
+          cashFlowStatements,
+        );
+        const marginStabilityHistory =
+          calculateMarginStabilityHistory(incomeStatements);
+        const netDebtToFCFHistory = calculateNetDebtToFCFHistory(
+          balanceSheets,
+          cashFlowStatements,
+        );
+        const shareDilutionHistory = calculateShareDilutionHistory(
+          incomeStatements,
+          balanceSheets,
+        );
 
         // 1. P/E Ratio History
         const peHistory = [...incomeStatements]
           .reverse()
-          .map(s => {
-            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
-            const matchRatio = financialRatios ? financialRatios.find((r: any) => r.date && new Date(r.date).getFullYear().toString() === year) : null;
+          .map((s) => {
+            const year = s.date
+              ? new Date(s.date).getFullYear().toString()
+              : "N/A";
+            const matchRatio = financialRatios
+              ? financialRatios.find(
+                  (r: any) =>
+                    r.date &&
+                    new Date(r.date).getFullYear().toString() === year,
+                )
+              : null;
             let val = matchRatio?.priceToEarningsRatio;
             if (!val || val <= 0) {
               if (profile.price && s.eps && s.eps > 0) {
@@ -197,14 +255,25 @@ function App() {
             }
             return { label: year, value: val && val > 0 ? val : null };
           })
-          .filter((item): item is { label: string; value: number } => item.value !== null && isFinite(item.value));
+          .filter(
+            (item): item is { label: string; value: number } =>
+              item.value !== null && isFinite(item.value),
+          );
 
         // 2. P/S Ratio History
         const psHistory = [...incomeStatements]
           .reverse()
-          .map(s => {
-            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
-            const matchRatio = financialRatios ? financialRatios.find((r: any) => r.date && new Date(r.date).getFullYear().toString() === year) : null;
+          .map((s) => {
+            const year = s.date
+              ? new Date(s.date).getFullYear().toString()
+              : "N/A";
+            const matchRatio = financialRatios
+              ? financialRatios.find(
+                  (r: any) =>
+                    r.date &&
+                    new Date(r.date).getFullYear().toString() === year,
+                )
+              : null;
             let val = matchRatio?.priceToSalesRatio;
             if (!val || val <= 0) {
               if (profile.mktCap && s.revenue && s.revenue > 0) {
@@ -213,18 +282,37 @@ function App() {
             }
             return { label: year, value: val && val > 0 ? val : null };
           })
-          .filter((item): item is { label: string; value: number } => item.value !== null && isFinite(item.value));
+          .filter(
+            (item): item is { label: string; value: number } =>
+              item.value !== null && isFinite(item.value),
+          );
 
         // 3. EV/Sales History
         const evsHistory = [...incomeStatements]
           .reverse()
-          .map(s => {
-            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
-            const matchMetric = keyMetrics ? keyMetrics.find((m: any) => m.date && new Date(m.date).getFullYear().toString() === year) : null;
+          .map((s) => {
+            const year = s.date
+              ? new Date(s.date).getFullYear().toString()
+              : "N/A";
+            const matchMetric = keyMetrics
+              ? keyMetrics.find(
+                  (m: any) =>
+                    m.date &&
+                    new Date(m.date).getFullYear().toString() === year,
+                )
+              : null;
             let val = matchMetric?.evToSales;
             if (!val || val <= 0) {
-              const matchBalance = balanceSheets.find(b => b.date && new Date(b.date).getFullYear().toString() === year);
-              if (profile.mktCap && s.revenue && s.revenue > 0 && matchBalance) {
+              const matchBalance = balanceSheets.find(
+                (b) =>
+                  b.date && new Date(b.date).getFullYear().toString() === year,
+              );
+              if (
+                profile.mktCap &&
+                s.revenue &&
+                s.revenue > 0 &&
+                matchBalance
+              ) {
                 const totalDebt = matchBalance.totalDebt || 0;
                 const cash = matchBalance.cashAndCashEquivalents || 0;
                 const ev = profile.mktCap + totalDebt - cash;
@@ -233,30 +321,52 @@ function App() {
             }
             return { label: year, value: val && val > 0 ? val : null };
           })
-          .filter((item): item is { label: string; value: number } => item.value !== null && isFinite(item.value));
+          .filter(
+            (item): item is { label: string; value: number } =>
+              item.value !== null && isFinite(item.value),
+          );
 
         // 4. P/FCF Ratio History
         const pfcfHistory = [...cashFlowStatements]
           .reverse()
-          .map(s => {
-            const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
-            const matchRatio = financialRatios ? financialRatios.find((r: any) => r.date && new Date(r.date).getFullYear().toString() === year) : null;
+          .map((s) => {
+            const year = s.date
+              ? new Date(s.date).getFullYear().toString()
+              : "N/A";
+            const matchRatio = financialRatios
+              ? financialRatios.find(
+                  (r: any) =>
+                    r.date &&
+                    new Date(r.date).getFullYear().toString() === year,
+                )
+              : null;
             let val = matchRatio?.priceToFreeCashFlowRatio;
             if (!val || val <= 0) {
-              const fcf = (s.operatingCashFlow || 0) - Math.abs(s.capitalExpenditure || 0);
+              const fcf =
+                (s.operatingCashFlow || 0) -
+                Math.abs(s.capitalExpenditure || 0);
               if (profile.mktCap && fcf > 0) {
                 val = profile.mktCap / fcf;
               }
             }
             return { label: year, value: val && val > 0 ? val : null };
           })
-          .filter((item): item is { label: string; value: number } => item.value !== null && isFinite(item.value));
+          .filter(
+            (item): item is { label: string; value: number } =>
+              item.value !== null && isFinite(item.value),
+          );
 
         // 5. Valuation Premium History (% premium vs average)
-        const peAvg = peHistory.length > 0 ? peHistory.reduce((a, b) => a + b.value, 0) / peHistory.length : null;
-        const psAvg = psHistory.length > 0 ? psHistory.reduce((a, b) => a + b.value, 0) / psHistory.length : null;
-        const valuationPremiumHistory = peHistory.map(item => {
-          const matchPs = psHistory.find(p => p.label === item.label);
+        const peAvg =
+          peHistory.length > 0
+            ? peHistory.reduce((a, b) => a + b.value, 0) / peHistory.length
+            : null;
+        const psAvg =
+          psHistory.length > 0
+            ? psHistory.reduce((a, b) => a + b.value, 0) / psHistory.length
+            : null;
+        const valuationPremiumHistory = peHistory.map((item) => {
+          const matchPs = psHistory.find((p) => p.label === item.label);
           let sum = 0;
           let count = 0;
           if (peAvg && item.value) {
@@ -291,7 +401,7 @@ function App() {
           marginStabilityHistory,
           netDebtToFCFHistory,
           shareDilutionHistory,
-          
+
           valuationMetrics,
           valuationScores,
           overallValuationScore,
@@ -315,12 +425,26 @@ function App() {
         setResult(null);
       }
     } catch (err: any) {
-      if (err?.code === "LOGIN_REQUIRED" || err?.message?.includes("LOGIN_REQUIRED") || err?.message?.includes("limit of 2")) {
+      if (
+        err?.code === "LOGIN_REQUIRED" ||
+        err?.message?.includes("LOGIN_REQUIRED") ||
+        err?.message?.includes("limit of 2")
+      ) {
         setPendingTicker(ticker);
-        setAuthPromptMessage(err.message || "You have reached your limit of 2 free anonymous stock analyses. Please sign up or log in to continue.");
+        setAuthPromptMessage(
+          err.message ||
+            "You have reached your limit of 2 free anonymous stock analyses. Please sign up or log in to continue.",
+        );
         setShowAuthModal(true);
       } else {
-        const errMsg = typeof err === "string" ? err : (typeof err?.message === "string" ? err.message : (err?.message ? JSON.stringify(err.message) : "An error occurred while analyzing the stock"));
+        const errMsg =
+          typeof err === "string"
+            ? err
+            : typeof err?.message === "string"
+              ? err.message
+              : err?.message
+                ? JSON.stringify(err.message)
+                : "An error occurred while analyzing the stock";
         setError(errMsg);
       }
     } finally {
@@ -328,16 +452,19 @@ function App() {
     }
   }, []);
 
-  const handleAuthSuccess = useCallback((userProfile: UserProfile) => {
-    setUser(userProfile);
-    setShowAuthModal(false);
-    setAuthPromptMessage(null);
-    if (pendingTicker) {
-      const tickerToRetry = pendingTicker;
-      setPendingTicker(null);
-      handleSearch(tickerToRetry);
-    }
-  }, [pendingTicker, handleSearch]);
+  const handleAuthSuccess = useCallback(
+    (userProfile: UserProfile) => {
+      setUser(userProfile);
+      setShowAuthModal(false);
+      setAuthPromptMessage(null);
+      if (pendingTicker) {
+        const tickerToRetry = pendingTicker;
+        setPendingTicker(null);
+        handleSearch(tickerToRetry);
+      }
+    },
+    [pendingTicker, handleSearch],
+  );
 
   const handleRetry = useCallback(() => {
     setError(null);
@@ -358,7 +485,11 @@ function App() {
     return (
       <>
         <div className="fixed top-4 left-4 z-40">
-          <UserHeader user={user} onLogout={handleLogout} onLoginRequest={() => setShowAuthModal(true)} />
+          <UserHeader
+            user={user}
+            onLogout={handleLogout}
+            onLoginRequest={() => setShowAuthModal(true)}
+          />
         </div>
         <ThemeToggle />
         <LoadingSpinner message="Analyzing company fundamentals..." />
@@ -380,7 +511,11 @@ function App() {
     return (
       <>
         <div className="fixed top-4 left-4 z-40">
-          <UserHeader user={user} onLogout={handleLogout} onLoginRequest={() => setShowAuthModal(true)} />
+          <UserHeader
+            user={user}
+            onLogout={handleLogout}
+            onLoginRequest={() => setShowAuthModal(true)}
+          />
         </div>
         <ThemeToggle />
         <ErrorMessage
@@ -406,7 +541,11 @@ function App() {
     return (
       <>
         <div className="fixed top-4 left-4 z-40">
-          <UserHeader user={user} onLogout={handleLogout} onLoginRequest={() => setShowAuthModal(true)} />
+          <UserHeader
+            user={user}
+            onLogout={handleLogout}
+            onLoginRequest={() => setShowAuthModal(true)}
+          />
         </div>
         <ThemeToggle />
         <StockSearch onSearch={handleSearch} isLoading={isLoading} />
@@ -428,7 +567,11 @@ function App() {
     return (
       <>
         <div className="fixed top-4 left-4 z-40">
-          <UserHeader user={user} onLogout={handleLogout} onLoginRequest={() => setShowAuthModal(true)} />
+          <UserHeader
+            user={user}
+            onLogout={handleLogout}
+            onLoginRequest={() => setShowAuthModal(true)}
+          />
         </div>
         <ThemeToggle />
         <ProfileOnlyPage
@@ -460,7 +603,11 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 py-8 px-4 transition-colors duration-300">
       <div className="fixed top-4 left-4 z-40">
-        <UserHeader user={user} onLogout={handleLogout} onLoginRequest={() => setShowAuthModal(true)} />
+        <UserHeader
+          user={user}
+          onLogout={handleLogout}
+          onLoginRequest={() => setShowAuthModal(true)}
+        />
       </div>
       <ThemeToggle />
       <div className="max-w-7xl mx-auto">
@@ -491,7 +638,10 @@ function App() {
             <CompanyHeader profile={result.companyProfile} />
           </div>
           <div className="lg:col-span-5">
-            <StockNews ticker={result.ticker} companyName={result.companyProfile.companyName} />
+            <StockNews
+              ticker={result.ticker}
+              companyName={result.companyProfile.companyName}
+            />
           </div>
         </div>
 
@@ -506,7 +656,12 @@ function App() {
           <p className="text-sm text-blue-800 dark:text-blue-300 flex items-start gap-2.5">
             <span className="text-lg">💡</span>
             <span>
-              <strong>Valuation vs. Business Quality:</strong> These metrics evaluate different aspects. A company can have exceptional business fundamentals (high Business Quality) but be trading at an expensive stock price (low Valuation). Conversely, a weak or struggling business can be highly attractive on a valuation basis if the stock trades at a deep discount.
+              <strong>Valuation vs. Business Quality:</strong> These metrics
+              evaluate different aspects. A company can have exceptional
+              business fundamentals (high Business Quality) but be trading at an
+              expensive stock price (low Valuation). Conversely, a weak or
+              struggling business can be highly attractive on a valuation basis
+              if the stock trades at a deep discount.
             </span>
           </p>
         </div>
@@ -590,7 +745,9 @@ function App() {
                       </span>
                     </div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                      These 7 universal metrics apply broadly across all industries and directly determine the overall company rating.
+                      These universal metrics apply broadly across all
+                      industries and directly determine the overall company
+                      rating.
                     </p>
                   </div>
                   {result.fcfHistory && result.fcfHistory.length > 0 && (
@@ -598,7 +755,11 @@ function App() {
                       onClick={() => setShowAllCharts(!showAllCharts)}
                       className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-white hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-blue-200 dark:border-blue-800/50 rounded-lg shadow-sm transition-all duration-200"
                     >
-                      <span>{showAllCharts ? "Hide All Trend Charts" : "Show All Trend Charts"}</span>
+                      <span>
+                        {showAllCharts
+                          ? "Hide All Trend Charts"
+                          : "Show All Trend Charts"}
+                      </span>
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
@@ -607,7 +768,11 @@ function App() {
                         stroke="currentColor"
                         className={`w-3.5 h-3.5 transition-transform duration-200 ${showAllCharts ? "rotate-180" : ""}`}
                       >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                        />
                       </svg>
                     </button>
                   )}
@@ -684,12 +849,17 @@ function App() {
                     chartData={result.marginStabilityHistory}
                     chartValueType="percent"
                     referenceLineValue={
-                      result.marginStabilityHistory && result.marginStabilityHistory.length > 0
-                        ? result.marginStabilityHistory.reduce((a, b) => a + b.value, 0) / result.marginStabilityHistory.length
+                      result.marginStabilityHistory &&
+                      result.marginStabilityHistory.length > 0
+                        ? result.marginStabilityHistory.reduce(
+                            (a, b) => a + b.value,
+                            0,
+                          ) / result.marginStabilityHistory.length
                         : undefined
                     }
                     referenceLineLabel={
-                      result.marginStabilityHistory && result.marginStabilityHistory.length > 0
+                      result.marginStabilityHistory &&
+                      result.marginStabilityHistory.length > 0
                         ? `Avg: ${(result.marginStabilityHistory.reduce((a, b) => a + b.value, 0) / result.marginStabilityHistory.length).toFixed(1)}%`
                         : undefined
                     }
@@ -734,7 +904,11 @@ function App() {
                     value={result.metrics.revenueCAGR}
                     unit="%"
                     score={result.scores.revenue}
-                    description={result.revenueHistory && result.revenueHistory.length > 1 ? `${result.revenueHistory.length - 1}-year CAGR` : "CAGR"}
+                    description={
+                      result.revenueHistory && result.revenueHistory.length > 1
+                        ? `${result.revenueHistory.length - 1}-year CAGR`
+                        : "CAGR"
+                    }
                     tooltip="The average yearly growth rate of the company's sales over the historical period. Consistent revenue growth can indicate increasing demand and a growing business."
                     icon="📈"
                     chartData={result.revenueHistory}
@@ -750,7 +924,11 @@ function App() {
                     changePct={result.metrics.epsChangePct}
                     unit="%"
                     score={result.scores.eps}
-                    description={result.epsHistory && result.epsHistory.length > 1 ? `${result.epsHistory.length - 1}-year CAGR` : "CAGR"}
+                    description={
+                      result.epsHistory && result.epsHistory.length > 1
+                        ? `${result.epsHistory.length - 1}-year CAGR`
+                        : "CAGR"
+                    }
                     tooltip="The average yearly growth rate of the company's earnings per share over the historical period. Consistent EPS growth can indicate a company's ability to generate increasing profits."
                     icon="💹"
                     chartData={result.epsHistory}
@@ -775,7 +953,9 @@ function App() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    These metrics provide additional financial analysis (such as leverage or profit margins) but do not alter the main Universal Score.
+                    These metrics provide additional financial analysis (such as
+                    leverage or profit margins) but do not alter the main
+                    Universal Score.
                   </p>
                 </div>
 
@@ -787,7 +967,11 @@ function App() {
                     changePct={result.metrics.fcfBurnChangePct}
                     unit="%"
                     score={result.scores.fcf}
-                    description={result.fcfHistory && result.fcfHistory.length > 1 ? `${result.fcfHistory.length - 1}-year CAGR` : "CAGR"}
+                    description={
+                      result.fcfHistory && result.fcfHistory.length > 1
+                        ? `${result.fcfHistory.length - 1}-year CAGR`
+                        : "CAGR"
+                    }
                     tooltip="The average yearly growth rate of the company's free cash flow over the historical period."
                     icon="💰"
                     chartData={result.fcfHistory}
@@ -838,9 +1022,21 @@ function App() {
               <AnalysisTable
                 metrics={result.metrics}
                 scores={result.scores}
-                revenueYears={result.revenueHistory && result.revenueHistory.length > 1 ? result.revenueHistory.length - 1 : undefined}
-                epsYears={result.epsHistory && result.epsHistory.length > 1 ? result.epsHistory.length - 1 : undefined}
-                fcfYears={result.fcfHistory && result.fcfHistory.length > 1 ? result.fcfHistory.length - 1 : undefined}
+                revenueYears={
+                  result.revenueHistory && result.revenueHistory.length > 1
+                    ? result.revenueHistory.length - 1
+                    : undefined
+                }
+                epsYears={
+                  result.epsHistory && result.epsHistory.length > 1
+                    ? result.epsHistory.length - 1
+                    : undefined
+                }
+                fcfYears={
+                  result.fcfHistory && result.fcfHistory.length > 1
+                    ? result.fcfHistory.length - 1
+                    : undefined
+                }
               />
             </div>
 
@@ -852,9 +1048,10 @@ function App() {
               <div className="space-y-4 text-slate-600 dark:text-slate-300">
                 {result.metrics.revenueCAGR !== null && (
                   <p>
-                    <strong>Revenue Trend:</strong> The company's revenue has grown
-                    at a CAGR of {(result.metrics.revenueCAGR * 100).toFixed(2)}%
-                    over the past 10 years.{" "}
+                    <strong>Revenue Trend:</strong> The company's revenue has
+                    grown at a CAGR of{" "}
+                    {(result.metrics.revenueCAGR * 100).toFixed(2)}% over the
+                    past 10 years.{" "}
                     {result.metrics.revenueCAGR > 0.15
                       ? "This demonstrates excellent revenue growth."
                       : result.metrics.revenueCAGR > 0.08
@@ -864,8 +1061,9 @@ function App() {
                 )}
                 {result.metrics.debtToEquity !== null && (
                   <p>
-                    <strong>Financial Health:</strong> With a debt-to-equity ratio
-                    of {result.metrics.debtToEquity.toFixed(2)}, the company{" "}
+                    <strong>Financial Health:</strong> With a debt-to-equity
+                    ratio of {result.metrics.debtToEquity.toFixed(2)}, the
+                    company{" "}
                     {result.metrics.debtToEquity < 0.5
                       ? "maintains conservative leverage with low financial risk."
                       : result.metrics.debtToEquity <= 1
@@ -888,8 +1086,9 @@ function App() {
                 )}
                 {result.metrics.fcfGrowth !== null && (
                   <p>
-                    <strong>Cash Generation:</strong> Free cash flow has grown at{" "}
-                    {(result.metrics.fcfGrowth * 100).toFixed(2)}% CAGR, showing{" "}
+                    <strong>Cash Generation:</strong> Free cash flow has grown
+                    at {(result.metrics.fcfGrowth * 100).toFixed(2)}% CAGR,
+                    showing{" "}
                     {result.metrics.fcfGrowth > 0.1
                       ? "excellent cash generation capability."
                       : result.metrics.fcfGrowth > 0.05
@@ -916,7 +1115,11 @@ function App() {
                     onClick={() => setShowAllCharts(!showAllCharts)}
                     className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-950/60 border border-blue-100 dark:border-blue-800/40 rounded-lg shadow-sm transition-all duration-200"
                   >
-                    <span>{showAllCharts ? "Hide All Trend Charts" : "Show All Trend Charts"}</span>
+                    <span>
+                      {showAllCharts
+                        ? "Hide All Trend Charts"
+                        : "Show All Trend Charts"}
+                    </span>
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       fill="none"
@@ -925,7 +1128,11 @@ function App() {
                       stroke="currentColor"
                       className={`w-3 h-3 transition-transform duration-200 ${showAllCharts ? "rotate-180" : ""}`}
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                      />
                     </svg>
                   </button>
                 )}
@@ -985,7 +1192,11 @@ function App() {
                 />
                 <MetricCard
                   title="Historical Valuation Premium"
-                  value={result.valuationMetrics.averagePremium !== null ? result.valuationMetrics.averagePremium * 100 : null}
+                  value={
+                    result.valuationMetrics.averagePremium !== null
+                      ? result.valuationMetrics.averagePremium * 100
+                      : null
+                  }
                   unit="%"
                   score={result.valuationScores.historical}
                   description="Vs. Historical Average"
@@ -1018,15 +1229,22 @@ function App() {
               </h2>
               <div className="space-y-4 text-slate-600 dark:text-slate-300">
                 <p>
-                  <strong>Current Valuation Stance:</strong> According to our scoring system, the stock's valuation is rated as{" "}
-                  <strong className={
-                    result.overallValuationScore >= 80 ? "text-green-600 dark:text-green-400" :
-                    result.overallValuationScore >= 60 ? "text-blue-600 dark:text-blue-400" :
-                    result.overallValuationScore >= 40 ? "text-amber-600 dark:text-amber-400" :
-                    "text-red-600 dark:text-red-400"
-                  }>
+                  <strong>Current Valuation Stance:</strong> According to our
+                  scoring system, the stock's valuation is rated as{" "}
+                  <strong
+                    className={
+                      result.overallValuationScore >= 80
+                        ? "text-green-600 dark:text-green-400"
+                        : result.overallValuationScore >= 60
+                          ? "text-blue-600 dark:text-blue-400"
+                          : result.overallValuationScore >= 40
+                            ? "text-amber-600 dark:text-amber-400"
+                            : "text-red-600 dark:text-red-400"
+                    }
+                  >
                     {getValuationAnalysis(result.overallValuationScore).label}
-                  </strong>.
+                  </strong>
+                  .
                 </p>
                 {result.valuationMetrics.peRatio !== null && (
                   <p>
@@ -1041,10 +1259,16 @@ function App() {
                 )}
                 {result.valuationMetrics.averagePremium !== null && (
                   <p>
-                    <strong>Historical Comparison:</strong> The current stock valuation represents a{" "}
+                    <strong>Historical Comparison:</strong> The current stock
+                    valuation represents a{" "}
                     <strong>
-                      {result.valuationMetrics.averagePremium >= 0 ? "premium of " : "discount of "}
-                      {Math.abs(result.valuationMetrics.averagePremium * 100).toFixed(1)}%
+                      {result.valuationMetrics.averagePremium >= 0
+                        ? "premium of "
+                        : "discount of "}
+                      {Math.abs(
+                        result.valuationMetrics.averagePremium * 100,
+                      ).toFixed(1)}
+                      %
                     </strong>{" "}
                     against its 10-year historical multiples.
                   </p>
