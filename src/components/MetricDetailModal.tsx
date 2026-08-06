@@ -302,10 +302,11 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           referenceLineValue: 0,
           referenceLineLabel: "0% Baseline",
           description: "Measures whether management creates or reduces shareholder ownership value over time.",
-          formula: "Share Dilution = ((Current Shares - Historical Shares) / Historical Shares) * 100",
+          formula: "Annual Share Count Change (%) = ((Current Shares / Historical Shares)^(1 / Number of Years) - 1) * 100",
           mathExplanation: [
-            `1. Share Change over Period: ${result.metrics.shareDilution !== null ? formatPercentageMetric(result.metrics.shareDilution, true) : "N/A"}`,
-            `2. Negative percentage indicates share buybacks (accretive). Positive percentage indicates share issuance (dilutive).`,
+            `1. Annualized Share Change (CAGR): ${result.metrics.shareDilution !== null ? (result.metrics.shareDilution > 0 ? `+${result.metrics.shareDilution.toFixed(2)}% / year` : `${result.metrics.shareDilution.toFixed(2)}% / year`) : "N/A"}`,
+            `2. Data Source: FMP Diluted Weighted Average Shares (weightedAverageShsOutDil), with Basic Shares (weightedAverageShsOut) fallback.`,
+            `3. Negative percentage indicates share count reduced through buybacks (accretive). Positive percentage indicates share count increased (dilutive).`,
           ],
           whyItMatters: "Measures whether management creates or reduces shareholder ownership value over time. Consistent buybacks increase per-share equity value, while excessive stock issuance dilutes existing owners.",
           tiers: [

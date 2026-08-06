@@ -25,6 +25,8 @@ export interface FinancialStatement {
   operatingCashFlow?: number;
   capitalExpenditure?: number;
   shares?: number;
+  weightedAverageShsOutDil?: number;
+  weightedAverageShsOut?: number;
   eps?: number;
   totalAssets?: number;
   totalDebt?: number;

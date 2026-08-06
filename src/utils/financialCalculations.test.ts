@@ -1468,39 +1468,38 @@ describe("calculateNetDebtToFCF", () => {
 });
 
 describe("calculateShareDilution", () => {
-  it("should calculate negative percentage change for share buybacks", () => {
+  it("should calculate negative CAGR percentage change for share buybacks using diluted shares", () => {
     const income = [
-      { date: "2024-12-31", weightedAverageSharesDiluted: 90 },
-      { date: "2020-12-31", weightedAverageSharesDiluted: 100 },
+      { date: "2024-12-31", weightedAverageShsOutDil: 90 },
+      { date: "2020-12-31", weightedAverageShsOutDil: 100 },
     ];
-    // (90 - 100) / 100 = -10% buyback
-    expect(calculateShareDilution(income)).toBe(-10.0);
+    // (90 / 100) ^ (1/4) - 1 = -2.60%
+    expect(calculateShareDilution(income)).toBe(-2.6);
   });
 
   it("should calculate zero percentage change for stable shares", () => {
     const income = [
-      { date: "2024-12-31", weightedAverageSharesDiluted: 100 },
-      { date: "2020-12-31", weightedAverageSharesDiluted: 100 },
+      { date: "2024-12-31", weightedAverageShsOutDil: 100 },
+      { date: "2020-12-31", weightedAverageShsOutDil: 100 },
     ];
     expect(calculateShareDilution(income)).toBe(0.0);
   });
 
-  it("should calculate positive percentage for moderate share dilution", () => {
+  it("should calculate positive CAGR percentage for share dilution", () => {
     const income = [
-      { date: "2024-12-31", weightedAverageSharesDiluted: 104 },
-      { date: "2020-12-31", weightedAverageSharesDiluted: 100 },
+      { date: "2024-12-31", weightedAverageShsOutDil: 115 },
+      { date: "2020-12-31", weightedAverageShsOutDil: 100 },
     ];
-    // (104 - 100) / 100 = +4.0%
-    expect(calculateShareDilution(income)).toBe(4.0);
+    // (115 / 100) ^ (1/4) - 1 = +3.56%
+    expect(calculateShareDilution(income)).toBe(3.56);
   });
 
-  it("should calculate positive percentage for significant share dilution", () => {
+  it("should fall back to basic shares (weightedAverageShsOut) if diluted shares are missing", () => {
     const income = [
-      { date: "2024-12-31", weightedAverageSharesDiluted: 115 },
-      { date: "2020-12-31", weightedAverageSharesDiluted: 100 },
+      { date: "2024-12-31", weightedAverageShsOut: 90 },
+      { date: "2020-12-31", weightedAverageShsOut: 100 },
     ];
-    // (115 - 100) / 100 = +15.0%
-    expect(calculateShareDilution(income)).toBe(15.0);
+    expect(calculateShareDilution(income)).toBe(-2.6);
   });
 
   it("should handle missing share history safely and return null", () => {
@@ -1524,10 +1523,10 @@ describe("calculateShareDilution", () => {
     expect(history[1]).toEqual({ label: "2024", value: 2.0 });
   });
 
-  it("should generate Share Dilution history array correctly", () => {
+  it("should generate Share Dilution history array correctly using FMP fields", () => {
     const income = [
-      { date: "2024-12-31", weightedAverageSharesDiluted: 90 },
-      { date: "2023-12-31", weightedAverageSharesDiluted: 100 },
+      { date: "2024-12-31", weightedAverageShsOutDil: 90 },
+      { date: "2023-12-31", weightedAverageShsOutDil: 100 },
     ];
     const history = calculateShareDilutionHistory(income);
     expect(history.length).toBe(2);

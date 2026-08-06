@@ -134,6 +134,9 @@ class FinancialModelingPrepService {
         grossProfit: statement.grossProfit,
         operatingIncome: statement.operatingIncome,
         eps: statement.eps,
+        weightedAverageShsOutDil: statement.weightedAverageShsOutDil ?? statement.weightedAverageSharesDiluted,
+        weightedAverageShsOut: statement.weightedAverageShsOut ?? statement.weightedAverageSharesOutstanding,
+        shares: statement.weightedAverageShsOutDil ?? statement.weightedAverageShsOut ?? statement.weightedAverageSharesDiluted ?? statement.weightedAverageSharesOutstanding,
       }));
     } catch (error) {
       throw this.handleError(error);

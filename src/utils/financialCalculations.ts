@@ -1217,56 +1217,94 @@ export function calculateNetDebtToFCFHistory(
  * Shareholder Value Metric: Share Dilution
  * Measures whether management creates or reduces shareholder ownership value over time.
  * Calculates percentage change in shares outstanding over historical measurement period:
- * Share Dilution = ((Current Shares - Historical Shares) / Historical Shares) * 100
- * Negative value = Share buyback / ownership accretion (Positive)
- * Positive value = Share issuance / ownership dilution (Negative)
+/**
+ * Helper to extract historical weighted average shares from a financial statement.
+ * Data Source: Financial Modeling Prep (FMP) /income-statement endpoint.
+ * - Primary field: Diluted Weighted Average Shares Outstanding (`weightedAverageShsOutDil` or `weightedAverageSharesDiluted`)
+ * - Fallback field: Basic Weighted Average Shares Outstanding (`weightedAverageShsOut` or `weightedAverageSharesOutstanding` or `commonStockSharesOutstanding`)
+ */
+export function extractSharesFromStatement(s: FinancialStatement): { shares: number; fieldUsed: "diluted" | "basic" } | null {
+  if (!s) return null;
+
+  // 1. Primary: Diluted Weighted Average Shares Outstanding
+  const dilutedCandidates = [
+    s.weightedAverageShsOutDil,
+    (s as any).weightedAverageSharesDiluted,
+  ];
+  for (const c of dilutedCandidates) {
+    if (typeof c === "number" && c > 0 && isFinite(c)) {
+      return { shares: c, fieldUsed: "diluted" };
+    }
+  }
+
+  // 2. Fallback: Basic Weighted Average Shares Outstanding
+  const basicCandidates = [
+    s.weightedAverageShsOut,
+    (s as any).weightedAverageSharesOutstanding,
+    (s as any).commonStockSharesOutstanding,
+    (s as any).sharesOutstanding,
+    s.shares,
+  ];
+  for (const c of basicCandidates) {
+    if (typeof c === "number" && c > 0 && isFinite(c)) {
+      return { shares: c, fieldUsed: "basic" };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Calculate Share Dilution (Annual Share Count Change CAGR %) over historical period.
+ * Data Source: FMP Income Statements (weightedAverageShsOutDil preferred, weightedAverageShsOut fallback).
+ * Formula: ((Current Shares / Historical Shares) ^ (1 / Number of Years) - 1) * 100
+ * Interpretation:
+ * - Negative CAGR (%) = Share count reduced (Buybacks / Accretive to equity)
+ * - Positive CAGR (%) = Share count increased (Dilution / Equity issuance)
+ * Returns null (N/A) when data is insufficient or invalid.
  */
 export function calculateShareDilution(
   incomeStatements: FinancialStatement[] | null | undefined,
   balanceSheets?: FinancialStatement[] | null | undefined,
 ): number | null {
-  if ((!incomeStatements || incomeStatements.length < 2) && (!balanceSheets || balanceSheets.length < 2)) {
+  if ((!incomeStatements || incomeStatements.length === 0) && (!balanceSheets || balanceSheets.length === 0)) {
     return null;
   }
 
-  const extractShares = (s: FinancialStatement): number | null => {
-    if (!s) return null;
-    const candidates = [
-      (s as any).weightedAverageSharesDiluted,
-      (s as any).weightedAverageSharesOutstanding,
-      (s as any).weightedAverageShsOut,
-      (s as any).commonStockSharesOutstanding,
-      (s as any).sharesOutstanding,
-    ];
-    for (const c of candidates) {
-      if (typeof c === "number" && c > 0 && isFinite(c)) return c;
-    }
-    return null;
-  };
-
-  const statements = [...(incomeStatements || []), ...(balanceSheets || [])]
-    .filter((s) => s && s.date && extractShares(s) !== null)
+  const combined = [...(incomeStatements || []), ...(balanceSheets || [])]
+    .filter((s) => s && s.date)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  if (statements.length < 2) return null;
+  if (combined.length < 2) return null;
 
   const yearlyMap = new Map<string, number>();
-  for (const s of statements) {
+  for (const s of combined) {
     const year = new Date(s.date).getFullYear().toString();
-    const shs = extractShares(s);
-    if (shs !== null) yearlyMap.set(year, shs);
+    const extracted = extractSharesFromStatement(s);
+    if (extracted !== null) {
+      yearlyMap.set(year, extracted.shares);
+    }
   }
 
-  const years = Array.from(yearlyMap.keys()).sort();
-  if (years.length < 2) return null;
+  const sortedYears = Array.from(yearlyMap.keys()).sort();
+  if (sortedYears.length < 2) return null;
 
-  const initialShares = yearlyMap.get(years[0])!;
-  const latestShares = yearlyMap.get(years[years.length - 1])!;
+  const initialShares = yearlyMap.get(sortedYears[0])!;
+  const latestShares = yearlyMap.get(sortedYears[sortedYears.length - 1])!;
 
   if (initialShares <= 0 || latestShares <= 0) return null;
 
-  const dilution = ((latestShares - initialShares) / initialShares) * 100;
-  return Number(dilution.toFixed(2));
+  const startYear = parseInt(sortedYears[0], 10);
+  const endYear = parseInt(sortedYears[sortedYears.length - 1], 10);
+  const yearDiff = endYear - startYear;
+  const numYears = yearDiff > 0 ? yearDiff : sortedYears.length - 1;
+
+  if (numYears <= 0) return null;
+
+  const cagr = (Math.pow(latestShares / initialShares, 1 / numYears) - 1) * 100;
+  if (isNaN(cagr) || !isFinite(cagr)) return null;
+
+  return Number(cagr.toFixed(2));
 }
 
 /**
@@ -1281,21 +1319,6 @@ export function calculateShareDilutionHistory(
     return [];
   }
 
-  const extractShares = (s: FinancialStatement): number | null => {
-    if (!s) return null;
-    const candidates = [
-      (s as any).weightedAverageSharesDiluted,
-      (s as any).weightedAverageSharesOutstanding,
-      (s as any).weightedAverageShsOut,
-      (s as any).commonStockSharesOutstanding,
-      (s as any).sharesOutstanding,
-    ];
-    for (const c of candidates) {
-      if (typeof c === "number" && c > 0 && isFinite(c)) return c;
-    }
-    return null;
-  };
-
   const yearlyMap = new Map<string, number>();
   const combined = [...(incomeStatements || []), ...(balanceSheets || [])]
     .filter((s) => s && s.date)
@@ -1303,8 +1326,10 @@ export function calculateShareDilutionHistory(
 
   for (const s of combined) {
     const year = new Date(s.date).getFullYear().toString();
-    const shs = extractShares(s);
-    if (shs !== null) yearlyMap.set(year, shs);
+    const extracted = extractSharesFromStatement(s);
+    if (extracted !== null) {
+      yearlyMap.set(year, extracted.shares);
+    }
   }
 
   const result: { label: string; value: number }[] = [];
