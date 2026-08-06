@@ -524,7 +524,6 @@ function App() {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
         <Navbar
-          currentView={currentView}
           onViewChange={setCurrentView}
           savedCount={savedStocks.length}
           user={user}
@@ -541,7 +540,6 @@ function App() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 transition-colors duration-300">
         <Navbar
-          currentView={currentView}
           onViewChange={setCurrentView}
           savedCount={savedStocks.length}
           user={user}
@@ -552,11 +550,7 @@ function App() {
           savedStocks={savedStocks}
           onSelectStock={handleSelectSavedStock}
           onRemoveStock={handleRemoveSavedStock}
-          onNewSearch={() => {
-            setCurrentView("analyze");
-            setResult(null);
-            setProfileOnly(null);
-          }}
+          onReturnToAnalysis={() => setCurrentView("analyze")}
         />
         {showAuthModal && (
           <AuthModal
@@ -576,7 +570,6 @@ function App() {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
         <Navbar
-          currentView={currentView}
           onViewChange={setCurrentView}
           savedCount={savedStocks.length}
           user={user}
@@ -602,7 +595,6 @@ function App() {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
         <Navbar
-          currentView={currentView}
           onViewChange={setCurrentView}
           savedCount={savedStocks.length}
           user={user}
@@ -632,7 +624,6 @@ function App() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 transition-colors duration-300">
         <Navbar
-          currentView={currentView}
           onViewChange={setCurrentView}
           savedCount={savedStocks.length}
           user={user}
@@ -658,7 +649,6 @@ function App() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 transition-colors duration-300">
         <Navbar
-          currentView={currentView}
           onViewChange={setCurrentView}
           savedCount={savedStocks.length}
           user={user}
@@ -694,7 +684,6 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 transition-colors duration-300">
       <Navbar
-        currentView={currentView}
         onViewChange={setCurrentView}
         savedCount={savedStocks.length}
         user={user}
