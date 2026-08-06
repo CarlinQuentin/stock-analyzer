@@ -219,3 +219,13 @@ export interface MarketMover {
   changesPercentage: number;
   exchange?: string;
 }
+
+export interface SavedStock {
+  ticker: string;
+  companyName: string;
+  score: number;
+  lastAnalyzed: string;
+  sector?: string;
+  industry?: string;
+  image?: string;
+}

@@ -3,20 +3,40 @@ import { CompanyProfile } from "../types";
 
 interface CompanyHeaderProps {
   profile: CompanyProfile;
+  isSaved?: boolean;
+  onToggleSave?: () => void;
 }
 
-export const CompanyHeader: React.FC<CompanyHeaderProps> = ({ profile }) => {
+export const CompanyHeader: React.FC<CompanyHeaderProps> = ({
+  profile,
+  isSaved = false,
+  onToggleSave,
+}) => {
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 h-full flex flex-col justify-between border border-transparent dark:border-slate-700/50 transition-colors duration-300">
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
               {profile.companyName}
             </h1>
             <span className="text-2xl font-bold text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-950/50 px-3 py-1 rounded border border-transparent dark:border-blue-800/40">
               {profile.symbol}
             </span>
+            {onToggleSave && (
+              <button
+                onClick={onToggleSave}
+                title={isSaved ? "Remove from saved stocks" : "Save stock for quick access"}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-full transition-all duration-200 shadow-sm transform hover:scale-105 active:scale-95 ${
+                  isSaved
+                    ? "bg-amber-500 hover:bg-amber-600 text-white border border-amber-600 shadow-amber-500/20"
+                    : "bg-slate-100 hover:bg-amber-50 dark:bg-slate-700 dark:hover:bg-amber-950/40 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 hover:border-amber-400 hover:text-amber-600 dark:hover:text-amber-400"
+                }`}
+              >
+                <span className="text-sm">{isSaved ? "⭐" : "☆"}</span>
+                <span>{isSaved ? "Saved" : "Save Stock"}</span>
+              </button>
+            )}
           </div>
           <p className="text-slate-600 dark:text-slate-300">
             {profile.sector && <span>{profile.sector}</span>}
