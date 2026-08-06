@@ -48,6 +48,14 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
       expect(scoreRevenueGrowth(0)).toBe(30);
     });
 
+    it("7. Formats Share Dilution percentage values correctly without double conversion", () => {
+      expect(formatPercentageMetric(-4.77, true)).toBe("-4.77%");
+      expect(formatPercentageMetric(-0.0477, true)).toBe("-4.77%");
+      expect(formatPercentageMetric(0.0215, true)).toBe("2.15%");
+      expect(formatPercentageMetric(2.15, true)).toBe("2.15%");
+      expect(formatPercentageMetric(-10.0, true)).toBe("-10%");
+    });
+
     it("7. ROIC = 25 displays as 25%", () => {
       expect(formatPercentageMetric(25, true)).toBe("25%");
     });

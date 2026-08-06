@@ -92,7 +92,9 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     title.toLowerCase().includes("margin") ||
     title.toLowerCase().includes("consistency") ||
     title.toLowerCase().includes("conversion") ||
-    title.toLowerCase().includes("stability");
+    title.toLowerCase().includes("stability") ||
+    title.toLowerCase().includes("dilution") ||
+    title.toLowerCase().includes("share");
 
   const formattedValue =
     typeof value === "number"
