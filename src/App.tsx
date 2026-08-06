@@ -68,9 +68,7 @@ function App() {
   const [showAllCharts, setShowAllCharts] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
-  const [savedStocks, setSavedStocks] = useState<SavedStock[]>(() =>
-    savedStocksService.getSavedStocks(),
-  );
+  const [savedStocks, setSavedStocks] = useState<SavedStock[]>([]);
   const [currentView, setCurrentView] = useState<"analyze" | "saved">("analyze");
 
   useEffect(() => {
@@ -82,14 +80,29 @@ function App() {
     });
   }, []);
 
+  // Fetch account-specific saved stocks whenever current user changes
+  useEffect(() => {
+    let isMounted = true;
+    savedStocksService.getSavedStocks(user?.id).then((stocks) => {
+      if (isMounted) {
+        setSavedStocks(stocks);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
+
   const handleLogout = useCallback(() => {
     authService.logout();
     setUser(null);
+    setSavedStocks([]); // Immediately clear cached saved stocks on sign out
     setResult(null);
     setProfileOnly(null);
+    setCurrentView("analyze");
   }, []);
 
-  const handleToggleSaveStock = useCallback(() => {
+  const handleToggleSaveStock = useCallback(async () => {
     if (!result) return;
     const stockToSave: SavedStock = {
       ticker: result.ticker,
@@ -100,14 +113,20 @@ function App() {
       image: result.companyProfile.image,
       lastAnalyzed: new Date().toISOString(),
     };
-    const { stocks } = savedStocksService.toggleSaveStock(stockToSave);
+    const { stocks } = await savedStocksService.toggleSaveStock(
+      stockToSave,
+      user?.id,
+    );
     setSavedStocks(stocks);
-  }, [result]);
+  }, [result, user?.id]);
 
-  const handleRemoveSavedStock = useCallback((ticker: string) => {
-    const stocks = savedStocksService.removeStock(ticker);
-    setSavedStocks(stocks);
-  }, []);
+  const handleRemoveSavedStock = useCallback(
+    async (ticker: string) => {
+      const stocks = await savedStocksService.removeStock(ticker, user?.id);
+      setSavedStocks(stocks);
+    },
+    [user?.id],
+  );
 
   const handleSearch = useCallback(async (ticker: string) => {
     setIsLoading(true);
@@ -441,16 +460,19 @@ function App() {
           valuationPremiumHistory,
         });
 
-        if (savedStocksService.isStockSaved(ticker)) {
-          const updatedStocks = savedStocksService.saveStock({
-            ticker,
-            companyName: profile.companyName,
-            score: overallScore,
-            sector: profile.sector,
-            industry: profile.industry,
-            image: profile.image,
-            lastAnalyzed: new Date().toISOString(),
-          });
+        if (savedStocksService.isStockSaved(ticker, savedStocks)) {
+          const updatedStocks = await savedStocksService.saveStock(
+            {
+              ticker,
+              companyName: profile.companyName,
+              score: overallScore,
+              sector: profile.sector,
+              industry: profile.industry,
+              image: profile.image,
+              lastAnalyzed: new Date().toISOString(),
+            },
+            user?.id,
+          );
           setSavedStocks(updatedStocks);
         }
 
@@ -739,7 +761,7 @@ function App() {
           <div className="lg:col-span-7">
             <CompanyHeader
               profile={result.companyProfile}
-              isSaved={savedStocksService.isStockSaved(result.ticker)}
+              isSaved={savedStocksService.isStockSaved(result.ticker, savedStocks)}
               onToggleSave={handleToggleSaveStock}
             />
           </div>

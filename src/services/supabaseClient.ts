@@ -31,13 +31,21 @@ export const isSupabaseConfigured = Boolean(
     supabaseUrl.startsWith("http")
 );
 
-// Fallback dummy URL to prevent createClient runtime crash if keys not configured yet
 const dummyUrl = "https://placeholder-project.supabase.co";
 const dummyKey = "placeholder-key";
 
+if (typeof window === "undefined" && typeof globalThis.WebSocket === "undefined") {
+  (globalThis as any).WebSocket = class DummyWebSocket {
+    addEventListener() {}
+    removeEventListener() {}
+    close() {}
+    send() {}
+  };
+}
+
 export const supabase: SupabaseClient = createClient(
   isSupabaseConfigured ? supabaseUrl : dummyUrl,
-  isSupabaseConfigured ? supabaseAnonKey : dummyKey
+  isSupabaseConfigured ? supabaseAnonKey : dummyKey,
 );
 
 /**
