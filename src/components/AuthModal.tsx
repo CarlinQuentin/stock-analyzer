@@ -71,82 +71,97 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md transition-all duration-300">
-      <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-2xl border border-slate-200/80 dark:border-slate-800 transition-all duration-300">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-md transition-all duration-300 overflow-hidden">
+      <div className="relative w-full max-w-md max-h-[calc(100vh-2rem)] sm:max-h-[88vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200/90 dark:border-slate-800 flex flex-col transition-all duration-300">
+        {/* Sticky/Pinned Close Button */}
         {onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 dark:hover:text-white p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            aria-label="Close modal"
+            className="absolute top-4 right-4 z-20 text-slate-400 hover:text-slate-700 dark:hover:text-white p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2.5}
+              stroke="currentColor"
+              className="w-5 h-5"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         )}
 
-        {/* Custom Prompt Banner (Quota Exceeded) */}
-        {customPrompt && (
-          <div className="mb-6 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex items-start gap-3">
-            <span className="text-xl">🔒</span>
-            <div className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed font-medium">
-              <strong className="block mb-0.5 text-amber-900 dark:text-amber-100 font-bold">Limit Reached</strong>
-              {customPrompt}
+        {/* Scrollable Content Container */}
+        <div className="overflow-y-auto p-6 sm:p-8 flex-1">
+          {/* Custom Prompt Banner (Quota Exceeded) */}
+          {customPrompt && (
+            <div className="mb-6 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex items-start gap-3 pr-10">
+              <span className="text-xl">🔒</span>
+              <div className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed font-medium">
+                <strong className="block mb-0.5 text-amber-900 dark:text-amber-100 font-bold">
+                  Limit Reached
+                </strong>
+                {customPrompt}
+              </div>
+            </div>
+          )}
+
+          {/* Brand Header */}
+          <div className="text-center mb-6">
+            <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-blue-500/25">
+              <span className="text-2xl">📈</span>
+            </div>
+            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-1">
+              Investor's Edge
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+              Create an account to preserve your analyses & unlock unlimited searches
+            </p>
+
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100/80 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/50 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+              <span>⚡</span>
+              <span>
+                {isSupabaseConfigured
+                  ? "Connected to Supabase Auth"
+                  : "Supabase Auth Ready (Local Mode)"}
+              </span>
             </div>
           </div>
-        )}
 
-        {/* Brand Header */}
-        <div className="text-center mb-6">
-          <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-blue-500/25">
-            <span className="text-2xl">📈</span>
+          {/* Mode Switcher Tabs */}
+          <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl mb-6 border border-slate-200/60 dark:border-slate-700/50">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("login");
+                setError(null);
+              }}
+              className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all duration-200 ${
+                mode === "login"
+                  ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-md"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("register");
+                setError(null);
+              }}
+              className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all duration-200 ${
+                mode === "register"
+                  ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-md"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              Create Account
+            </button>
           </div>
-          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-1">
-            Investor's Edge
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-            Create an account to preserve your analyses & unlock unlimited searches
-          </p>
-
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100/80 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/50 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
-            <span>⚡</span>
-            <span>
-              {isSupabaseConfigured ? "Connected to Supabase Auth" : "Supabase Auth Ready (Local Mode)"}
-            </span>
-          </div>
-        </div>
-
-        {/* Mode Switcher Tabs */}
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl mb-6 border border-slate-200/60 dark:border-slate-700/50">
-          <button
-            type="button"
-            onClick={() => {
-              setMode("login");
-              setError(null);
-            }}
-            className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all duration-200 ${
-              mode === "login"
-                ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-md"
-                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-            }`}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("register");
-              setError(null);
-            }}
-            className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all duration-200 ${
-              mode === "register"
-                ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-md"
-                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-            }`}
-          >
-            Create Account
-          </button>
-        </div>
 
         {/* Error Alert */}
         {error && (
@@ -250,5 +265,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 };

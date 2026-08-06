@@ -12,7 +12,7 @@ export function ProfileOnlyPage({
   onBack,
 }: ProfileOnlyPageProps) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 py-8 px-4 transition-colors duration-300">
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-100/90 to-slate-200/70 dark:from-slate-900 dark:to-slate-950 py-8 px-4 transition-colors duration-300">
       <div className="max-w-5xl mx-auto">
         <button
           onClick={onBack}

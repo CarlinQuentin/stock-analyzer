@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  body {
+    @apply bg-slate-100/90 text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-100 transition-colors duration-300;
+  }
+}
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;
