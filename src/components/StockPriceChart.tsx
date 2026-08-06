@@ -257,24 +257,24 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
   const timeframes: Timeframe[] = ["1M", "3M", "6M", "YTD", "1Y", "3Y", "5Y", "ALL"];
 
   return (
-    <div className="w-full bg-white dark:bg-slate-800/90 backdrop-blur-md rounded-2xl p-6 shadow-xl border border-slate-200/80 dark:border-slate-700/60 transition-all duration-300 mb-8">
+    <div className="w-full bg-white dark:bg-slate-800/90 backdrop-blur-md rounded-2xl p-4 sm:p-6 shadow-xl border border-slate-200/80 dark:border-slate-700/60 transition-all duration-300 mb-8">
       {/* Header Bar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-700/60">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <span>Stock Price Chart</span>
-              <span className="text-sm font-semibold px-2.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+              <span className="text-xs sm:text-sm font-semibold px-2.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
                 {profile.symbol}
               </span>
             </h2>
           </div>
-          <div className="flex flex-wrap items-baseline gap-3">
-            <span className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+          <div className="flex flex-wrap items-baseline gap-2 sm:gap-3">
+            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               {formatCurrency(activePoint ? activePoint.close : profile.price || 0)}
             </span>
             <div
-              className={`inline-flex items-center gap-1 text-sm font-bold px-2.5 py-1 rounded-full ${
+              className={`inline-flex items-center gap-1 text-xs sm:text-sm font-bold px-2.5 py-1 rounded-full ${
                 (hoveredIndex !== null ? activeChange >= 0 : stats.isPositive)
                   ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50"
                   : "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800/50"
@@ -302,7 +302,7 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
         </div>
 
         {/* Timeframe Selector */}
-        <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 dark:bg-slate-900/60 p-1.5 rounded-xl border border-slate-200/60 dark:border-slate-700/50">
+        <div className="flex flex-wrap items-center gap-1 bg-slate-100 dark:bg-slate-900/60 p-1.5 rounded-xl border border-slate-200/60 dark:border-slate-700/50 overflow-x-auto scrollbar-none">
           {timeframes.map((tf) => (
             <button
               key={tf}
@@ -310,7 +310,7 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
                 setTimeframe(tf);
                 setHoveredIndex(null);
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 min-h-[36px] flex items-center justify-center ${
                 timeframe === tf
                   ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-md scale-105 border border-slate-200/50 dark:border-slate-600"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/50"

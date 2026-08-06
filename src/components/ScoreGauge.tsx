@@ -79,7 +79,7 @@ export const ScoreGauge = ({
   });
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-8 mb-6 border border-transparent dark:border-slate-700/50 transition-colors duration-300">
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-4 sm:p-6 flex flex-col items-center border border-transparent dark:border-slate-700/50 transition-colors duration-300">
       <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 text-center">
         {title}
       </h2>

@@ -476,21 +476,21 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   return (
     <div 
       onClick={onClick}
-      className={`bg-white dark:bg-slate-800 rounded-lg shadow p-6 border-l-4 border-slate-200 dark:border-slate-700 hover:shadow-lg flex flex-col justify-between ${
+      className={`bg-white dark:bg-slate-800 rounded-lg shadow p-4 sm:p-6 border-l-4 border-slate-200 dark:border-slate-700 hover:shadow-lg flex flex-col justify-between ${
         onClick 
           ? "cursor-pointer hover:border-blue-500/80 dark:hover:border-blue-500/80 active:scale-[0.99] transition-all duration-200" 
           : "transition-all duration-300"
       }`}
     >
       <div>
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+        <div className="flex items-start justify-between mb-3 gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider truncate">
                 {title}
               </h3>
               {tooltip && (
-                <div className="relative group/tooltip inline-block">
+                <div className="relative group/tooltip inline-block flex-shrink-0">
                   <span
                     aria-label={tooltip}
                     className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 cursor-help transition-colors duration-200"
@@ -507,7 +507,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
                   </span>
                   
                   {/* Premium Custom Tooltip */}
-                  <div className="absolute bottom-full left-0 md:left-1/2 md:-translate-x-1/2 mb-2 w-64 p-3 rounded-lg bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-sm text-xs text-slate-200 dark:text-slate-200 shadow-xl border border-slate-800/80 dark:border-slate-800/50 pointer-events-none opacity-0 scale-95 group-hover/tooltip:opacity-100 group-hover/tooltip:scale-100 transition-all duration-200 origin-bottom z-30 font-normal normal-case tracking-normal text-left">
+                  <div className="absolute bottom-full left-0 md:left-1/2 md:-translate-x-1/2 mb-2 w-64 max-w-[calc(100vw-3rem)] p-3 rounded-lg bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-sm text-xs text-slate-200 dark:text-slate-200 shadow-xl border border-slate-800/80 dark:border-slate-800/50 pointer-events-none opacity-0 scale-95 group-hover/tooltip:opacity-100 group-hover/tooltip:scale-100 transition-all duration-200 origin-bottom z-30 font-normal normal-case tracking-normal text-left">
                     <p className="leading-relaxed">{tooltip}</p>
                     {/* Caret */}
                     <div className="absolute top-full left-3 md:left-1/2 md:-translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900/95 dark:border-t-slate-950/95"></div>
@@ -516,42 +516,42 @@ export const MetricCard: React.FC<MetricCardProps> = ({
               )}
             </div>
             {description && (
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{description}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">{description}</p>
             )}
           </div>
-          {icon && <span className="text-2xl">{icon}</span>}
+          {icon && <span className="text-xl sm:text-2xl flex-shrink-0">{icon}</span>}
         </div>
 
         <div className="mb-4">
           {value !== null ? (
-            <p className="text-3xl font-bold text-slate-900 dark:text-white">
+            <p className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
               {formattedValue}
               {unit && (
-                <span className="text-xl text-slate-600 dark:text-slate-400 ml-1">{unit}</span>
+                <span className="text-lg sm:text-xl text-slate-600 dark:text-slate-400 ml-1">{unit}</span>
               )}
             </p>
           ) : statusText ? (
-            <p className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">
+            <p className="text-xl sm:text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">
               {statusText}
             </p>
           ) : (
-            <p className="text-lg text-slate-500 dark:text-slate-400 italic">Data not available</p>
+            <p className="text-sm sm:text-lg text-slate-500 dark:text-slate-400 italic">Data not available</p>
           )}
         </div>
 
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300">
             {getMetricAnalysis(score)}
           </span>
           <div
-            className={`px-3 py-1 rounded-full text-sm font-bold border ${getScoreColor(score)}`}
+            className={`px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-bold border ${getScoreColor(score)}`}
           >
             {score !== null ? score : "N/A"}
           </div>
         </div>
 
         {/* Score bar */}
-        <div className="mt-4 w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+        <div className="mt-3 sm:mt-4 w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
           <div
             className={`h-full transition-all duration-500 ${getScoreBg(score)}`}
             style={{ width: `${score !== null ? Math.min(score, 100) : 0}%` }}
@@ -559,7 +559,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
         </div>
 
         {isInformational && (
-          <div className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900/60 px-2.5 py-1 rounded border border-slate-200/80 dark:border-slate-700/60 font-medium text-center">
+          <div className="mt-3 text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900/60 px-2 sm:px-2.5 py-1 rounded border border-slate-200/80 dark:border-slate-700/60 font-medium text-center">
             Informational Metric - Not included in Universal Score
           </div>
         )}

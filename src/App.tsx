@@ -743,7 +743,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-100/90 to-slate-200/70 dark:from-slate-900 dark:to-slate-950 py-8 px-4 transition-colors duration-300">
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-100/90 to-slate-200/70 dark:from-slate-900 dark:to-slate-950 py-4 sm:py-8 px-3 sm:px-6 lg:px-8 transition-colors duration-300">
       <div className="fixed top-4 left-4 z-40">
         <UserHeader
           user={user}
@@ -853,26 +853,28 @@ function App() {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-slate-200 dark:border-slate-700 mb-6">
+        <div className="flex border-b border-slate-200 dark:border-slate-700 mb-6 overflow-x-auto scrollbar-none text-xs sm:text-sm">
           <button
             onClick={() => setActiveTab("fundamentals")}
-            className={`py-3 px-6 font-semibold text-sm transition-all duration-200 border-b-2 -mb-[2px] ${
+            className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
               activeTab === "fundamentals"
-                ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400"
+                ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
                 : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
             }`}
           >
-            📊 Business Quality (Fundamentals)
+            <span>📊</span>
+            <span>Business Quality (Fundamentals)</span>
           </button>
           <button
             onClick={() => setActiveTab("valuation")}
-            className={`py-3 px-6 font-semibold text-sm transition-all duration-200 border-b-2 -mb-[2px] ${
+            className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
               activeTab === "valuation"
-                ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400"
+                ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
                 : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
             }`}
           >
-            💰 Stock Valuation (Price)
+            <span>💰</span>
+            <span>Stock Valuation (Price)</span>
           </button>
         </div>
 
@@ -882,12 +884,12 @@ function App() {
             {/* Detailed Metrics - Two Distinct Sections */}
             <div className="mb-10 space-y-10">
               {/* Section 1: Universal Business Quality Score */}
-              <div className="p-6 bg-gradient-to-r from-blue-50/80 via-slate-50 to-emerald-50/60 dark:from-slate-900/90 dark:via-slate-900 dark:to-emerald-950/20 rounded-2xl border border-blue-200/80 dark:border-blue-800/40 shadow-sm transition-all duration-300">
+              <div className="p-4 sm:p-6 bg-gradient-to-r from-blue-50/80 via-slate-50 to-emerald-50/60 dark:from-slate-900/90 dark:via-slate-900 dark:to-emerald-950/20 rounded-2xl border border-blue-200/80 dark:border-blue-800/40 shadow-sm transition-all duration-300">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-blue-100 dark:border-blue-900/40">
                   <div>
-                    <div className="flex items-center gap-2.5 flex-wrap">
+                    <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
                       <span className="text-xl">⭐</span>
-                      <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                      <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
                         Universal Business Quality Score
                       </h2>
                       <span className="px-3 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/60 rounded-full border border-blue-200 dark:border-blue-700/50">
@@ -1091,11 +1093,11 @@ function App() {
               </div>
 
               {/* Section 2: Supporting Business Insights */}
-              <div className="p-6 bg-slate-50/70 dark:bg-slate-900/60 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm transition-all duration-300">
+              <div className="p-4 sm:p-6 bg-slate-50/70 dark:bg-slate-900/60 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm transition-all duration-300">
                 <div className="mb-6 pb-4 border-b border-slate-200/80 dark:border-slate-800">
-                  <div className="flex items-center gap-2.5 flex-wrap">
+                  <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
                     <span className="text-xl">💡</span>
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                    <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
                       Supporting Business Insights
                     </h2>
                     <span className="px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-200/80 dark:bg-slate-800 rounded-full border border-slate-300 dark:border-slate-700">

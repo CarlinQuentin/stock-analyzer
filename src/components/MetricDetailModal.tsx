@@ -1256,15 +1256,15 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-slate-950/60 dark:bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/60 dark:bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150 overflow-hidden">
       {/* Outer Click Dismiss */}
       <div className="absolute inset-0 cursor-default" onClick={onClose}></div>
 
       {/* Modal Box */}
-      <div className="relative w-[90vw] max-w-7xl max-h-[85vh] md:max-h-[90vh] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-y-auto flex flex-col md:flex-row animate-in fade-in zoom-in-95 duration-200 z-10">
+      <div className="relative w-full max-w-7xl max-h-[calc(100vh-1.5rem)] sm:max-h-[85vh] md:max-h-[90vh] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-y-auto flex flex-col md:flex-row animate-in fade-in zoom-in-95 duration-200 z-10">
         
         {/* Left Panel: Charts and Table */}
-        <div className="w-full md:w-1/2 p-6 md:border-r border-slate-100 dark:border-slate-800/80">
+        <div className="w-full md:w-1/2 p-4 sm:p-6 md:border-r border-slate-100 dark:border-slate-800/80">
           <div className="flex items-center gap-3 mb-4">
             <span className="text-3xl">{config.icon}</span>
             <div>

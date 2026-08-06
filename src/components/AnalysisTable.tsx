@@ -82,20 +82,20 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
             </p>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <div className="overflow-x-auto scrollbar-thin">
+          <table className="w-full text-xs sm:text-sm">
             <thead>
               <tr className="bg-slate-100 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-700">
-                <th className="text-left px-6 py-4 font-semibold text-slate-900 dark:text-slate-200">
+                <th className="text-left px-3.5 sm:px-6 py-3 sm:py-4 font-semibold text-slate-900 dark:text-slate-200">
                   Metric
                 </th>
-                <th className="text-right px-6 py-4 font-semibold text-slate-900 dark:text-slate-200">
+                <th className="text-right px-3.5 sm:px-6 py-3 sm:py-4 font-semibold text-slate-900 dark:text-slate-200">
                   Value
                 </th>
-                <th className="text-center px-6 py-4 font-semibold text-slate-900 dark:text-slate-200">
+                <th className="text-center px-3.5 sm:px-6 py-3 sm:py-4 font-semibold text-slate-900 dark:text-slate-200">
                   Performance
                 </th>
-                <th className="text-right px-6 py-4 font-semibold text-slate-900 dark:text-slate-200">
+                <th className="text-right px-3.5 sm:px-6 py-3 sm:py-4 font-semibold text-slate-900 dark:text-slate-200">
                   Score
                 </th>
               </tr>
