@@ -15,9 +15,12 @@ import { AuthModal } from "./components/AuthModal";
 import { UserHeader } from "./components/UserHeader";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { SavedStocksPage } from "./components/SavedStocksPage";
+import { LeadershipSection } from "./components/LeadershipSection";
 import { authService, UserProfile } from "./services/authService";
 import { fmpService } from "./services/financialModelingPrep";
 import { savedStocksService } from "./services/savedStocksService";
+import { leadershipService } from "./services/leadershipService";
+import { LeadershipProfile } from "./types";
 import {
   calculateAllMetrics,
   calculateFCFMarginHistory,
@@ -62,9 +65,11 @@ function App() {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"fundamentals" | "valuation">(
+  const [activeTab, setActiveTab] = useState<"fundamentals" | "valuation" | "leadership">(
     "fundamentals",
   );
+  const [leadershipProfile, setLeadershipProfile] = useState<LeadershipProfile | null>(null);
+  const [isLoadingLeadership, setIsLoadingLeadership] = useState(false);
   const [showAllCharts, setShowAllCharts] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
@@ -143,6 +148,8 @@ function App() {
     setIsLoading(true);
     setError(null);
     setResult(null);
+    setLeadershipProfile(null);
+    setIsLoadingLeadership(true);
     setActiveTab("fundamentals");
     setShowAllCharts(false);
     setSelectedMetric(null);
@@ -155,6 +162,13 @@ function App() {
         fmpService.getCompanyProfile(ticker),
         fmpService.getHistoricalPrices(ticker),
       ]);
+
+      // Fetch Senior Leadership profile asynchronously
+      leadershipService
+        .fetchLeadershipProfile(ticker, profile.companyName)
+        .then((leadProfile) => setLeadershipProfile(leadProfile))
+        .catch((err) => console.warn("Leadership fetch failed:", err))
+        .finally(() => setIsLoadingLeadership(false));
 
       try {
         const {
@@ -876,6 +890,17 @@ function App() {
             <span>💰</span>
             <span>Stock Valuation (Price)</span>
           </button>
+          <button
+            onClick={() => setActiveTab("leadership")}
+            className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === "leadership"
+                ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
+                : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+            }`}
+          >
+            <span>👔</span>
+            <span>Senior Leadership</span>
+          </button>
         </div>
 
         {/* Fundamentals Tab Content */}
@@ -1428,6 +1453,15 @@ function App() {
               </div>
             </div>
           </>
+        )}
+
+        {/* Leadership Tab Content */}
+        {activeTab === "leadership" && (
+          <LeadershipSection
+            leadership={leadershipProfile}
+            isLoading={isLoadingLeadership}
+            symbol={result.companyProfile.symbol || result.ticker}
+          />
         )}
 
         {/* Footer */}

@@ -429,6 +429,21 @@ class FinancialModelingPrepService {
     }
   }
 
+  async getKeyExecutives(ticker: string): Promise<any[]> {
+    try {
+      const response = await this.client.get("/key-executives", {
+        params: { ...this.getParams(), symbol: ticker.toUpperCase() },
+      });
+      if (!response.data || !Array.isArray(response.data)) {
+        return [];
+      }
+      return response.data;
+    } catch (error) {
+      console.warn(`Could not fetch key executives for ${ticker}:`, error);
+      return [];
+    }
+  }
+
   private handleError(error: any): ApiError {
     if (axios.isAxiosError(error)) {
       const rawData = error.response?.data;

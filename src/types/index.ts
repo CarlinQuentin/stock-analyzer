@@ -231,3 +231,44 @@ export interface SavedStock {
   industry?: string;
   image?: string;
 }
+
+export interface PreviousRole {
+  company: string;
+  title: string;
+  startYear?: number | string;
+  endYear?: number | string;
+}
+
+export interface ExecutiveProfile {
+  id: string;
+  name: string;
+  title: string;
+  bio?: string;
+  tenureStartYear?: number;
+  yearBorn?: number;
+  gender?: string;
+  pay?: number;
+  currencyPay?: string;
+  previousRoles: PreviousRole[];
+  education?: string[];
+  isKeyOfficer: boolean;
+}
+
+export interface LeadershipQualityScoreSupport {
+  /** Extension points for future Leadership Quality Scoring algorithm */
+  executiveExperienceScore?: number | null;
+  industryTenureYears?: number | null;
+  priorPerformanceRating?: "High" | "Moderate" | "Low" | null;
+  insiderAlignmentScore?: number | null;
+}
+
+export interface LeadershipProfile {
+  symbol: string;
+  companyName: string;
+  executives: ExecutiveProfile[];
+  careerSummary?: string;
+  strengths?: string[];
+  leadershipScoreSupport?: LeadershipQualityScoreSupport;
+  source: string;
+  lastUpdated: string;
+}
