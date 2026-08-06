@@ -1,10 +1,81 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
+
+export type ThemeMode = "light" | "dark" | "developer" | "whisky";
+
+export interface ThemeOption {
+  id: ThemeMode;
+  name: string;
+  subtitle: string;
+  icon: string;
+  preview: {
+    bg: string;
+    card: string;
+    accent: string;
+  };
+}
+
+export const THEME_OPTIONS: ThemeOption[] = [
+  {
+    id: "light",
+    name: "Light",
+    subtitle: "Soft neutral slate mode",
+    icon: "☀️",
+    preview: {
+      bg: "#f1f5f9",
+      card: "#ffffff",
+      accent: "#2563eb",
+    },
+  },
+  {
+    id: "dark",
+    name: "Dark",
+    subtitle: "Sleek dark slate mode",
+    icon: "🌙",
+    preview: {
+      bg: "#0f172a",
+      card: "#1e293b",
+      accent: "#3b82f6",
+    },
+  },
+  {
+    id: "developer",
+    name: "Developer",
+    subtitle: "IDE & terminal dark theme",
+    icon: "💻",
+    preview: {
+      bg: "#0b0f19",
+      card: "#0f172a",
+      accent: "#06b6d4",
+    },
+  },
+  {
+    id: "whisky",
+    name: "Whisky",
+    subtitle: "Aged oak & amber lounge",
+    icon: "🥃",
+    preview: {
+      bg: "#18110c",
+      card: "#241911",
+      accent: "#f59e0b",
+    },
+  },
+];
 
 export const ThemeToggle: React.FC = () => {
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const [theme, setTheme] = useState<ThemeMode>(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("theme");
-      if (stored === "dark" || stored === "light") return stored;
+      if (
+        stored === "light" ||
+        stored === "dark" ||
+        stored === "developer" ||
+        stored === "whisky"
+      ) {
+        return stored as ThemeMode;
+      }
 
       const systemPreference = window.matchMedia(
         "(prefers-color-scheme: dark)",
@@ -16,65 +87,157 @@ export const ThemeToggle: React.FC = () => {
 
   useEffect(() => {
     const root = window.document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      root.classList.remove("dark");
-      localStorage.setItem("theme", "light");
+    // Reset all theme classes
+    root.classList.remove(
+      "theme-light",
+      "theme-dark",
+      "theme-developer",
+      "theme-whisky",
+      "dark",
+    );
+
+    if (theme === "light") {
+      root.classList.add("theme-light");
+    } else if (theme === "dark") {
+      root.classList.add("dark", "theme-dark");
+    } else if (theme === "developer") {
+      root.classList.add("dark", "theme-developer");
+    } else if (theme === "whisky") {
+      root.classList.add("dark", "theme-whisky");
     }
+
+    localStorage.setItem("theme", theme);
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === "light" ? "dark" : "light"));
-  };
+  // Close dropdown on outside click or Escape key
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsOpen(false);
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  const activeOption =
+    THEME_OPTIONS.find((t) => t.id === theme) || THEME_OPTIONS[0];
 
   return (
-    <button
-      onClick={toggleTheme}
-      className="fixed top-4 right-4 z-50 p-3 rounded-full bg-white/80 dark:bg-slate-800/85 backdrop-blur-md border border-slate-200 dark:border-slate-700/80 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-      aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-      title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-    >
-      <div className="relative w-6 h-6 overflow-hidden">
-        {/* Sun Icon */}
+    <div className="fixed top-4 right-4 z-50 text-left" ref={dropdownRef}>
+      {/* Trigger Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 px-3 py-2 rounded-full bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border border-slate-200/90 dark:border-slate-700/80 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 select-none"
+        aria-label="Select Color Theme"
+        aria-expanded={isOpen}
+        title="Select Color Theme"
+      >
+        <span className="text-base">{activeOption.icon}</span>
+        <span className="hidden sm:inline font-bold">{activeOption.name}</span>
         <svg
-          className={`w-6 h-6 text-amber-500 absolute transition-all duration-500 transform ${
-            theme === "dark"
-              ? "rotate-90 scale-0 opacity-0"
-              : "rotate-0 scale-100 opacity-100"
+          className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
+            isOpen ? "rotate-180" : ""
           }`}
           fill="none"
           stroke="currentColor"
-          strokeWidth="2"
           viewBox="0 0 24 24"
         >
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707.707M12 8a4 4 0 100 8 4 4 0 000-8z"
+            strokeWidth={2}
+            d="M19 9l-7 7-7-7"
           />
         </svg>
+      </button>
 
-        {/* Moon Icon */}
-        <svg
-          className={`w-6 h-6 text-indigo-400 absolute transition-all duration-500 transform ${
-            theme === "light"
-              ? "-rotate-90 scale-0 opacity-0"
-              : "rotate-0 scale-100 opacity-100"
-          }`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-          />
-        </svg>
-      </div>
-    </button>
+      {/* Theme Options Dropdown Popover */}
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700/80 shadow-2xl p-2.5 z-50 transition-all duration-200 animate-in fade-in slide-in-from-top-2">
+          <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700/60 mb-1 flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+              Color Theme
+            </span>
+            <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+              4 Themes
+            </span>
+          </div>
+
+          <div className="space-y-1">
+            {THEME_OPTIONS.map((option) => {
+              const isSelected = theme === option.id;
+              return (
+                <button
+                  key={option.id}
+                  onClick={() => {
+                    setTheme(option.id);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all duration-150 ${
+                    isSelected
+                      ? "bg-blue-50/80 dark:bg-slate-700/80 border border-blue-200/80 dark:border-blue-500/40 shadow-sm"
+                      : "hover:bg-slate-50 dark:hover:bg-slate-700/40 border border-transparent"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl flex-shrink-0">{option.icon}</span>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`text-xs font-bold ${
+                            isSelected
+                              ? "text-blue-700 dark:text-blue-300"
+                              : "text-slate-900 dark:text-slate-100"
+                          }`}
+                        >
+                          {option.name}
+                        </span>
+                        {isSelected && (
+                          <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">
+                        {option.subtitle}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Swatch Preview Dots */}
+                  <div className="flex items-center gap-1 flex-shrink-0 ml-2 p-1 rounded-md bg-slate-100 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/50">
+                    <span
+                      className="w-3 h-3 rounded-full border border-black/10 shadow-xs"
+                      style={{ backgroundColor: option.preview.bg }}
+                      title="Background"
+                    />
+                    <span
+                      className="w-3 h-3 rounded-full border border-black/10 shadow-xs"
+                      style={{ backgroundColor: option.preview.card }}
+                      title="Surface"
+                    />
+                    <span
+                      className="w-3 h-3 rounded-full border border-black/10 shadow-xs"
+                      style={{ backgroundColor: option.preview.accent }}
+                      title="Accent"
+                    />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 };

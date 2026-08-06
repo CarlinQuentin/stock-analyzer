@@ -8,6 +8,154 @@
   }
 }
 
+/* ==========================================================================
+   DEVELOPER THEME (IDE & Code-Editor Dark Aesthetic)
+   ========================================================================== */
+html.theme-developer {
+  color-scheme: dark;
+}
+
+html.theme-developer body,
+html.theme-developer .min-h-screen {
+  background-color: #0b0f19 !important;
+  background-image: radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.08) 0px, transparent 50%),
+                    radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.06) 0px, transparent 50%) !important;
+  color: #e2e8f0 !important;
+}
+
+html.theme-developer .bg-white,
+html.theme-developer .bg-white\/95,
+html.theme-developer .bg-white\/90,
+html.theme-developer .bg-white\/80,
+html.theme-developer .bg-slate-50,
+html.theme-developer .bg-slate-50\/70,
+html.theme-developer .dark\:bg-slate-800,
+html.theme-developer .dark\:bg-slate-800\/90,
+html.theme-developer .dark\:bg-slate-800\/80,
+html.theme-developer .dark\:bg-slate-900,
+html.theme-developer .dark\:bg-slate-900\/90,
+html.theme-developer .dark\:bg-slate-900\/60,
+html.theme-developer .dark\:bg-slate-950 {
+  background-color: #0f172a !important;
+  border-color: rgba(30, 41, 59, 0.8) !important;
+}
+
+html.theme-developer .border-slate-200,
+html.theme-developer .border-slate-200\/80,
+html.theme-developer .border-slate-200\/90,
+html.theme-developer .dark\:border-slate-800,
+html.theme-developer .dark\:border-slate-700,
+html.theme-developer .dark\:border-slate-700\/50,
+html.theme-developer .dark\:border-slate-700\/60,
+html.theme-developer .dark\:border-slate-800\/80 {
+  border-color: rgba(30, 41, 59, 0.8) !important;
+}
+
+html.theme-developer .text-slate-900,
+html.theme-developer .text-slate-800,
+html.theme-developer .dark\:text-white,
+html.theme-developer .dark\:text-slate-100 {
+  color: #f8fafc !important;
+}
+
+html.theme-developer .text-slate-600,
+html.theme-developer .text-slate-500,
+html.theme-developer .dark\:text-slate-400,
+html.theme-developer .dark\:text-slate-300 {
+  color: #94a3b8 !important;
+}
+
+html.theme-developer .text-blue-600,
+html.theme-developer .text-blue-500,
+html.theme-developer .dark\:text-blue-400,
+html.theme-developer .dark\:text-blue-300 {
+  color: #38bdf8 !important;
+}
+
+html.theme-developer .bg-blue-600,
+html.theme-developer .dark\:bg-blue-600 {
+  background-color: #0284c7 !important;
+}
+
+html.theme-developer .border-blue-650,
+html.theme-developer .dark\:border-blue-400 {
+  border-color: #38bdf8 !important;
+}
+
+/* ==========================================================================
+   WHISKY THEME (Aged Oak, Gold & Amber Lounge Aesthetic)
+   ========================================================================== */
+html.theme-whisky {
+  color-scheme: dark;
+}
+
+html.theme-whisky body,
+html.theme-whisky .min-h-screen {
+  background-color: #18110c !important;
+  background-image: radial-gradient(at 10% 10%, rgba(245, 158, 11, 0.08) 0px, transparent 50%),
+                    radial-gradient(at 90% 90%, rgba(180, 83, 9, 0.07) 0px, transparent 50%) !important;
+  color: #fef3c7 !important;
+}
+
+html.theme-whisky .bg-white,
+html.theme-whisky .bg-white\/95,
+html.theme-whisky .bg-white\/90,
+html.theme-whisky .bg-white\/80,
+html.theme-whisky .bg-slate-50,
+html.theme-whisky .bg-slate-50\/70,
+html.theme-whisky .dark\:bg-slate-800,
+html.theme-whisky .dark\:bg-slate-800\/90,
+html.theme-whisky .dark\:bg-slate-800\/80,
+html.theme-whisky .dark\:bg-slate-900,
+html.theme-whisky .dark\:bg-slate-900\/90,
+html.theme-whisky .dark\:bg-slate-900\/60,
+html.theme-whisky .dark\:bg-slate-950 {
+  background-color: #241911 !important;
+  border-color: rgba(87, 58, 38, 0.6) !important;
+}
+
+html.theme-whisky .border-slate-200,
+html.theme-whisky .border-slate-200\/80,
+html.theme-whisky .border-slate-200\/90,
+html.theme-whisky .dark\:border-slate-800,
+html.theme-whisky .dark\:border-slate-700,
+html.theme-whisky .dark\:border-slate-700\/50,
+html.theme-whisky .dark\:border-slate-700\/60,
+html.theme-whisky .dark\:border-slate-800\/80 {
+  border-color: rgba(87, 58, 38, 0.6) !important;
+}
+
+html.theme-whisky .text-slate-900,
+html.theme-whisky .text-slate-800,
+html.theme-whisky .dark\:text-white,
+html.theme-whisky .dark\:text-slate-100 {
+  color: #fef3c7 !important;
+}
+
+html.theme-whisky .text-slate-600,
+html.theme-whisky .text-slate-500,
+html.theme-whisky .dark\:text-slate-400,
+html.theme-whisky .dark\:text-slate-300 {
+  color: #d97706 !important;
+}
+
+html.theme-whisky .text-blue-600,
+html.theme-whisky .text-blue-500,
+html.theme-whisky .dark\:text-blue-400,
+html.theme-whisky .dark\:text-blue-300 {
+  color: #f59e0b !important;
+}
+
+html.theme-whisky .bg-blue-600,
+html.theme-whisky .dark\:bg-blue-600 {
+  background-color: #d97706 !important;
+}
+
+html.theme-whisky .border-blue-650,
+html.theme-whisky .dark\:border-blue-400 {
+  border-color: #f59e0b !important;
+}
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;
