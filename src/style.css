@@ -9,150 +9,150 @@
 }
 
 /* ==========================================================================
-   DEVELOPER THEME (IDE & Code-Editor Dark Aesthetic)
+   GOLD THEME (Executive Obsidian Charcoal & Rich Metallic Gold)
    ========================================================================== */
-html.theme-developer {
+html.theme-gold {
   color-scheme: dark;
 }
 
-html.theme-developer body,
-html.theme-developer .min-h-screen {
-  background-color: #0b0f19 !important;
-  background-image: radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.08) 0px, transparent 50%),
-                    radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.06) 0px, transparent 50%) !important;
-  color: #e2e8f0 !important;
+html.theme-gold body,
+html.theme-gold .min-h-screen {
+  background-color: #0d0e12 !important;
+  background-image: radial-gradient(at 15% 15%, rgba(234, 179, 8, 0.08) 0px, transparent 50%),
+                    radial-gradient(at 85% 85%, rgba(202, 138, 4, 0.06) 0px, transparent 50%) !important;
+  color: #fef08a !important;
 }
 
-html.theme-developer .bg-white,
-html.theme-developer .bg-white\/95,
-html.theme-developer .bg-white\/90,
-html.theme-developer .bg-white\/80,
-html.theme-developer .bg-slate-50,
-html.theme-developer .bg-slate-50\/70,
-html.theme-developer .dark\:bg-slate-800,
-html.theme-developer .dark\:bg-slate-800\/90,
-html.theme-developer .dark\:bg-slate-800\/80,
-html.theme-developer .dark\:bg-slate-900,
-html.theme-developer .dark\:bg-slate-900\/90,
-html.theme-developer .dark\:bg-slate-900\/60,
-html.theme-developer .dark\:bg-slate-950 {
-  background-color: #0f172a !important;
-  border-color: rgba(30, 41, 59, 0.8) !important;
+html.theme-gold .bg-white,
+html.theme-gold .bg-white\/95,
+html.theme-gold .bg-white\/90,
+html.theme-gold .bg-white\/80,
+html.theme-gold .bg-slate-50,
+html.theme-gold .bg-slate-50\/70,
+html.theme-gold .dark\:bg-slate-800,
+html.theme-gold .dark\:bg-slate-800\/90,
+html.theme-gold .dark\:bg-slate-800\/80,
+html.theme-gold .dark\:bg-slate-900,
+html.theme-gold .dark\:bg-slate-900\/90,
+html.theme-gold .dark\:bg-slate-900\/60,
+html.theme-gold .dark\:bg-slate-950 {
+  background-color: #161820 !important;
+  border-color: rgba(234, 179, 8, 0.25) !important;
 }
 
-html.theme-developer .border-slate-200,
-html.theme-developer .border-slate-200\/80,
-html.theme-developer .border-slate-200\/90,
-html.theme-developer .dark\:border-slate-800,
-html.theme-developer .dark\:border-slate-700,
-html.theme-developer .dark\:border-slate-700\/50,
-html.theme-developer .dark\:border-slate-700\/60,
-html.theme-developer .dark\:border-slate-800\/80 {
-  border-color: rgba(30, 41, 59, 0.8) !important;
+html.theme-gold .border-slate-200,
+html.theme-gold .border-slate-200\/80,
+html.theme-gold .border-slate-200\/90,
+html.theme-gold .dark\:border-slate-800,
+html.theme-gold .dark\:border-slate-700,
+html.theme-gold .dark\:border-slate-700\/50,
+html.theme-gold .dark\:border-slate-700\/60,
+html.theme-gold .dark\:border-slate-800\/80 {
+  border-color: rgba(234, 179, 8, 0.22) !important;
 }
 
-html.theme-developer .text-slate-900,
-html.theme-developer .text-slate-800,
-html.theme-developer .dark\:text-white,
-html.theme-developer .dark\:text-slate-100 {
-  color: #f8fafc !important;
+html.theme-gold .text-slate-900,
+html.theme-gold .text-slate-800,
+html.theme-gold .dark\:text-white,
+html.theme-gold .dark\:text-slate-100 {
+  color: #fef08a !important;
 }
 
-html.theme-developer .text-slate-600,
-html.theme-developer .text-slate-500,
-html.theme-developer .dark\:text-slate-400,
-html.theme-developer .dark\:text-slate-300 {
-  color: #94a3b8 !important;
+html.theme-gold .text-slate-600,
+html.theme-gold .text-slate-500,
+html.theme-gold .dark\:text-slate-400,
+html.theme-gold .dark\:text-slate-300 {
+  color: #eab308 !important;
 }
 
-html.theme-developer .text-blue-600,
-html.theme-developer .text-blue-500,
-html.theme-developer .dark\:text-blue-400,
-html.theme-developer .dark\:text-blue-300 {
-  color: #38bdf8 !important;
+html.theme-gold .text-blue-600,
+html.theme-gold .text-blue-500,
+html.theme-gold .dark\:text-blue-400,
+html.theme-gold .dark\:text-blue-300 {
+  color: #facc15 !important;
 }
 
-html.theme-developer .bg-blue-600,
-html.theme-developer .dark\:bg-blue-600 {
-  background-color: #0284c7 !important;
+html.theme-gold .bg-blue-600,
+html.theme-gold .dark\:bg-blue-600 {
+  background-color: #ca8a04 !important;
 }
 
-html.theme-developer .border-blue-650,
-html.theme-developer .dark\:border-blue-400 {
-  border-color: #38bdf8 !important;
+html.theme-gold .border-blue-650,
+html.theme-gold .dark\:border-blue-400 {
+  border-color: #eab308 !important;
 }
 
 /* ==========================================================================
-   WHISKY THEME (Aged Oak, Gold & Amber Lounge Aesthetic)
+   OAK RESERVE THEME (Aged Oak, Gold & Amber Lounge Aesthetic)
    ========================================================================== */
-html.theme-whisky {
+html.theme-oak {
   color-scheme: dark;
 }
 
-html.theme-whisky body,
-html.theme-whisky .min-h-screen {
+html.theme-oak body,
+html.theme-oak .min-h-screen {
   background-color: #18110c !important;
   background-image: radial-gradient(at 10% 10%, rgba(245, 158, 11, 0.08) 0px, transparent 50%),
                     radial-gradient(at 90% 90%, rgba(180, 83, 9, 0.07) 0px, transparent 50%) !important;
   color: #fef3c7 !important;
 }
 
-html.theme-whisky .bg-white,
-html.theme-whisky .bg-white\/95,
-html.theme-whisky .bg-white\/90,
-html.theme-whisky .bg-white\/80,
-html.theme-whisky .bg-slate-50,
-html.theme-whisky .bg-slate-50\/70,
-html.theme-whisky .dark\:bg-slate-800,
-html.theme-whisky .dark\:bg-slate-800\/90,
-html.theme-whisky .dark\:bg-slate-800\/80,
-html.theme-whisky .dark\:bg-slate-900,
-html.theme-whisky .dark\:bg-slate-900\/90,
-html.theme-whisky .dark\:bg-slate-900\/60,
-html.theme-whisky .dark\:bg-slate-950 {
+html.theme-oak .bg-white,
+html.theme-oak .bg-white\/95,
+html.theme-oak .bg-white\/90,
+html.theme-oak .bg-white\/80,
+html.theme-oak .bg-slate-50,
+html.theme-oak .bg-slate-50\/70,
+html.theme-oak .dark\:bg-slate-800,
+html.theme-oak .dark\:bg-slate-800\/90,
+html.theme-oak .dark\:bg-slate-800\/80,
+html.theme-oak .dark\:bg-slate-900,
+html.theme-oak .dark\:bg-slate-900\/90,
+html.theme-oak .dark\:bg-slate-900\/60,
+html.theme-oak .dark\:bg-slate-950 {
   background-color: #241911 !important;
   border-color: rgba(87, 58, 38, 0.6) !important;
 }
 
-html.theme-whisky .border-slate-200,
-html.theme-whisky .border-slate-200\/80,
-html.theme-whisky .border-slate-200\/90,
-html.theme-whisky .dark\:border-slate-800,
-html.theme-whisky .dark\:border-slate-700,
-html.theme-whisky .dark\:border-slate-700\/50,
-html.theme-whisky .dark\:border-slate-700\/60,
-html.theme-whisky .dark\:border-slate-800\/80 {
+html.theme-oak .border-slate-200,
+html.theme-oak .border-slate-200\/80,
+html.theme-oak .border-slate-200\/90,
+html.theme-oak .dark\:border-slate-800,
+html.theme-oak .dark\:border-slate-700,
+html.theme-oak .dark\:border-slate-700\/50,
+html.theme-oak .dark\:border-slate-700\/60,
+html.theme-oak .dark\:border-slate-800\/80 {
   border-color: rgba(87, 58, 38, 0.6) !important;
 }
 
-html.theme-whisky .text-slate-900,
-html.theme-whisky .text-slate-800,
-html.theme-whisky .dark\:text-white,
-html.theme-whisky .dark\:text-slate-100 {
+html.theme-oak .text-slate-900,
+html.theme-oak .text-slate-800,
+html.theme-oak .dark\:text-white,
+html.theme-oak .dark\:text-slate-100 {
   color: #fef3c7 !important;
 }
 
-html.theme-whisky .text-slate-600,
-html.theme-whisky .text-slate-500,
-html.theme-whisky .dark\:text-slate-400,
-html.theme-whisky .dark\:text-slate-300 {
+html.theme-oak .text-slate-600,
+html.theme-oak .text-slate-500,
+html.theme-oak .dark\:text-slate-400,
+html.theme-oak .dark\:text-slate-300 {
   color: #d97706 !important;
 }
 
-html.theme-whisky .text-blue-600,
-html.theme-whisky .text-blue-500,
-html.theme-whisky .dark\:text-blue-400,
-html.theme-whisky .dark\:text-blue-300 {
+html.theme-oak .text-blue-600,
+html.theme-oak .text-blue-500,
+html.theme-oak .dark\:text-blue-400,
+html.theme-oak .dark\:text-blue-300 {
   color: #f59e0b !important;
 }
 
-html.theme-whisky .bg-blue-600,
-html.theme-whisky .dark\:bg-blue-600 {
+html.theme-oak .bg-blue-600,
+html.theme-oak .dark\:bg-blue-600 {
   background-color: #d97706 !important;
 }
 
-html.theme-whisky .border-blue-650,
-html.theme-whisky .dark\:border-blue-400 {
+html.theme-oak .border-blue-650,
+html.theme-oak .dark\:border-blue-400 {
   border-color: #f59e0b !important;
 }
 

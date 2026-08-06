@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 
-export type ThemeMode = "light" | "dark" | "developer" | "whisky";
+export type ThemeMode = "light" | "dark" | "gold" | "oak";
 
 export interface ThemeOption {
   id: ThemeMode;
@@ -38,20 +38,20 @@ export const THEME_OPTIONS: ThemeOption[] = [
     },
   },
   {
-    id: "developer",
-    name: "Developer",
-    subtitle: "IDE & terminal dark theme",
-    icon: "💻",
+    id: "gold",
+    name: "Gold",
+    subtitle: "Executive charcoal & rich gold",
+    icon: "👑",
     preview: {
-      bg: "#0b0f19",
-      card: "#0f172a",
-      accent: "#06b6d4",
+      bg: "#0d0e12",
+      card: "#161820",
+      accent: "#eab308",
     },
   },
   {
-    id: "whisky",
-    name: "Whisky",
-    subtitle: "Aged oak & amber lounge",
+    id: "oak",
+    name: "Oak Reserve",
+    subtitle: "Aged oak & warm amber lounge",
     icon: "🥃",
     preview: {
       bg: "#18110c",
@@ -68,11 +68,15 @@ export const ThemeToggle: React.FC = () => {
   const [theme, setTheme] = useState<ThemeMode>(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("theme");
+      // Handle legacy migration
+      if (stored === "whisky") return "oak";
+      if (stored === "developer") return "dark";
+
       if (
         stored === "light" ||
         stored === "dark" ||
-        stored === "developer" ||
-        stored === "whisky"
+        stored === "gold" ||
+        stored === "oak"
       ) {
         return stored as ThemeMode;
       }
@@ -91,6 +95,8 @@ export const ThemeToggle: React.FC = () => {
     root.classList.remove(
       "theme-light",
       "theme-dark",
+      "theme-gold",
+      "theme-oak",
       "theme-developer",
       "theme-whisky",
       "dark",
@@ -100,10 +106,10 @@ export const ThemeToggle: React.FC = () => {
       root.classList.add("theme-light");
     } else if (theme === "dark") {
       root.classList.add("dark", "theme-dark");
-    } else if (theme === "developer") {
-      root.classList.add("dark", "theme-developer");
-    } else if (theme === "whisky") {
-      root.classList.add("dark", "theme-whisky");
+    } else if (theme === "gold") {
+      root.classList.add("dark", "theme-gold");
+    } else if (theme === "oak") {
+      root.classList.add("dark", "theme-oak");
     }
 
     localStorage.setItem("theme", theme);
