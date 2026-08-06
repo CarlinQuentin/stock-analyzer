@@ -96,9 +96,28 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     title.toLowerCase().includes("dilution") ||
     title.toLowerCase().includes("share");
 
+  const formatShortenedNumber = (val: number): string => {
+    const abs = Math.abs(val);
+    if (abs >= 1e9) {
+      return (val / 1e9).toFixed(2) + "B";
+    }
+    if (abs >= 1e6) {
+      return (val / 1e6).toFixed(2) + "M";
+    }
+    if (abs >= 1e3) {
+      return (val / 1e3).toFixed(2) + "K";
+    }
+    if (val % 1 !== 0) {
+      return val > 0 ? `+${val.toFixed(2)}` : val.toFixed(2);
+    }
+    return val.toString();
+  };
+
   const formattedValue =
     typeof value === "number"
-      ? unit === "%"
+      ? title.toLowerCase().includes("dilution") || title.toLowerCase().includes("share count")
+        ? formatShortenedNumber(value)
+        : unit === "%"
         ? formatPercentageMetric(value, isAlreadyPercentage).replace("%", "")
         : value % 1 !== 0
         ? value.toFixed(2)

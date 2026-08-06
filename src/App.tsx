@@ -1038,15 +1038,15 @@ function App() {
                   <MetricCard
                     title="Share Dilution"
                     value={result.metrics.shareDilution}
-                    unit="%"
+                    unit=""
                     score={result.scores.shareDilution}
                     description="Ownership change over time"
                     tooltip="Measures whether management creates or reduces shareholder ownership value over time through share buybacks or equity issuance."
                     icon="🪙"
                     chartData={result.shareDilutionHistory}
-                    chartValueType="percent"
+                    chartValueType="number"
                     referenceLineValue={0}
-                    referenceLineLabel="0% Baseline"
+                    referenceLineLabel="0 Baseline"
                     isExpanded={showAllCharts}
                     onClick={() => setSelectedMetric("shareDilution")}
                     directionStrategy="lowerIsBetter"
