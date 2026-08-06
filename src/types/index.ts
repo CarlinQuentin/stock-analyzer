@@ -93,6 +93,15 @@ export interface ScoringConfig {
   industryScoreMetrics?: Record<string, { name: string; weight: number; description?: string }>;
 }
 
+export interface ChartDataPoint {
+  label: string;
+  value: number;
+  netIncome?: number;
+  fcf?: number;
+  revenue?: number;
+  operatingIncome?: number;
+}
+
 export interface AnalysisResult {
   ticker: string;
   companyProfile: CompanyProfile;
@@ -103,16 +112,16 @@ export interface AnalysisResult {
   dataConfidenceScore: number;
   unavailableMetrics: string[];
   priceHistory?: HistoricalPricePoint[];
-  fcfHistory?: { label: string; value: number }[];
-  revenueHistory?: { label: string; value: number }[];
-  epsHistory?: { label: string; value: number }[];
-  roicHistory?: { label: string; value: number }[];
-  debtEquityHistory?: { label: string; value: number }[];
-  profitabilityHistory?: { label: string; value: number }[];
-  fcfMarginHistory?: { label: string; value: number }[];
-  fcfConsistencyHistory?: { label: string; value: number }[];
-  fcfConversionHistory?: { label: string; value: number }[];
-  marginStabilityHistory?: { label: string; value: number }[];
+  fcfHistory?: ChartDataPoint[];
+  revenueHistory?: ChartDataPoint[];
+  epsHistory?: ChartDataPoint[];
+  roicHistory?: ChartDataPoint[];
+  debtEquityHistory?: ChartDataPoint[];
+  profitabilityHistory?: ChartDataPoint[];
+  fcfMarginHistory?: ChartDataPoint[];
+  fcfConsistencyHistory?: ChartDataPoint[];
+  fcfConversionHistory?: ChartDataPoint[];
+  marginStabilityHistory?: ChartDataPoint[];
   
   // Valuation fields
   valuationMetrics: ValuationMetrics;
@@ -120,11 +129,11 @@ export interface AnalysisResult {
   overallValuationScore: number;
   valuationConfidenceScore: number;
   unavailableValuationMetrics: string[];
-  peHistory?: { label: string; value: number }[];
-  psHistory?: { label: string; value: number }[];
-  evsHistory?: { label: string; value: number }[];
-  pfcfHistory?: { label: string; value: number }[];
-  valuationPremiumHistory?: { label: string; value: number }[];
+  peHistory?: ChartDataPoint[];
+  psHistory?: ChartDataPoint[];
+  evsHistory?: ChartDataPoint[];
+  pfcfHistory?: ChartDataPoint[];
+  valuationPremiumHistory?: ChartDataPoint[];
 }
 
 export interface FCFTrendResult {
@@ -135,6 +144,14 @@ export interface FCFTrendResult {
 }
 
 export interface FinancialMetrics {
+  /**
+   * Metric Score & Percentage Representation Convention:
+   * - Percentage-based metrics & quality scores (e.g., fcfConsistency, fcfConversion, marginStability, fcfMargin, roic, grossMargin, netMargin)
+   *   are represented as whole percentages (e.g., 96 for 96%, 100 for 100%, 0 for 0%) or decimal ratios (0.96 -> 96%).
+   * - Growth rates (e.g., revenueCAGR, epsGrowth, fcfGrowth) are represented as decimal rates (e.g., 0.15 for 15%).
+   * - Display and formatting utilities (formatPercentageMetric, MetricCard) accept both whole percentage values (96)
+   *   and decimal ratio inputs (0.96) seamlessly, formatting both as "96%".
+   */
   revenueCAGR: number | null;
   epsGrowth: number | null;
   epsTrend?: "Improving" | "Deteriorating" | "Declining" | "Flat" | "Turnaround" | "Emerging";
@@ -145,8 +162,11 @@ export interface FinancialMetrics {
   fcfTrendScore?: number | null;
   fcfBurnChangePct?: number | null;
   fcfMargin: number | null;
+  /** Stored as whole percentage (0-100), e.g. 96 for 96% */
   fcfConsistency: number | null;
+  /** Stored as whole percentage (0-100+), e.g. 105 for 105% */
   fcfConversion: number | null;
+  /** Stored as whole percentage (0-100), e.g. 80 for 80% */
   marginStability: number | null;
   roic: number | null;
   debtToEquity: number | null;
@@ -163,8 +183,11 @@ export interface MetricScores {
   eps: number | null;
   fcf: number | null;
   fcfMargin: number | null;
+  /** Stored as whole percentage score (0-100), e.g. 96 for 96% */
   fcfConsistency: number | null;
+  /** Stored as whole percentage score (0-100), e.g. 100 for 100% */
   fcfConversion: number | null;
+  /** Stored as whole percentage score (0-100), e.g. 80 for 80% */
   marginStability: number | null;
   roic: number | null;
   debt: number | null;

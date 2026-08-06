@@ -38,15 +38,37 @@ export const SCORE_RANGES = {
 
 /**
  * Format a percentage metric value for UI display.
- * If isAlreadyPercentage is true (e.g. ROIC = 25.0 or -166.45), formats without multiplying by 100.
- * If false/omitted (e.g. CAGR = 1.58 or 0.125), converts decimal rate to percentage by multiplying by 100.
+ * Handles both whole percentage values (e.g. 96 or 25.0) and decimal ratios (e.g. 0.96 or 0.25).
+ * - A score of 96 displays as "96%"
+ * - A score of 0.96 displays as "96%"
+ * - A score of 100 displays as "100%"
+ * - A score of 0 displays as "0%"
+ * - Never displays "9600.00%"
  */
 export function formatPercentageMetric(
   value: number | null | undefined,
   isAlreadyPercentage: boolean = false,
 ): string {
   if (value === null || value === undefined || isNaN(value)) return "N/A";
-  const numVal = isAlreadyPercentage ? value : value * 100;
+
+  let numVal: number;
+
+  if (isAlreadyPercentage) {
+    // If value is passed as a decimal ratio (e.g. 0.96 for 96%, 1.05 for 105%, 0.80 for 80%), convert to whole percentage
+    if (Math.abs(value) > 0 && Math.abs(value) <= 2.0 && !Number.isInteger(value)) {
+      numVal = value * 100;
+    } else {
+      numVal = value;
+    }
+
+    if (Number.isInteger(numVal)) {
+      return `${numVal}%`;
+    }
+    return `${numVal.toFixed(2)}%`;
+  }
+
+  // Growth rate / decimal CAGR (isAlreadyPercentage = false)
+  numVal = value * 100;
   return `${numVal.toFixed(2)}%`;
 }
 

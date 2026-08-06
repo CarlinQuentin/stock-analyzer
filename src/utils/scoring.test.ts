@@ -46,12 +46,34 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
       expect(scoreRevenueGrowth(0)).toBe(30);
     });
 
-    it("7. ROIC = 25 displays as 25.00%", () => {
-      expect(formatPercentageMetric(25, true)).toBe("25.00%");
+    it("7. ROIC = 25 displays as 25%", () => {
+      expect(formatPercentageMetric(25, true)).toBe("25%");
     });
 
     it("8. ROIC = -166.45 displays as -166.45%", () => {
       expect(formatPercentageMetric(-166.45, true)).toBe("-166.45%");
+    });
+
+    it("9. FCF Consistency score formatting requirements", () => {
+      // FCF Consistency score = 96 displays "96%"
+      expect(formatPercentageMetric(96, true)).toBe("96%");
+      // FCF Consistency score = 0.96 displays "96%"
+      expect(formatPercentageMetric(0.96, true)).toBe("96%");
+      // FCF Consistency score = 100 displays "100%"
+      expect(formatPercentageMetric(100, true)).toBe("100%");
+      // FCF Consistency score = 0 displays "0%"
+      expect(formatPercentageMetric(0, true)).toBe("0%");
+    });
+
+    it("10. Other percentage-based metrics format consistently", () => {
+      // FCF Conversion: 105 or 1.05 displays as "105%"
+      expect(formatPercentageMetric(105, true)).toBe("105%");
+      expect(formatPercentageMetric(1.05, true)).toBe("105%");
+      // Margin Stability: 80 or 0.80 displays as "80%"
+      expect(formatPercentageMetric(80, true)).toBe("80%");
+      expect(formatPercentageMetric(0.80, true)).toBe("80%");
+      // FCF Margin: 15.5 displays as "15.50%"
+      expect(formatPercentageMetric(15.5, true)).toBe("15.50%");
     });
   });
 

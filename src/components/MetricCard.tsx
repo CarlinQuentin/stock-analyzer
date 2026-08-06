@@ -1,10 +1,6 @@
 import React from "react";
-import { getMetricAnalysis } from "../utils/scoring";
-
-interface ChartDataPoint {
-  label: string;
-  value: number;
-}
+import { getMetricAnalysis, formatPercentageMetric } from "../utils/scoring";
+import { ChartDataPoint } from "../types";
 
 interface MetricCardProps {
   title: string;
@@ -18,6 +14,9 @@ interface MetricCardProps {
   tooltip?: string;
   chartData?: ChartDataPoint[];
   chartValueType?: "currency" | "percent" | "number";
+  chartType?: "line" | "bar";
+  referenceLineValue?: number;
+  referenceLineLabel?: string;
   isExpanded?: boolean;
   onClick?: () => void;
   directionStrategy?: "higherIsBetter" | "lowerIsBetter";
@@ -35,6 +34,9 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   tooltip,
   chartData,
   chartValueType = "currency",
+  chartType = "line",
+  referenceLineValue,
+  referenceLineLabel,
   isExpanded = false,
   onClick,
   directionStrategy,
@@ -66,7 +68,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
 
   const formatChartValue = (val: number): string => {
     if (chartValueType === "percent") {
-      return `${val.toFixed(1)}%`;
+      return formatPercentageMetric(val, true);
     }
     if (chartValueType === "number") {
       return val.toFixed(2);
@@ -87,13 +89,15 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   const isAlreadyPercentage =
     title.toLowerCase().includes("roic") ||
     title.toLowerCase().includes("profitability") ||
-    title.toLowerCase().includes("margin");
+    title.toLowerCase().includes("margin") ||
+    title.toLowerCase().includes("consistency") ||
+    title.toLowerCase().includes("conversion") ||
+    title.toLowerCase().includes("stability");
+
   const formattedValue =
     typeof value === "number"
       ? unit === "%"
-        ? isAlreadyPercentage
-          ? value.toFixed(2)
-          : (value * 100).toFixed(2)
+        ? formatPercentageMetric(value, isAlreadyPercentage).replace("%", "")
         : value % 1 !== 0
         ? value.toFixed(2)
         : value
@@ -105,26 +109,163 @@ export const MetricCard: React.FC<MetricCardProps> = ({
 
     const width = 400;
     const height = 120;
-    const paddingLeft = 20;
+    const paddingLeft = 25;
     const paddingRight = 20;
     const paddingTop = 20;
     const paddingBottom = 20;
 
+    /**
+     * FCF Consistency Zero-Baseline Bar Chart Renderer:
+     * Visualizes historical annual Free Cash Flow to demonstrate:
+     * 1. Positive cash generation frequency (green bars > $0 vs red bars <= $0)
+     * 2. Cash flow volatility and stability across fiscal years
+     * 3. Long-term operational consistency.
+     */
+    if (chartType === "bar") {
+      const values = chartData.map(d => d.value);
+      const minVal = Math.min(...values);
+      const maxVal = Math.max(...values);
+
+      const yMin = Math.min(0, minVal);
+      const yMax = Math.max(0, maxVal);
+      const range = yMax - yMin;
+      const adjustedMin = range === 0 ? yMin - 1 : yMin - range * 0.15;
+      const adjustedMax = range === 0 ? yMax + 1 : yMax + range * 0.15;
+      const plotHeight = height - paddingTop - paddingBottom;
+      const plotWidth = width - paddingLeft - paddingRight;
+
+      const getY = (val: number) =>
+        height - paddingBottom - ((val - adjustedMin) / (adjustedMax - adjustedMin)) * plotHeight;
+
+      const yZero = getY(0);
+      const step = chartData.length > 0 ? plotWidth / chartData.length : plotWidth;
+      const barWidth = Math.min(22, Math.max(8, step * 0.6));
+
+      return (
+        <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
+          {/* Zero Baseline Reference Line */}
+          <line
+            x1={paddingLeft}
+            y1={yZero}
+            x2={width - paddingRight}
+            y2={yZero}
+            className="stroke-slate-300 dark:stroke-slate-600 stroke-1 stroke-dasharray-[3,3]"
+            strokeDasharray="3,3"
+          />
+
+          {/* Zero Baseline $0 Label */}
+          <text
+            x={paddingLeft - 4}
+            y={yZero + 3}
+            textAnchor="end"
+            className="text-[8px] font-bold fill-slate-400 dark:fill-slate-500"
+          >
+            $0
+          </text>
+
+          {/* Vertical Bars */}
+          {chartData.map((item, i) => {
+            const xCenter = paddingLeft + (i + 0.5) * step;
+            const xLeft = xCenter - barWidth / 2;
+            const yVal = getY(item.value);
+            const isPositive = item.value > 0;
+            const barY = isPositive ? yVal : yZero;
+            const barH = Math.max(2, Math.abs(yVal - yZero));
+            const barColor = isPositive ? "#10b981" : "#ef4444";
+            const statusLabel = isPositive ? "Positive FCF" : "Cash Burn";
+
+            return (
+              <g key={i} className="group/bar cursor-pointer">
+                {/* SVG Bar */}
+                <rect
+                  x={xLeft}
+                  y={barY}
+                  width={barWidth}
+                  height={barH}
+                  rx={2}
+                  fill={barColor}
+                  className="transition-all duration-200 opacity-90 group-hover/bar:opacity-100 group-hover/bar:brightness-110"
+                />
+
+                {/* Fiscal Year Label */}
+                <text
+                  x={xCenter}
+                  y={height - 4}
+                  textAnchor="middle"
+                  className="text-[9px] font-semibold fill-slate-400 dark:fill-slate-400"
+                >
+                  {item.label}
+                </text>
+
+                {/* Interactive Tooltip on Bar Hover */}
+                <g className="opacity-0 group-hover/bar:opacity-100 transition-opacity duration-200 pointer-events-none z-40">
+                  <rect
+                    x={Math.max(4, Math.min(width - 110, xCenter - 55))}
+                    y={Math.max(2, barY - 32)}
+                    width={110}
+                    height={28}
+                    rx={4}
+                    className="fill-slate-900/95 dark:fill-slate-950/95 stroke-slate-700/80"
+                  />
+                  <text
+                    x={Math.max(4, Math.min(width - 110, xCenter - 55)) + 55}
+                    y={Math.max(2, barY - 32) + 12}
+                    textAnchor="middle"
+                    className="text-[9px] font-bold fill-white"
+                  >
+                    {item.label}: {formatChartValue(item.value)}
+                  </text>
+                  <text
+                    x={Math.max(4, Math.min(width - 110, xCenter - 55)) + 55}
+                    y={Math.max(2, barY - 32) + 23}
+                    textAnchor="middle"
+                    className={`text-[8px] font-semibold ${isPositive ? "fill-emerald-400" : "fill-red-400"}`}
+                  >
+                    ● {statusLabel}
+                  </text>
+                </g>
+              </g>
+            );
+          })}
+        </svg>
+      );
+    }
+
     const values = chartData.map(d => d.value);
-    const minVal = Math.min(...values);
-    const maxVal = Math.max(...values);
+    let minVal = Math.min(...values);
+    let maxVal = Math.max(...values);
+    if (referenceLineValue !== undefined) {
+      minVal = Math.min(minVal, referenceLineValue);
+      maxVal = Math.max(maxVal, referenceLineValue);
+    }
     const range = maxVal - minVal;
     
     const adjustedMin = range === 0 ? minVal - 1 : minVal - range * 0.15;
     const adjustedMax = range === 0 ? maxVal + 1 : maxVal + range * 0.15;
 
+    const plotHeight = height - paddingTop - paddingBottom;
+    const plotWidth = width - paddingLeft - paddingRight;
+
     const points = chartData.map((item, i) => {
       const divisor = chartData.length > 1 ? chartData.length - 1 : 1;
-      const x = paddingLeft + (i / divisor) * (width - paddingLeft - paddingRight);
+      const x = paddingLeft + (i / divisor) * plotWidth;
       const val = item.value;
-      const y = height - paddingBottom - ((val - adjustedMin) / (adjustedMax - adjustedMin)) * (height - paddingTop - paddingBottom);
-      return { x, y, label: item.label, value: item.value };
+      const y = height - paddingBottom - ((val - adjustedMin) / (adjustedMax - adjustedMin)) * plotHeight;
+      return {
+        x,
+        y,
+        label: item.label,
+        value: item.value,
+        netIncome: item.netIncome,
+        fcf: item.fcf,
+        revenue: item.revenue,
+        operatingIncome: item.operatingIncome,
+      };
     });
+
+    const yRef = referenceLineValue !== undefined
+      ? height - paddingBottom - ((referenceLineValue - adjustedMin) / (adjustedMax - adjustedMin)) * plotHeight
+      : null;
 
     const getTrendColorHex = (
       data: ChartDataPoint[],
@@ -155,6 +296,15 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       areaPath = `${linePath} L ${points[points.length - 1].x.toFixed(1)},${(height - paddingBottom).toFixed(1)} L ${points[0].x.toFixed(1)},${(height - paddingBottom).toFixed(1)} Z`;
     }
 
+    const formatHelperCurrency = (v: number | undefined): string => {
+      if (v === undefined || isNaN(v)) return "N/A";
+      const isNeg = v < 0;
+      const abs = Math.abs(v);
+      if (abs >= 1e9) return (isNeg ? "-" : "") + "$" + (abs / 1e9).toFixed(2) + "B";
+      if (abs >= 1e6) return (isNeg ? "-" : "") + "$" + (abs / 1e6).toFixed(2) + "M";
+      return (isNeg ? "-" : "") + "$" + abs.toFixed(2);
+    };
+
     return (
       <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
         <defs>
@@ -182,6 +332,28 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           strokeDasharray="3,3"
         />
 
+        {/* Reference Line */}
+        {yRef !== null && yRef >= paddingTop - 5 && yRef <= height - paddingBottom + 5 && (
+          <g>
+            <line
+              x1={paddingLeft}
+              y1={yRef}
+              x2={width - paddingRight}
+              y2={yRef}
+              className="stroke-amber-500/80 dark:stroke-amber-400/80 stroke-1 stroke-dasharray-[3,3]"
+              strokeDasharray="3,3"
+            />
+            <text
+              x={width - paddingRight}
+              y={Math.max(paddingTop + 8, Math.min(height - paddingBottom - 4, yRef - 3))}
+              textAnchor="end"
+              className="text-[8px] font-bold fill-amber-600 dark:fill-amber-400"
+            >
+              {referenceLineLabel || `${referenceLineValue?.toFixed(0)}%`}
+            </text>
+          </g>
+        )}
+
         {/* Filled Area */}
         {points.length > 1 && <path d={areaPath} fill={`url(#${gradId})`} />}
 
@@ -197,39 +369,106 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           />
         )}
 
-        {/* Dots and Labels */}
-        {points.map((p, i) => (
-          <g key={i}>
-            {/* Direct Value Label above the dot */}
-            <text 
-              x={p.x} 
-              y={p.y - 7} 
-              textAnchor="middle" 
-              className="text-[9px] font-bold fill-slate-700 dark:fill-slate-200"
-            >
-              {formatChartValue(p.value)}
-            </text>
-            
-            {/* Dot */}
-            <circle 
-              cx={p.x} 
-              cy={p.y} 
-              r="4" 
-              fill={colorHex} 
-              className="stroke-white dark:stroke-slate-800 stroke-[2px]"
-            />
-            
-            {/* Year Label below the plot area */}
-            <text 
-              x={p.x} 
-              y={height - 4} 
-              textAnchor="middle" 
-              className="text-[9px] font-semibold fill-slate-400 dark:fill-slate-400"
-            >
-              {p.label}
-            </text>
-          </g>
-        ))}
+        {/* Dots, Node Labels, and Interactive Tooltips */}
+        {points.map((p, i) => {
+          const hasFCFDetails = p.netIncome !== undefined && p.fcf !== undefined;
+          const hasMarginDetails = p.revenue !== undefined && p.operatingIncome !== undefined;
+
+          return (
+            <g key={i} className="group/node cursor-pointer">
+              {/* Direct Value Label above the dot */}
+              <text 
+                x={p.x} 
+                y={p.y - 7} 
+                textAnchor="middle" 
+                className="text-[9px] font-bold fill-slate-700 dark:fill-slate-200"
+              >
+                {formatChartValue(p.value)}
+              </text>
+              
+              {/* Dot */}
+              <circle 
+                cx={p.x} 
+                cy={p.y} 
+                r="4" 
+                fill={colorHex} 
+                className="stroke-white dark:stroke-slate-800 stroke-[2px] group-hover/node:r-6 transition-all"
+              />
+              
+              {/* Year Label below the plot area */}
+              <text 
+                x={p.x} 
+                y={height - 4} 
+                textAnchor="middle" 
+                className="text-[9px] font-semibold fill-slate-400 dark:fill-slate-400"
+              >
+                {p.label}
+              </text>
+
+              {/* Enhanced Interactive Tooltip on Hover */}
+              {(hasFCFDetails || hasMarginDetails) && (
+                <g className="opacity-0 group-hover/node:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                  <rect
+                    x={Math.max(4, Math.min(width - 130, p.x - 65))}
+                    y={Math.max(2, p.y - 48)}
+                    width={130}
+                    height={42}
+                    rx={4}
+                    className="fill-slate-900/95 dark:fill-slate-950/95 stroke-slate-700/80 shadow-md"
+                  />
+                  <text
+                    x={Math.max(4, Math.min(width - 130, p.x - 65)) + 65}
+                    y={Math.max(2, p.y - 48) + 12}
+                    textAnchor="middle"
+                    className="text-[9px] font-bold fill-white"
+                  >
+                    {p.label}: {formatChartValue(p.value)}
+                  </text>
+                  {hasFCFDetails && (
+                    <>
+                      <text
+                        x={Math.max(4, Math.min(width - 130, p.x - 65)) + 65}
+                        y={Math.max(2, p.y - 48) + 24}
+                        textAnchor="middle"
+                        className="text-[8px] font-medium fill-slate-300"
+                      >
+                        FCF: {formatHelperCurrency(p.fcf)} | Net Inc: {formatHelperCurrency(p.netIncome)}
+                      </text>
+                      <text
+                        x={Math.max(4, Math.min(width - 130, p.x - 65)) + 65}
+                        y={Math.max(2, p.y - 48) + 35}
+                        textAnchor="middle"
+                        className={`text-[8px] font-semibold ${p.value >= 100 ? "fill-emerald-400" : "fill-amber-400"}`}
+                      >
+                        ● {p.value >= 100 ? "High Quality (>=100%)" : "Lower Conversion (<100%)"}
+                      </text>
+                    </>
+                  )}
+                  {hasMarginDetails && (
+                    <>
+                      <text
+                        x={Math.max(4, Math.min(width - 130, p.x - 65)) + 65}
+                        y={Math.max(2, p.y - 48) + 24}
+                        textAnchor="middle"
+                        className="text-[8px] font-medium fill-slate-300"
+                      >
+                        Op Inc: {formatHelperCurrency(p.operatingIncome)}
+                      </text>
+                      <text
+                        x={Math.max(4, Math.min(width - 130, p.x - 65)) + 65}
+                        y={Math.max(2, p.y - 48) + 35}
+                        textAnchor="middle"
+                        className="text-[8px] font-medium fill-slate-300"
+                      >
+                        Rev: {formatHelperCurrency(p.revenue)}
+                      </text>
+                    </>
+                  )}
+                </g>
+              )}
+            </g>
+          );
+        })}
       </svg>
     );
   };

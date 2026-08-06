@@ -12,7 +12,9 @@ import {
   calculateFCFMargin,
   calculateFCFConsistency,
   calculateFCFConversion,
+  calculateFCFConversionHistory,
   calculateMarginStability,
+  calculateMarginStabilityHistory,
   calculateDividendCAGR,
   calculateROIC,
   calculateAverageROIC,
@@ -1351,5 +1353,79 @@ describe("calculateAllMetrics", () => {
     expect(metrics.marginStability).not.toBeNull();
     expect(metrics.debtToEquity).toBe(0.5);
     expect(metrics.dividendYield).toBe(0.02);
+  });
+});
+
+describe("calculateFCFConversionHistory", () => {
+  it("should generate annual conversion percentages and underlying FCF/NetIncome details", () => {
+    const income = [
+      { date: "2024-12-31", netIncome: 200 },
+      { date: "2023-12-31", netIncome: 100 },
+    ];
+    const cashFlow = [
+      { date: "2024-12-31", operatingCashFlow: 300, capitalExpenditure: 60 }, // FCF = 240, Conversion = 120%
+      { date: "2023-12-31", operatingCashFlow: 100, capitalExpenditure: 20 }, // FCF = 80, Conversion = 80%
+    ];
+
+    const history = calculateFCFConversionHistory(income, cashFlow);
+
+    expect(history.length).toBe(2);
+    expect(history[0]).toEqual({ label: "2023", value: 80, netIncome: 100, fcf: 80 });
+    expect(history[1]).toEqual({ label: "2024", value: 120, netIncome: 200, fcf: 240 });
+  });
+
+  it("should safely exclude years with negative or zero net income without crashing", () => {
+    const income = [
+      { date: "2024-12-31", netIncome: 200 },
+      { date: "2023-12-31", netIncome: -50 }, // Negative net income excluded from ratio
+    ];
+    const cashFlow = [
+      { date: "2024-12-31", operatingCashFlow: 300, capitalExpenditure: 60 },
+      { date: "2023-12-31", operatingCashFlow: -10, capitalExpenditure: 10 },
+    ];
+
+    const history = calculateFCFConversionHistory(income, cashFlow);
+
+    expect(history.length).toBe(1);
+    expect(history[0].label).toBe("2024");
+    expect(history[0].value).toBe(120);
+  });
+
+  it("should return empty array for null or empty input statements", () => {
+    expect(calculateFCFConversionHistory(null, null)).toEqual([]);
+    expect(calculateFCFConversionHistory([], [])).toEqual([]);
+  });
+});
+
+describe("calculateMarginStabilityHistory", () => {
+  it("should generate annual operating margins alongside revenue and operating income", () => {
+    const income = [
+      { date: "2024-12-31", revenue: 1000, operatingIncome: 200 }, // Margin = 20%
+      { date: "2023-12-31", revenue: 800, operatingIncome: 120 },  // Margin = 15%
+    ];
+
+    const history = calculateMarginStabilityHistory(income);
+
+    expect(history.length).toBe(2);
+    expect(history[0]).toEqual({ label: "2023", value: 15, revenue: 800, operatingIncome: 120 });
+    expect(history[1]).toEqual({ label: "2024", value: 20, revenue: 1000, operatingIncome: 200 });
+  });
+
+  it("should handle missing or invalid revenue years gracefully", () => {
+    const income = [
+      { date: "2024-12-31", revenue: 1000, operatingIncome: 200 },
+      { date: "2023-12-31", revenue: 0, operatingIncome: 50 },
+    ];
+
+    const history = calculateMarginStabilityHistory(income);
+
+    expect(history.length).toBe(1);
+    expect(history[0].label).toBe("2024");
+    expect(history[0].value).toBe(20);
+  });
+
+  it("should return empty array for empty or null statements", () => {
+    expect(calculateMarginStabilityHistory(null)).toEqual([]);
+    expect(calculateMarginStabilityHistory([])).toEqual([]);
   });
 });

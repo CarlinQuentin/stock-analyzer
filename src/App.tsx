@@ -16,7 +16,7 @@ import { AuthModal } from "./components/AuthModal";
 import { UserHeader } from "./components/UserHeader";
 import { authService, UserProfile } from "./services/authService";
 import { fmpService } from "./services/financialModelingPrep";
-import { calculateAllMetrics, calculateFCFMarginHistory } from "./utils/financialCalculations";
+import { calculateAllMetrics, calculateFCFMarginHistory, calculateFCFConversionHistory, calculateMarginStabilityHistory } from "./utils/financialCalculations";
 import { calculateMetricScores, calculateOverallScore, calculateDataConfidenceScore, getUnavailableMetrics } from "./utils/scoring";
 import {
   calculateValuationMetrics,
@@ -176,6 +176,8 @@ function App() {
           });
 
         const fcfMarginHistory = calculateFCFMarginHistory(incomeStatements, cashFlowStatements);
+        const fcfConversionHistory = calculateFCFConversionHistory(incomeStatements, cashFlowStatements);
+        const marginStabilityHistory = calculateMarginStabilityHistory(incomeStatements);
 
         // 1. P/E Ratio History
         const peHistory = [...incomeStatements]
@@ -283,6 +285,8 @@ function App() {
           debtEquityHistory,
           profitabilityHistory,
           fcfMarginHistory,
+          fcfConversionHistory,
+          marginStabilityHistory,
           
           valuationMetrics,
           valuationScores,
@@ -629,7 +633,9 @@ function App() {
                   description="Reliability of FCF generation"
                   tooltip="Measures the consistency and reliability of positive free cash flow generation over historical years."
                   icon="🛡️"
-                  chartValueType="percent"
+                  chartData={result.fcfHistory}
+                  chartValueType="currency"
+                  chartType="bar"
                   isExpanded={showAllCharts}
                   onClick={() => setSelectedMetric("fcfConsistency")}
                   directionStrategy="higherIsBetter"
@@ -644,6 +650,8 @@ function App() {
                   icon="🔄"
                   chartData={result.fcfConversionHistory}
                   chartValueType="percent"
+                  referenceLineValue={100}
+                  referenceLineLabel="100% Target"
                   isExpanded={showAllCharts}
                   onClick={() => setSelectedMetric("fcfConversion")}
                   directionStrategy="higherIsBetter"
@@ -658,6 +666,16 @@ function App() {
                   icon="📊"
                   chartData={result.marginStabilityHistory}
                   chartValueType="percent"
+                  referenceLineValue={
+                    result.marginStabilityHistory && result.marginStabilityHistory.length > 0
+                      ? result.marginStabilityHistory.reduce((a, b) => a + b.value, 0) / result.marginStabilityHistory.length
+                      : undefined
+                  }
+                  referenceLineLabel={
+                    result.marginStabilityHistory && result.marginStabilityHistory.length > 0
+                      ? `Avg: ${(result.marginStabilityHistory.reduce((a, b) => a + b.value, 0) / result.marginStabilityHistory.length).toFixed(1)}%`
+                      : undefined
+                  }
                   isExpanded={showAllCharts}
                   onClick={() => setSelectedMetric("marginStability")}
                   directionStrategy="higherIsBetter"

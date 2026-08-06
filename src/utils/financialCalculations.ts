@@ -974,6 +974,50 @@ export function calculateFCFConversion(
 }
 
 /**
+ * Historical FCF Conversion Generator:
+ * Generates historical annual FCF Conversion ratios (%) alongside raw FCF and Net Income values
+ * for visual trend analysis and tooltip details.
+ * Answers: "Why did this company receive its FCF Conversion score?"
+ */
+export function calculateFCFConversionHistory(
+  incomeStatements: FinancialStatement[] | null | undefined,
+  cashFlowStatements: FinancialStatement[] | null | undefined,
+): { label: string; value: number; netIncome?: number; fcf?: number }[] {
+  if (!incomeStatements || !cashFlowStatements || incomeStatements.length === 0 || cashFlowStatements.length === 0) {
+    return [];
+  }
+
+  const result: { label: string; value: number; netIncome?: number; fcf?: number }[] = [];
+  const reversedIncome = [...incomeStatements].reverse();
+
+  for (const s of reversedIncome) {
+    if (!s || !s.date || typeof s.netIncome !== "number" || isNaN(s.netIncome) || s.netIncome <= 0) {
+      continue;
+    }
+
+    const year = new Date(s.date).getFullYear().toString();
+    const matchCF = cashFlowStatements.find(c => c && c.date && new Date(c.date).getFullYear().toString() === year);
+
+    if (matchCF && typeof matchCF.operatingCashFlow === "number" && typeof matchCF.capitalExpenditure === "number") {
+      const fcf = calculateFCF(matchCF.operatingCashFlow, matchCF.capitalExpenditure);
+      if (fcf !== null) {
+        const conversion = (fcf / s.netIncome) * 100;
+        if (isFinite(conversion)) {
+          result.push({
+            label: year,
+            value: Number(conversion.toFixed(2)),
+            netIncome: s.netIncome,
+            fcf: fcf,
+          });
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
  * Calculate Margin Stability score (0-100) measuring whether operating profitability is improving, stable, or deteriorating over time.
  */
 export function calculateMarginStability(
@@ -1036,6 +1080,47 @@ export function calculateMarginStability(
   }
 
   return Math.min(100, Math.max(0, score));
+}
+
+/**
+ * Historical Margin Stability Generator:
+ * Generates historical annual Operating Margins (%) alongside Revenue and Operating Income
+ * for visual trend analysis, reference line calculations, and interactive tooltips.
+ * Answers: "Why did this company receive its Margin Stability score?"
+ */
+export function calculateMarginStabilityHistory(
+  incomeStatements: FinancialStatement[] | null | undefined,
+): { label: string; value: number; revenue?: number; operatingIncome?: number }[] {
+  if (!incomeStatements || !Array.isArray(incomeStatements) || incomeStatements.length === 0) {
+    return [];
+  }
+
+  const result: { label: string; value: number; revenue?: number; operatingIncome?: number }[] = [];
+  const reversedIncome = [...incomeStatements].reverse();
+
+  for (const s of reversedIncome) {
+    if (
+      s &&
+      s.date &&
+      typeof s.revenue === "number" &&
+      s.revenue > 0 &&
+      typeof s.operatingIncome === "number" &&
+      !isNaN(s.operatingIncome)
+    ) {
+      const year = new Date(s.date).getFullYear().toString();
+      const margin = (s.operatingIncome / s.revenue) * 100;
+      if (isFinite(margin)) {
+        result.push({
+          label: year,
+          value: Number(margin.toFixed(2)),
+          revenue: s.revenue,
+          operatingIncome: s.operatingIncome,
+        });
+      }
+    }
+  }
+
+  return result;
 }
 
 /**

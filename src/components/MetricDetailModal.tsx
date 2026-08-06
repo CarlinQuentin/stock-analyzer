@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { AnalysisResult, FinancialMetrics } from "../types";
 import { getFCFFormula } from "../utils/financialCalculations";
+import { formatPercentageMetric } from "../utils/scoring";
 
 const getScoreCategory = (score: number): { label: string; color: string } => {
   if (score >= 85) return { label: "Excellent", color: "green" };
@@ -184,12 +185,13 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           score: result.scores.fcfConsistency,
           value: result.metrics.fcfConsistency,
           unit: "%",
-          chartData: [],
-          chartValueType: "percent" as const,
+          chartData: result.fcfHistory || [],
+          chartValueType: "currency" as const,
+          chartType: "bar" as const,
           description: "Measures the reliability and consistency of positive free cash flow generation over history.",
           formula: "FCF Consistency = Weighted (Positive FCF Years % + Count + Low Volatility)",
           mathExplanation: [
-            `1. FCF Consistency Score: ${result.metrics.fcfConsistency !== null ? result.metrics.fcfConsistency : "N/A"}%`,
+            `1. FCF Consistency Value: ${result.metrics.fcfConsistency !== null ? formatPercentageMetric(result.metrics.fcfConsistency, true) : "N/A"}`,
             `2. Evaluates the ratio of profitable free cash flow years and low volatility.`,
           ],
           whyItMatters: "Consistent free cash flow generation ensures a company can reliably fund capital investments, pay dividends, pay down debt, and weather macroeconomic downcycles.",
@@ -211,10 +213,12 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           unit: "%",
           chartData: result.fcfConversionHistory || [],
           chartValueType: "percent" as const,
+          referenceLineValue: 100,
+          referenceLineLabel: "100% Target",
           description: "Measures the proportion of Net Income converted into Free Cash Flow.",
           formula: "FCF Conversion = (Free Cash Flow / Net Income) * 100",
           mathExplanation: [
-            `1. Latest FCF Conversion Ratio: ${result.metrics.fcfConversion !== null ? result.metrics.fcfConversion.toFixed(2) : "N/A"}%`,
+            `1. Latest FCF Conversion Ratio: ${result.metrics.fcfConversion !== null ? formatPercentageMetric(result.metrics.fcfConversion, true) : "N/A"}`,
             `2. Conversion above 100% indicates earnings are backed by strong cash flow.`,
           ],
           whyItMatters: "FCF conversion evaluates earnings quality. Companies converting >100% of reported accounting net income into true cash flow possess strong cash generation capabilities.",
@@ -227,6 +231,9 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           getInsights: () => ["High FCF conversion indicates high-quality earnings backed by real cash flow."],
         };
       case "marginStability":
+        const avgMargin = result.marginStabilityHistory && result.marginStabilityHistory.length > 0
+          ? result.marginStabilityHistory.reduce((a, b) => a + b.value, 0) / result.marginStabilityHistory.length
+          : undefined;
         return {
           ...defaultData,
           title: "Margin Stability",
@@ -236,10 +243,12 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           unit: "%",
           chartData: result.marginStabilityHistory || [],
           chartValueType: "percent" as const,
+          referenceLineValue: avgMargin,
+          referenceLineLabel: avgMargin !== undefined ? `Avg Margin: ${avgMargin.toFixed(1)}%` : undefined,
           description: "Measures whether operating profitability is improving, stable, or deteriorating over time.",
           formula: "Margin Stability = Standard Deviation of Operating Margins + Trend Adjustment",
           mathExplanation: [
-            `1. Margin Stability Score: ${result.metrics.marginStability !== null ? result.metrics.marginStability : "N/A"}%`,
+            `1. Margin Stability Score: ${result.metrics.marginStability !== null ? formatPercentageMetric(result.metrics.marginStability, true) : "N/A"}`,
             `2. Measures low variation and positive direction in operating profit margins over time.`,
           ],
           whyItMatters: "Stable or expanding operating margins demonstrate pricing power, cost control discipline, and a strong competitive moat against inflation.",
@@ -811,21 +820,159 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     const paddingTop = 30;
     const paddingBottom = 30;
 
+    /**
+     * FCF Consistency Zero-Baseline Bar Chart Renderer:
+     * Visualizes historical annual Free Cash Flow to evaluate:
+     * 1. Positive cash generation frequency (green bars > $0 vs red bars <= $0)
+     * 2. Cash flow volatility and stability across fiscal years
+     * 3. Long-term operational consistency.
+     */
+    if ((config as any).chartType === "bar") {
+      const values = config.chartData.map(d => d.value);
+      const minVal = Math.min(...values);
+      const maxVal = Math.max(...values);
+
+      const yMin = Math.min(0, minVal);
+      const yMax = Math.max(0, maxVal);
+      const range = yMax - yMin;
+      const adjustedMin = range === 0 ? yMin - 1 : yMin - range * 0.15;
+      const adjustedMax = range === 0 ? yMax + 1 : yMax + range * 0.15;
+      const plotHeight = height - paddingTop - paddingBottom;
+      const plotWidth = width - paddingLeft - paddingRight;
+
+      const getY = (val: number) =>
+        height - paddingBottom - ((val - adjustedMin) / (adjustedMax - adjustedMin)) * plotHeight;
+
+      const yZero = getY(0);
+      const step = config.chartData.length > 0 ? plotWidth / config.chartData.length : plotWidth;
+      const barWidth = Math.min(36, Math.max(12, step * 0.6));
+
+      return (
+        <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
+          {/* Zero Baseline Reference Line */}
+          <line
+            x1={paddingLeft}
+            y1={yZero}
+            x2={width - paddingRight}
+            y2={yZero}
+            className="stroke-slate-300 dark:stroke-slate-600 stroke-1 stroke-dasharray-[4,4]"
+            strokeDasharray="4,4"
+          />
+
+          {/* Zero Baseline $0 Label */}
+          <text
+            x={paddingLeft - 6}
+            y={yZero + 3}
+            textAnchor="end"
+            className="text-[9px] font-bold fill-slate-400 dark:fill-slate-500"
+          >
+            $0
+          </text>
+
+          {/* Vertical Bars */}
+          {config.chartData.map((item, i) => {
+            const xCenter = paddingLeft + (i + 0.5) * step;
+            const xLeft = xCenter - barWidth / 2;
+            const yVal = getY(item.value);
+            const isPositive = item.value > 0;
+            const barY = isPositive ? yVal : yZero;
+            const barH = Math.max(3, Math.abs(yVal - yZero));
+            const barColor = isPositive ? "#10b981" : "#ef4444";
+            const statusLabel = isPositive ? "Positive FCF" : "Cash Burn";
+
+            return (
+              <g key={i} className="group/modalbar cursor-pointer">
+                {/* Bar */}
+                <rect
+                  x={xLeft}
+                  y={barY}
+                  width={barWidth}
+                  height={barH}
+                  rx={3}
+                  fill={barColor}
+                  className="transition-all duration-200 opacity-90 group-hover/modalbar:opacity-100 group-hover/modalbar:brightness-110"
+                />
+
+                {/* Fiscal Year Label */}
+                <text
+                  x={xCenter}
+                  y={height - 6}
+                  textAnchor="middle"
+                  className="text-[10px] font-semibold fill-slate-400 dark:fill-slate-400"
+                >
+                  {item.label}
+                </text>
+
+                {/* Interactive Tooltip on Bar Hover */}
+                <g className="opacity-0 group-hover/modalbar:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                  <rect
+                    x={Math.max(6, Math.min(width - 140, xCenter - 70))}
+                    y={Math.max(4, barY - 36)}
+                    width={140}
+                    height={32}
+                    rx={5}
+                    className="fill-slate-900/95 dark:fill-slate-950/95 stroke-slate-700/80 shadow-lg"
+                  />
+                  <text
+                    x={Math.max(6, Math.min(width - 140, xCenter - 70)) + 70}
+                    y={Math.max(4, barY - 36) + 14}
+                    textAnchor="middle"
+                    className="text-[10px] font-bold fill-white"
+                  >
+                    {item.label}: {formatChartValue(item.value, config.chartValueType)}
+                  </text>
+                  <text
+                    x={Math.max(6, Math.min(width - 140, xCenter - 70)) + 70}
+                    y={Math.max(4, barY - 36) + 26}
+                    textAnchor="middle"
+                    className={`text-[9px] font-semibold ${isPositive ? "fill-emerald-400" : "fill-red-400"}`}
+                  >
+                    ● {statusLabel}
+                  </text>
+                </g>
+              </g>
+            );
+          })}
+        </svg>
+      );
+    }
+
     const values = config.chartData.map(d => d.value);
-    const minVal = Math.min(...values);
-    const maxVal = Math.max(...values);
+    let minVal = Math.min(...values);
+    let maxVal = Math.max(...values);
+    const refVal = (config as any).referenceLineValue;
+    const refLabel = (config as any).referenceLineLabel;
+    if (typeof refVal === "number" && isFinite(refVal)) {
+      minVal = Math.min(minVal, refVal);
+      maxVal = Math.max(maxVal, refVal);
+    }
     const range = maxVal - minVal;
     
     const adjustedMin = range === 0 ? minVal - 1 : minVal - range * 0.15;
     const adjustedMax = range === 0 ? maxVal + 1 : maxVal + range * 0.15;
+    const plotHeight = height - paddingTop - paddingBottom;
+    const plotWidth = width - paddingLeft - paddingRight;
 
     const points = config.chartData.map((item, i) => {
       const divisor = config.chartData.length > 1 ? config.chartData.length - 1 : 1;
-      const x = paddingLeft + (i / divisor) * (width - paddingLeft - paddingRight);
+      const x = paddingLeft + (i / divisor) * plotWidth;
       const val = item.value;
-      const y = height - paddingBottom - ((val - adjustedMin) / (adjustedMax - adjustedMin)) * (height - paddingTop - paddingBottom);
-      return { x, y, label: item.label, value: item.value };
+      const y = height - paddingBottom - ((val - adjustedMin) / (adjustedMax - adjustedMin)) * plotHeight;
+      return {
+        x,
+        y,
+        label: item.label,
+        value: item.value,
+        netIncome: (item as any).netIncome,
+        fcf: (item as any).fcf,
+        revenue: (item as any).revenue,
+        operatingIncome: (item as any).operatingIncome,
+      };
     });
+
+    const yRef = typeof refVal === "number" && isFinite(refVal)
+      ? height - paddingBottom - ((refVal - adjustedMin) / (adjustedMax - adjustedMin)) * plotHeight
+      : null;
 
     const gradId = `modal-chart-grad-${metricKey}`;
 
@@ -836,6 +983,15 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       linePath = `M ${points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L ")}`;
       areaPath = `${linePath} L ${points[points.length - 1].x.toFixed(1)},${(height - paddingBottom).toFixed(1)} L ${points[0].x.toFixed(1)},${(height - paddingBottom).toFixed(1)} Z`;
     }
+
+    const formatHelperCurrency = (v: number | undefined): string => {
+      if (v === undefined || isNaN(v)) return "N/A";
+      const isNeg = v < 0;
+      const abs = Math.abs(v);
+      if (abs >= 1e9) return (isNeg ? "-" : "") + "$" + (abs / 1e9).toFixed(2) + "B";
+      if (abs >= 1e6) return (isNeg ? "-" : "") + "$" + (abs / 1e6).toFixed(2) + "M";
+      return (isNeg ? "-" : "") + "$" + abs.toFixed(2);
+    };
 
     return (
       <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
@@ -864,6 +1020,28 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           strokeDasharray="4,4"
         />
 
+        {/* Reference Line */}
+        {yRef !== null && yRef >= paddingTop - 5 && yRef <= height - paddingBottom + 5 && (
+          <g>
+            <line
+              x1={paddingLeft}
+              y1={yRef}
+              x2={width - paddingRight}
+              y2={yRef}
+              className="stroke-amber-500/80 dark:stroke-amber-400/80 stroke-1 stroke-dasharray-[4,4]"
+              strokeDasharray="4,4"
+            />
+            <text
+              x={width - paddingRight}
+              y={Math.max(paddingTop + 10, Math.min(height - paddingBottom - 4, yRef - 4))}
+              textAnchor="end"
+              className="text-[9px] font-bold fill-amber-600 dark:fill-amber-400"
+            >
+              {refLabel || `${refVal?.toFixed(0)}%`}
+            </text>
+          </g>
+        )}
+
         {/* Area */}
         {points.length > 1 && <path d={areaPath} fill={`url(#${gradId})`} />}
 
@@ -879,39 +1057,106 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           />
         )}
 
-        {/* Nodes */}
-        {points.map((p, i) => (
-          <g key={i}>
-            {/* Value Label above dot */}
-            <text 
-              x={p.x} 
-              y={p.y - 8} 
-              textAnchor="middle" 
-              className="text-[10px] font-bold fill-slate-700 dark:fill-slate-200"
-            >
-              {formatChartValue(p.value, config.chartValueType)}
-            </text>
-            
-            {/* Circle Node */}
-            <circle 
-              cx={p.x} 
-              cy={p.y} 
-              r="5" 
-              fill={activeColorHex} 
-              className="stroke-white dark:stroke-slate-900 stroke-[2.5px] drop-shadow-sm"
-            />
-            
-            {/* Year Label below axis */}
-            <text 
-              x={p.x} 
-              y={height - 6} 
-              textAnchor="middle" 
-              className="text-[10px] font-semibold fill-slate-400 dark:fill-slate-400"
-            >
-              {p.label}
-            </text>
-          </g>
-        ))}
+        {/* Nodes and Hover Tooltips */}
+        {points.map((p, i) => {
+          const hasFCFDetails = p.netIncome !== undefined && p.fcf !== undefined;
+          const hasMarginDetails = p.revenue !== undefined && p.operatingIncome !== undefined;
+
+          return (
+            <g key={i} className="group/modalnode cursor-pointer">
+              {/* Value Label above dot */}
+              <text 
+                x={p.x} 
+                y={p.y - 8} 
+                textAnchor="middle" 
+                className="text-[10px] font-bold fill-slate-700 dark:fill-slate-200"
+              >
+                {formatChartValue(p.value, config.chartValueType)}
+              </text>
+              
+              {/* Circle Node */}
+              <circle 
+                cx={p.x} 
+                cy={p.y} 
+                r="5" 
+                fill={activeColorHex} 
+                className="stroke-white dark:stroke-slate-900 stroke-[2.5px] drop-shadow-sm group-hover/modalnode:r-7 transition-all"
+              />
+              
+              {/* Year Label below axis */}
+              <text 
+                x={p.x} 
+                y={height - 6} 
+                textAnchor="middle" 
+                className="text-[10px] font-semibold fill-slate-400 dark:fill-slate-400"
+              >
+                {p.label}
+              </text>
+
+              {/* Enhanced Interactive Tooltip on Hover */}
+              {(hasFCFDetails || hasMarginDetails) && (
+                <g className="opacity-0 group-hover/modalnode:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                  <rect
+                    x={Math.max(6, Math.min(width - 150, p.x - 75))}
+                    y={Math.max(4, p.y - 52)}
+                    width={150}
+                    height={46}
+                    rx={5}
+                    className="fill-slate-900/95 dark:fill-slate-950/95 stroke-slate-700/80 shadow-lg"
+                  />
+                  <text
+                    x={Math.max(6, Math.min(width - 150, p.x - 75)) + 75}
+                    y={Math.max(4, p.y - 52) + 14}
+                    textAnchor="middle"
+                    className="text-[10px] font-bold fill-white"
+                  >
+                    {p.label}: {formatChartValue(p.value, config.chartValueType)}
+                  </text>
+                  {hasFCFDetails && (
+                    <>
+                      <text
+                        x={Math.max(6, Math.min(width - 150, p.x - 75)) + 75}
+                        y={Math.max(4, p.y - 52) + 27}
+                        textAnchor="middle"
+                        className="text-[9px] font-medium fill-slate-300"
+                      >
+                        FCF: {formatHelperCurrency(p.fcf)} | Net Inc: {formatHelperCurrency(p.netIncome)}
+                      </text>
+                      <text
+                        x={Math.max(6, Math.min(width - 150, p.x - 75)) + 75}
+                        y={Math.max(4, p.y - 52) + 39}
+                        textAnchor="middle"
+                        className={`text-[9px] font-semibold ${p.value >= 100 ? "fill-emerald-400" : "fill-amber-400"}`}
+                      >
+                        ● {p.value >= 100 ? "High Quality (>=100%)" : "Lower Conversion (<100%)"}
+                      </text>
+                    </>
+                  )}
+                  {hasMarginDetails && (
+                    <>
+                      <text
+                        x={Math.max(6, Math.min(width - 150, p.x - 75)) + 75}
+                        y={Math.max(4, p.y - 52) + 27}
+                        textAnchor="middle"
+                        className="text-[9px] font-medium fill-slate-300"
+                      >
+                        Op Inc: {formatHelperCurrency(p.operatingIncome)}
+                      </text>
+                      <text
+                        x={Math.max(6, Math.min(width - 150, p.x - 75)) + 75}
+                        y={Math.max(4, p.y - 52) + 39}
+                        textAnchor="middle"
+                        className="text-[9px] font-medium fill-slate-300"
+                      >
+                        Rev: {formatHelperCurrency(p.revenue)}
+                      </text>
+                    </>
+                  )}
+                </g>
+              )}
+            </g>
+          );
+        })}
       </svg>
     );
   };
@@ -1043,11 +1288,15 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                   {config.value !== null ? (
                     <>
                       {config.unit === "%"
-                        ? config.title.toLowerCase().includes("roic") ||
-                          config.title.toLowerCase().includes("profitability") ||
-                          config.title.toLowerCase().includes("margin")
-                          ? config.value.toFixed(2)
-                          : (config.value * 100).toFixed(2)
+                        ? formatPercentageMetric(
+                            config.value,
+                            config.title.toLowerCase().includes("roic") ||
+                            config.title.toLowerCase().includes("profitability") ||
+                            config.title.toLowerCase().includes("margin") ||
+                            config.title.toLowerCase().includes("consistency") ||
+                            config.title.toLowerCase().includes("conversion") ||
+                            config.title.toLowerCase().includes("stability")
+                          ).replace("%", "")
                         : config.value.toFixed(2)}
                       <span className="text-lg text-slate-500 font-semibold ml-1">{config.unit}</span>
                     </>
