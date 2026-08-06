@@ -63,7 +63,7 @@ export const savedStocksService = {
   },
 
   async saveStock(stock: SavedStock, userId?: string | null): Promise<SavedStock[]> {
-    if (!stock || !stock.ticker) return this.getSavedStocks(userId);
+    if (!userId || !stock || !stock.ticker) return [];
     const cleanTicker = stock.ticker.toUpperCase();
     const now = new Date().toISOString();
 
@@ -116,7 +116,7 @@ export const savedStocksService = {
   },
 
   async removeStock(ticker: string, userId?: string | null): Promise<SavedStock[]> {
-    if (!ticker) return this.getSavedStocks(userId);
+    if (!userId || !ticker) return [];
     const cleanTicker = ticker.toUpperCase();
 
     const currentStocks = await this.getSavedStocks(userId);

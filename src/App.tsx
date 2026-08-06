@@ -93,6 +93,13 @@ function App() {
     };
   }, [user?.id]);
 
+  const isAuthenticated = Boolean(user && user.email && user.email.includes("@"));
+
+  const handleRequireAuth = useCallback((message?: string) => {
+    setAuthPromptMessage(message || "Sign in to save stocks to your account.");
+    setShowAuthModal(true);
+  }, []);
+
   const handleLogout = useCallback(() => {
     authService.logout();
     setUser(null);
@@ -103,6 +110,10 @@ function App() {
   }, []);
 
   const handleToggleSaveStock = useCallback(async () => {
+    if (!isAuthenticated) {
+      handleRequireAuth("Sign in to save stocks to your account.");
+      return;
+    }
     if (!result) return;
     const stockToSave: SavedStock = {
       ticker: result.ticker,
@@ -118,7 +129,7 @@ function App() {
       user?.id,
     );
     setSavedStocks(stocks);
-  }, [result, user?.id]);
+  }, [result, user?.id, isAuthenticated, handleRequireAuth]);
 
   const handleRemoveSavedStock = useCallback(
     async (ticker: string) => {
@@ -551,7 +562,7 @@ function App() {
             user={user}
             savedCount={savedStocks.length}
             onLogout={handleLogout}
-            onLoginRequest={() => setShowAuthModal(true)}
+            onLoginRequest={() => handleRequireAuth("Sign in to save stocks to your account.")}
             onOpenSavedStocks={() => setCurrentView("saved")}
           />
         </div>
@@ -563,6 +574,15 @@ function App() {
 
   // Render Saved Stocks Page View
   if (currentView === "saved") {
+    if (!isAuthenticated) {
+      // Unauthenticated users are prompted to sign in and redirected back to analyze
+      setTimeout(() => {
+        setCurrentView("analyze");
+        handleRequireAuth("Sign in to access your saved stocks.");
+      }, 0);
+      return null;
+    }
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 transition-colors duration-300">
         <div className="fixed top-4 left-4 z-40">
@@ -570,7 +590,7 @@ function App() {
             user={user}
             savedCount={savedStocks.length}
             onLogout={handleLogout}
-            onLoginRequest={() => setShowAuthModal(true)}
+            onLoginRequest={() => handleRequireAuth("Sign in to access your saved stocks.")}
             onOpenSavedStocks={() => setCurrentView("saved")}
           />
         </div>
@@ -603,7 +623,7 @@ function App() {
             user={user}
             savedCount={savedStocks.length}
             onLogout={handleLogout}
-            onLoginRequest={() => setShowAuthModal(true)}
+            onLoginRequest={() => handleRequireAuth("Sign in to save stocks to your account.")}
             onOpenSavedStocks={() => setCurrentView("saved")}
           />
         </div>
@@ -631,7 +651,7 @@ function App() {
             user={user}
             savedCount={savedStocks.length}
             onLogout={handleLogout}
-            onLoginRequest={() => setShowAuthModal(true)}
+            onLoginRequest={() => handleRequireAuth("Sign in to save stocks to your account.")}
             onOpenSavedStocks={() => setCurrentView("saved")}
           />
         </div>
@@ -663,7 +683,7 @@ function App() {
             user={user}
             savedCount={savedStocks.length}
             onLogout={handleLogout}
-            onLoginRequest={() => setShowAuthModal(true)}
+            onLoginRequest={() => handleRequireAuth("Sign in to save stocks to your account.")}
             onOpenSavedStocks={() => setCurrentView("saved")}
           />
         </div>
@@ -691,7 +711,7 @@ function App() {
             user={user}
             savedCount={savedStocks.length}
             onLogout={handleLogout}
-            onLoginRequest={() => setShowAuthModal(true)}
+            onLoginRequest={() => handleRequireAuth("Sign in to save stocks to your account.")}
             onOpenSavedStocks={() => setCurrentView("saved")}
           />
         </div>
@@ -729,7 +749,7 @@ function App() {
           user={user}
           savedCount={savedStocks.length}
           onLogout={handleLogout}
-          onLoginRequest={() => setShowAuthModal(true)}
+          onLoginRequest={() => handleRequireAuth("Sign in to save stocks to your account.")}
           onOpenSavedStocks={() => setCurrentView("saved")}
         />
       </div>
@@ -762,7 +782,9 @@ function App() {
             <CompanyHeader
               profile={result.companyProfile}
               isSaved={savedStocksService.isStockSaved(result.ticker, savedStocks)}
+              isAuthenticated={isAuthenticated}
               onToggleSave={handleToggleSaveStock}
+              onRequireAuth={() => handleRequireAuth("Sign in to save stocks to your account.")}
             />
           </div>
           <div className="lg:col-span-5">

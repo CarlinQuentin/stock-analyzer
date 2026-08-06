@@ -78,7 +78,12 @@ export const UserHeader: React.FC<UserHeaderProps> = ({
             <button
               onClick={() => {
                 setIsOpen(false);
-                if (onOpenSavedStocks) onOpenSavedStocks();
+                const isAuthenticated = Boolean(user && user.email && user.email.includes("@"));
+                if (isAuthenticated) {
+                  if (onOpenSavedStocks) onOpenSavedStocks();
+                } else {
+                  if (onLoginRequest) onLoginRequest();
+                }
               }}
               className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
             >
@@ -86,9 +91,11 @@ export const UserHeader: React.FC<UserHeaderProps> = ({
                 <span className="text-sm">⭐</span>
                 <span>Saved Stocks</span>
               </div>
-              <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
-                {savedCount}
-              </span>
+              {Boolean(user && user.email) && (
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                  {savedCount}
+                </span>
+              )}
             </button>
 
             <div className="my-1 border-t border-slate-100 dark:border-slate-700/60" />
