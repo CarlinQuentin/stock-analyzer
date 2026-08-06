@@ -1124,6 +1124,198 @@ export function calculateMarginStabilityHistory(
 }
 
 /**
+ * Financial Strength Metric: Net Debt / FCF
+ * Measures financial flexibility and ability to repay obligations using internally generated free cash flow.
+ * Net Debt = Total Debt - Cash & Cash Equivalents
+ * Ratio = Net Debt / FCF
+ */
+export function calculateNetDebtToFCF(
+  balanceSheets: FinancialStatement[] | null | undefined,
+  cashFlowStatements: FinancialStatement[] | null | undefined,
+): number | null {
+  if (!balanceSheets || !cashFlowStatements || balanceSheets.length === 0 || cashFlowStatements.length === 0) {
+    return null;
+  }
+
+  const sortedBalance = [...balanceSheets]
+    .filter((s) => s && s.date)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const sortedCashFlow = [...cashFlowStatements]
+    .filter((s) => s && s.date && s.operatingCashFlow !== undefined && s.capitalExpenditure !== undefined)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  if (sortedBalance.length === 0 || sortedCashFlow.length === 0) {
+    return null;
+  }
+
+  const latestBalance = sortedBalance[0];
+  const totalDebt = typeof latestBalance.totalDebt === "number" ? latestBalance.totalDebt : 0;
+  const cash = typeof latestBalance.cashAndCashEquivalents === "number"
+    ? latestBalance.cashAndCashEquivalents
+    : typeof (latestBalance as any).cashAndShortTermInvestments === "number"
+    ? (latestBalance as any).cashAndShortTermInvestments
+    : 0;
+
+  const netDebt = totalDebt - cash;
+
+  const latestYear = new Date(latestBalance.date).getFullYear();
+  let matchCF = sortedCashFlow.find((c) => new Date(c.date).getFullYear() === latestYear);
+  if (!matchCF) matchCF = sortedCashFlow[0];
+
+  const fcf = calculateFCF(matchCF.operatingCashFlow, matchCF.capitalExpenditure);
+  if (fcf === null) return null;
+
+  if (fcf <= 0) {
+    if (netDebt <= 0) return Number((netDebt / Math.abs(fcf || 1)).toFixed(2));
+    return 99.0;
+  }
+
+  return Number((netDebt / fcf).toFixed(2));
+}
+
+/**
+ * Historical Net Debt / FCF History Generator:
+ * Computes annual Net Debt / FCF ratios for trend visualization.
+ */
+export function calculateNetDebtToFCFHistory(
+  balanceSheets: FinancialStatement[] | null | undefined,
+  cashFlowStatements: FinancialStatement[] | null | undefined,
+): { label: string; value: number }[] {
+  if (!balanceSheets || !cashFlowStatements || balanceSheets.length === 0 || cashFlowStatements.length === 0) {
+    return [];
+  }
+
+  const result: { label: string; value: number }[] = [];
+  const reversedBalance = [...balanceSheets]
+    .filter((s) => s && s.date)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  for (const b of reversedBalance) {
+    const year = new Date(b.date).getFullYear().toString();
+    const matchCF = cashFlowStatements.find((c) => c && c.date && new Date(c.date).getFullYear().toString() === year);
+
+    if (matchCF && typeof matchCF.operatingCashFlow === "number" && typeof matchCF.capitalExpenditure === "number") {
+      const totalDebt = typeof b.totalDebt === "number" ? b.totalDebt : 0;
+      const cash = typeof b.cashAndCashEquivalents === "number" ? b.cashAndCashEquivalents : 0;
+      const netDebt = totalDebt - cash;
+      const fcf = calculateFCF(matchCF.operatingCashFlow, matchCF.capitalExpenditure);
+
+      if (fcf !== null) {
+        const ratio = fcf > 0 ? netDebt / fcf : netDebt <= 0 ? netDebt / Math.abs(fcf || 1) : 99.0;
+        if (isFinite(ratio)) {
+          result.push({ label: year, value: Number(ratio.toFixed(2)) });
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Shareholder Value Metric: Share Dilution
+ * Measures whether management creates or reduces shareholder ownership value over time.
+ * Calculates percentage change in shares outstanding over historical measurement period:
+ * Share Dilution = ((Current Shares - Historical Shares) / Historical Shares) * 100
+ * Negative value = Share buyback / ownership accretion (Positive)
+ * Positive value = Share issuance / ownership dilution (Negative)
+ */
+export function calculateShareDilution(
+  incomeStatements: FinancialStatement[] | null | undefined,
+  balanceSheets?: FinancialStatement[] | null | undefined,
+): number | null {
+  if ((!incomeStatements || incomeStatements.length < 2) && (!balanceSheets || balanceSheets.length < 2)) {
+    return null;
+  }
+
+  const extractShares = (s: FinancialStatement): number | null => {
+    if (!s) return null;
+    const candidates = [
+      (s as any).weightedAverageSharesDiluted,
+      (s as any).weightedAverageSharesOutstanding,
+      (s as any).weightedAverageShsOut,
+      (s as any).commonStockSharesOutstanding,
+      (s as any).sharesOutstanding,
+    ];
+    for (const c of candidates) {
+      if (typeof c === "number" && c > 0 && isFinite(c)) return c;
+    }
+    return null;
+  };
+
+  const statements = [...(incomeStatements || []), ...(balanceSheets || [])]
+    .filter((s) => s && s.date && extractShares(s) !== null)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  if (statements.length < 2) return null;
+
+  const yearlyMap = new Map<string, number>();
+  for (const s of statements) {
+    const year = new Date(s.date).getFullYear().toString();
+    const shs = extractShares(s);
+    if (shs !== null) yearlyMap.set(year, shs);
+  }
+
+  const years = Array.from(yearlyMap.keys()).sort();
+  if (years.length < 2) return null;
+
+  const initialShares = yearlyMap.get(years[0])!;
+  const latestShares = yearlyMap.get(years[years.length - 1])!;
+
+  if (initialShares <= 0 || latestShares <= 0) return null;
+
+  const dilution = ((latestShares - initialShares) / initialShares) * 100;
+  return Number(dilution.toFixed(2));
+}
+
+/**
+ * Historical Share Count Generator:
+ * Generates annual shares outstanding ({ label: year, value: shares }) for visual trend chart.
+ */
+export function calculateShareDilutionHistory(
+  incomeStatements: FinancialStatement[] | null | undefined,
+  balanceSheets?: FinancialStatement[] | null | undefined,
+): { label: string; value: number }[] {
+  if ((!incomeStatements || incomeStatements.length === 0) && (!balanceSheets || balanceSheets.length === 0)) {
+    return [];
+  }
+
+  const extractShares = (s: FinancialStatement): number | null => {
+    if (!s) return null;
+    const candidates = [
+      (s as any).weightedAverageSharesDiluted,
+      (s as any).weightedAverageSharesOutstanding,
+      (s as any).weightedAverageShsOut,
+      (s as any).commonStockSharesOutstanding,
+      (s as any).sharesOutstanding,
+    ];
+    for (const c of candidates) {
+      if (typeof c === "number" && c > 0 && isFinite(c)) return c;
+    }
+    return null;
+  };
+
+  const yearlyMap = new Map<string, number>();
+  const combined = [...(incomeStatements || []), ...(balanceSheets || [])]
+    .filter((s) => s && s.date)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  for (const s of combined) {
+    const year = new Date(s.date).getFullYear().toString();
+    const shs = extractShares(s);
+    if (shs !== null) yearlyMap.set(year, shs);
+  }
+
+  const result: { label: string; value: number }[] = [];
+  for (const [year, val] of yearlyMap.entries()) {
+    result.push({ label: year, value: val });
+  }
+
+  return result.sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/**
  * Calculate all financial metrics
  */
 export function calculateAllMetrics(
@@ -1151,6 +1343,8 @@ export function calculateAllMetrics(
     fcfConsistency: calculateFCFConsistency(cashFlowStatements),
     fcfConversion: calculateFCFConversion(incomeStatements, cashFlowStatements),
     marginStability: calculateMarginStability(incomeStatements),
+    netDebtToFCF: calculateNetDebtToFCF(balanceSheets, cashFlowStatements),
+    shareDilution: calculateShareDilution(incomeStatements, balanceSheets),
     roic: calculateAverageROIC(incomeStatements, balanceSheets),
     debtToEquity: calculateDebtToEquity(
       sortedBalance[0]?.totalDebt,

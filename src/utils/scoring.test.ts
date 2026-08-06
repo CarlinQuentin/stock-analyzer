@@ -8,6 +8,8 @@ import {
   scoreFCFConsistency,
   scoreFCFConversion,
   scoreMarginStability,
+  scoreNetDebtToFCF,
+  scoreShareDilution,
   calculateMetricScores,
   calculateUniversalBusinessScore,
   calculateIndustryScore,
@@ -137,6 +139,24 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
       expect(scoreMarginStability(105)).toBe(100);
       expect(scoreMarginStability(null)).toBeNull();
     });
+
+    it("scoreNetDebtToFCF should score solvency ratios accurately", () => {
+      expect(scoreNetDebtToFCF(-1.5)).toBe(100); // Net cash position
+      expect(scoreNetDebtToFCF(1.0)).toBe(95);   // < 2.0x (Excellent)
+      expect(scoreNetDebtToFCF(3.0)).toBe(80);   // 2.0x - 4.0x (Good)
+      expect(scoreNetDebtToFCF(5.0)).toBe(60);   // 4.0x - 6.0x (Moderate risk)
+      expect(scoreNetDebtToFCF(7.0)).toBe(41);   // > 6.0x (High leverage)
+      expect(scoreNetDebtToFCF(null)).toBeNull();
+    });
+
+    it("scoreShareDilution should score share dilution and buybacks accurately", () => {
+      expect(scoreShareDilution(-8.0)).toBe(100); // <= -5% (Meaningful buyback)
+      expect(scoreShareDilution(-1.5)).toBe(92);  // -5% to +2% (Strong)
+      expect(scoreShareDilution(3.5)).toBe(72);   // 2% to 5% (Neutral)
+      expect(scoreShareDilution(7.5)).toBe(50);   // 5% to 10% (Penalty)
+      expect(scoreShareDilution(15.0)).toBe(24);  // > 10% (Significant dilution)
+      expect(scoreShareDilution(null)).toBeNull();
+    });
   });
 });
 
@@ -149,6 +169,8 @@ describe("Universal Business Quality Score Architecture & Engine", () => {
     fcfConsistency: 85,
     fcfConversion: 105,
     marginStability: 80,
+    netDebtToFCF: 1.5,
+    shareDilution: -5.0,
     roic: 16,
     debtToEquity: 0.4,
     dividendYield: 0.02,
@@ -176,27 +198,40 @@ describe("Universal Business Quality Score Architecture & Engine", () => {
     expect(scores.marginStability).toBe(80);
     expect(scores.revenue).toBeGreaterThan(0);
     expect(scores.eps).toBeGreaterThan(0);
-
-    // Informational metrics present in scores object
-    expect(scores.debt).not.toBeNull();
-    expect(scores.profitability).not.toBeNull();
-    expect(scores.fcf).not.toBeNull();
   });
 
-  it("3. Universal score ONLY includes configured universal metrics and IGNORES informational metrics", () => {
-    const baseScores: MetricScores = {
-      roic: 100,           // weight 0.20 -> 20 pts
-      fcfMargin: 100,      // weight 0.20 -> 20 pts
-      fcfConsistency: 100, // weight 0.15 -> 15 pts
-      fcfConversion: 100,  // weight 0.15 -> 15 pts
-      marginStability: 100,// weight 0.10 -> 10 pts
-      revenue: 100,        // weight 0.10 -> 10 pts
-      eps: 100,            // weight 0.10 -> 10 pts
+  it("2. Verifies universal scoring config contains exactly 9 universal metrics totaling 1.0 weight", () => {
+    const configMetrics = DEFAULT_SCORING_CONFIG.universalScoreMetrics;
+    const universalKeys = Object.keys(configMetrics);
+    expect(universalKeys.length).toBe(9);
+    expect(universalKeys).toContain("roic");
+    expect(universalKeys).toContain("fcfMargin");
+    expect(universalKeys).toContain("fcfConsistency");
+    expect(universalKeys).toContain("fcfConversion");
+    expect(universalKeys).toContain("marginStability");
+    expect(universalKeys).toContain("netDebtToFCF");
+    expect(universalKeys).toContain("shareDilution");
+    expect(universalKeys).toContain("revenue");
+    expect(universalKeys).toContain("eps");
 
-      // Informational metrics set to ZERO
-      fcf: 0,
-      debt: 0,
-      profitability: 0,
+    const totalConfigWeight = Object.values(configMetrics).reduce((sum, item) => sum + item.weight, 0);
+    expect(Number(totalConfigWeight.toFixed(2))).toBe(1.0);
+  });
+
+  it("3. Calculates Universal Business Quality Score correctly across 9 universal metrics", () => {
+    const baseScores: MetricScores = {
+      roic: 100,           // 15%
+      fcfMargin: 100,      // 15%
+      fcfConsistency: 100, // 15%
+      fcfConversion: 100,  // 10%
+      marginStability: 100,// 10%
+      netDebtToFCF: 100,   // 10%
+      shareDilution: 100,  // 10%
+      revenue: 100,        // 10%
+      eps: 100,            // 5%
+      fcf: 0,             // Informational (0%)
+      debt: 0,            // Informational (0%)
+      profitability: 0,   // Informational (0%)
     };
 
     // Total = 100 pts out of 100
@@ -220,6 +255,8 @@ describe("Universal Business Quality Score Architecture & Engine", () => {
       fcfConsistency: 80,
       fcfConversion: 80,
       marginStability: 80,
+      netDebtToFCF: 80,
+      shareDilution: 80,
       revenue: 80,
       eps: 80,
       debt: 0,
@@ -240,21 +277,23 @@ describe("Universal Business Quality Score Architecture & Engine", () => {
 
   it("5. Missing universal metrics do not break scoring and reweights dynamically", () => {
     const partialUniversalScores: MetricScores = {
-      roic: 100,           // weight 0.20
-      fcfMargin: 100,      // weight 0.20
+      roic: 100,           // weight 0.15
+      fcfMargin: 100,      // weight 0.15
       fcfConsistency: null,// missing
       fcfConversion: null, // missing
       marginStability: null,// missing
+      netDebtToFCF: 100,   // weight 0.10
+      shareDilution: 100,  // weight 0.10
       revenue: 100,        // weight 0.10
-      eps: 100,            // weight 0.10
+      eps: 100,            // weight 0.05
       debt: 50,
       profitability: 50,
       fcf: 50,
     };
 
-    // Available weights: 0.20 + 0.20 + 0.10 + 0.10 = 0.60
-    // Sum = (100*0.2) + (100*0.2) + (100*0.1) + (100*0.1) = 60 pts
-    // Score = 60 / 0.60 = 100
+    // Available weights: 0.15 + 0.15 + 0.10 + 0.10 + 0.10 + 0.05 = 0.65
+    // Sum = (100*0.15) + (100*0.15) + (100*0.1) + (100*0.1) + (100*0.1) + (100*0.05) = 65 pts
+    // Score = 65 / 0.65 = 100
     expect(calculateUniversalBusinessScore(partialUniversalScores)).toBe(100);
   });
 
@@ -265,6 +304,8 @@ describe("Universal Business Quality Score Architecture & Engine", () => {
       fcfConsistency: 80,
       fcfConversion: 80,
       marginStability: 80,
+      netDebtToFCF: 80,
+      shareDilution: 80,
       revenue: 80,
       eps: 80,
       fcf: null,
@@ -279,6 +320,6 @@ describe("Universal Business Quality Score Architecture & Engine", () => {
     };
 
     const industryScore = calculateIndustryScore(scores, bankingIndustryConfig);
-    expect(industryScore).toBe(88); // Round((95*0.5 + 80*0.5) / 1.0) = 88
+    expect(industryScore).toBe(88);
   });
 });

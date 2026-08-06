@@ -200,6 +200,44 @@ export const AnalysisTable: React.FC<AnalysisTableProps> = ({
                 </td>
               </tr>
 
+              {/* Net Debt / FCF */}
+              <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
+                  <div>Net Debt / FCF</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">Solvency & debt coverage by free cash flow</div>
+                </td>
+                <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200 font-semibold">
+                  {metrics.netDebtToFCF !== null ? `${metrics.netDebtToFCF.toFixed(2)}x` : "N/A"}
+                </td>
+                <td className="text-center px-6 py-4">
+                  {renderPerformanceBadge(scores.netDebtToFCF)}
+                </td>
+                <td className="text-right px-6 py-4">
+                  <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.netDebtToFCF)}`}>
+                    {scores.netDebtToFCF !== null ? scores.netDebtToFCF : "N/A"}
+                  </span>
+                </td>
+              </tr>
+
+              {/* Share Dilution */}
+              <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
+                  <div>Share Dilution</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">Shareholder ownership change over period</div>
+                </td>
+                <td className="text-right px-6 py-4 text-slate-900 dark:text-slate-200 font-semibold">
+                  {formatPercentage(metrics.shareDilution, true)}
+                </td>
+                <td className="text-center px-6 py-4">
+                  {renderPerformanceBadge(scores.shareDilution)}
+                </td>
+                <td className="text-right px-6 py-4">
+                  <span className={`inline-block px-3 py-1 rounded font-bold border ${getScoreBadgeClasses(scores.shareDilution)}`}>
+                    {scores.shareDilution !== null ? scores.shareDilution : "N/A"}
+                  </span>
+                </td>
+              </tr>
+
               {/* Revenue Growth */}
               <tr className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
                 <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">

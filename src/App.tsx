@@ -16,7 +16,7 @@ import { AuthModal } from "./components/AuthModal";
 import { UserHeader } from "./components/UserHeader";
 import { authService, UserProfile } from "./services/authService";
 import { fmpService } from "./services/financialModelingPrep";
-import { calculateAllMetrics, calculateFCFMarginHistory, calculateFCFConversionHistory, calculateMarginStabilityHistory } from "./utils/financialCalculations";
+import { calculateAllMetrics, calculateFCFMarginHistory, calculateFCFConversionHistory, calculateMarginStabilityHistory, calculateNetDebtToFCFHistory, calculateShareDilutionHistory } from "./utils/financialCalculations";
 import { calculateMetricScores, calculateOverallScore, calculateDataConfidenceScore, getUnavailableMetrics } from "./utils/scoring";
 import {
   calculateValuationMetrics,
@@ -178,6 +178,8 @@ function App() {
         const fcfMarginHistory = calculateFCFMarginHistory(incomeStatements, cashFlowStatements);
         const fcfConversionHistory = calculateFCFConversionHistory(incomeStatements, cashFlowStatements);
         const marginStabilityHistory = calculateMarginStabilityHistory(incomeStatements);
+        const netDebtToFCFHistory = calculateNetDebtToFCFHistory(balanceSheets, cashFlowStatements);
+        const shareDilutionHistory = calculateShareDilutionHistory(incomeStatements, balanceSheets);
 
         // 1. P/E Ratio History
         const peHistory = [...incomeStatements]
@@ -287,6 +289,8 @@ function App() {
           fcfMarginHistory,
           fcfConversionHistory,
           marginStabilityHistory,
+          netDebtToFCFHistory,
+          shareDilutionHistory,
           
           valuationMetrics,
           valuationScores,
@@ -692,6 +696,38 @@ function App() {
                     isExpanded={showAllCharts}
                     onClick={() => setSelectedMetric("marginStability")}
                     directionStrategy="higherIsBetter"
+                  />
+                  <MetricCard
+                    title="Net Debt / FCF"
+                    value={result.metrics.netDebtToFCF}
+                    unit="x"
+                    score={result.scores.netDebtToFCF}
+                    description="Solvency & leverage ratio"
+                    tooltip="Measures financial flexibility and ability to repay obligations using internally generated cash flow. Lower ratios indicate strong balance sheet health."
+                    icon="🏦"
+                    chartData={result.netDebtToFCFHistory}
+                    chartValueType="number"
+                    referenceLineValue={2.0}
+                    referenceLineLabel="2.0x Target"
+                    isExpanded={showAllCharts}
+                    onClick={() => setSelectedMetric("netDebtToFCF")}
+                    directionStrategy="lowerIsBetter"
+                  />
+                  <MetricCard
+                    title="Share Dilution"
+                    value={result.metrics.shareDilution}
+                    unit="%"
+                    score={result.scores.shareDilution}
+                    description="Ownership change over time"
+                    tooltip="Measures whether management creates or reduces shareholder ownership value over time through share buybacks or equity issuance."
+                    icon="🪙"
+                    chartData={result.shareDilutionHistory}
+                    chartValueType="percent"
+                    referenceLineValue={0}
+                    referenceLineLabel="0% Baseline"
+                    isExpanded={showAllCharts}
+                    onClick={() => setSelectedMetric("shareDilution")}
+                    directionStrategy="lowerIsBetter"
                   />
                   <MetricCard
                     title="Revenue Growth"

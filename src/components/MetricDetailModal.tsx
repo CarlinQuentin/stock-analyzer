@@ -260,6 +260,62 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           ],
           getInsights: () => analyzeEfficiencyHistory(result.marginStabilityHistory || [], "Operating Margin", 15),
         };
+      case "netDebtToFCF":
+        return {
+          ...defaultData,
+          title: "Net Debt / FCF",
+          icon: "🏦",
+          score: result.scores.netDebtToFCF,
+          value: result.metrics.netDebtToFCF,
+          unit: "x",
+          chartData: result.netDebtToFCFHistory || [],
+          chartValueType: "number" as const,
+          directionStrategy: "lowerIsBetter" as const,
+          referenceLineValue: 2.0,
+          referenceLineLabel: "2.0x Target",
+          description: "Measures financial flexibility and ability to repay obligations using internally generated cash.",
+          formula: "Net Debt / FCF = (Total Debt - Cash & Equivalents) / Free Cash Flow",
+          mathExplanation: [
+            `1. Net Debt / FCF Ratio: ${result.metrics.netDebtToFCF !== null ? `${result.metrics.netDebtToFCF.toFixed(2)}x` : "N/A"}`,
+            `2. Measures financial flexibility and ability to repay obligations using internally generated cash.`,
+          ],
+          whyItMatters: "Measures financial flexibility and ability to repay obligations using internally generated cash. Ratios under 2.0x reflect strong solvency and low financial risk.",
+          tiers: [
+            { label: "Excellent", range: "< 2.0x (or Net Cash)", color: "text-green-500" },
+            { label: "Good", range: "2.0x - 4.0x", color: "text-blue-500" },
+            { label: "Moderate Risk", range: "4.0x - 6.0x", color: "text-amber-500" },
+            { label: "High Leverage", range: "> 6.0x", color: "text-red-500" },
+          ],
+          getInsights: () => ["Lower Net Debt / FCF ratios indicate strong balance sheet health and debt repayment capacity."],
+        };
+      case "shareDilution":
+        return {
+          ...defaultData,
+          title: "Share Dilution",
+          icon: "🪙",
+          score: result.scores.shareDilution,
+          value: result.metrics.shareDilution,
+          unit: "%",
+          chartData: result.shareDilutionHistory || [],
+          chartValueType: "percent" as const,
+          directionStrategy: "lowerIsBetter" as const,
+          referenceLineValue: 0,
+          referenceLineLabel: "0% Baseline",
+          description: "Measures whether management creates or reduces shareholder ownership value over time.",
+          formula: "Share Dilution = ((Current Shares - Historical Shares) / Historical Shares) * 100",
+          mathExplanation: [
+            `1. Share Change over Period: ${result.metrics.shareDilution !== null ? formatPercentageMetric(result.metrics.shareDilution, true) : "N/A"}`,
+            `2. Negative percentage indicates share buybacks (accretive). Positive percentage indicates share issuance (dilutive).`,
+          ],
+          whyItMatters: "Measures whether management creates or reduces shareholder ownership value over time. Consistent buybacks increase per-share equity value, while excessive stock issuance dilutes existing owners.",
+          tiers: [
+            { label: "Excellent (Buybacks)", range: "<= -5.0%", color: "text-green-500" },
+            { label: "Strong", range: "-5.0% - +2.0%", color: "text-blue-500" },
+            { label: "Neutral", range: "+2.0% - +5.0%", color: "text-amber-500" },
+            { label: "Dilution Concern", range: "> +5.0%", color: "text-red-500" },
+          ],
+          getInsights: () => ["Share buybacks reduce total share count and increase ownership value per share."],
+        };
       case "roic":
         return {
           ...defaultData,

@@ -122,6 +122,8 @@ export interface AnalysisResult {
   fcfConsistencyHistory?: ChartDataPoint[];
   fcfConversionHistory?: ChartDataPoint[];
   marginStabilityHistory?: ChartDataPoint[];
+  netDebtToFCFHistory?: ChartDataPoint[];
+  shareDilutionHistory?: ChartDataPoint[];
   
   // Valuation fields
   valuationMetrics: ValuationMetrics;
@@ -146,7 +148,7 @@ export interface FCFTrendResult {
 export interface FinancialMetrics {
   /**
    * Metric Score & Percentage Representation Convention:
-   * - Percentage-based metrics & quality scores (e.g., fcfConsistency, fcfConversion, marginStability, fcfMargin, roic, grossMargin, netMargin)
+   * - Percentage-based metrics & quality scores (e.g., fcfConsistency, fcfConversion, marginStability, shareDilution, fcfMargin, roic, grossMargin, netMargin)
    *   are represented as whole percentages (e.g., 96 for 96%, 100 for 100%, 0 for 0%) or decimal ratios (0.96 -> 96%).
    * - Growth rates (e.g., revenueCAGR, epsGrowth, fcfGrowth) are represented as decimal rates (e.g., 0.15 for 15%).
    * - Display and formatting utilities (formatPercentageMetric, MetricCard) accept both whole percentage values (96)
@@ -168,6 +170,10 @@ export interface FinancialMetrics {
   fcfConversion: number | null;
   /** Stored as whole percentage (0-100), e.g. 80 for 80% */
   marginStability: number | null;
+  /** Stored as leverage ratio, e.g. 1.5 for 1.5x, -0.8 for net cash position */
+  netDebtToFCF: number | null;
+  /** Stored as percentage change in shares outstanding over measurement period, e.g. -5.2 for -5.2% buyback */
+  shareDilution: number | null;
   roic: number | null;
   debtToEquity: number | null;
   dividendYield: number | null;
@@ -189,6 +195,10 @@ export interface MetricScores {
   fcfConversion: number | null;
   /** Stored as whole percentage score (0-100), e.g. 80 for 80% */
   marginStability: number | null;
+  /** Stored as whole percentage score (0-100), e.g. 90 for 90% */
+  netDebtToFCF: number | null;
+  /** Stored as whole percentage score (0-100), e.g. 95 for 95% */
+  shareDilution: number | null;
   roic: number | null;
   debt: number | null;
   profitability: number | null;

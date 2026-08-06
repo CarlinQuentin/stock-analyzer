@@ -3,13 +3,15 @@ import { calculateEPSTrend, calculateFCFTrend } from "./financialCalculations";
 
 export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
   universalScoreMetrics: {
-    roic: { name: "ROIC", weight: 0.20, description: "Return on Invested Capital" },
-    fcfMargin: { name: "FCF Margin", weight: 0.20, description: "Free Cash Flow Margin" },
+    roic: { name: "ROIC", weight: 0.15, description: "Return on Invested Capital" },
+    fcfMargin: { name: "FCF Margin", weight: 0.15, description: "Free Cash Flow Margin" },
     fcfConsistency: { name: "FCF Consistency", weight: 0.15, description: "Reliability of FCF generation" },
-    fcfConversion: { name: "FCF Conversion", weight: 0.15, description: "Free Cash Flow to Net Income ratio" },
+    fcfConversion: { name: "FCF Conversion", weight: 0.10, description: "Free Cash Flow to Net Income ratio" },
     marginStability: { name: "Margin Stability", weight: 0.10, description: "Operating profitability trend stability" },
+    netDebtToFCF: { name: "Net Debt / FCF", weight: 0.10, description: "Solvency & debt coverage by free cash flow" },
+    shareDilution: { name: "Share Dilution", weight: 0.10, description: "Shareholder ownership change over time" },
     revenue: { name: "Revenue Growth", weight: 0.10, description: "Compound annual revenue growth rate" },
-    eps: { name: "EPS Growth", weight: 0.10, description: "Earnings per share growth" },
+    eps: { name: "EPS Growth", weight: 0.05, description: "Earnings per share growth" },
   },
   informationalMetrics: {
     fcf: { name: "FCF Growth", weight: 0, description: "Free cash flow growth" },
@@ -20,13 +22,15 @@ export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
 };
 
 export const SCORE_WEIGHTS: Record<string, number> = {
-  roic: 0.20,
-  fcfMargin: 0.20,
+  roic: 0.15,
+  fcfMargin: 0.15,
   fcfConsistency: 0.15,
-  fcfConversion: 0.15,
+  fcfConversion: 0.10,
   marginStability: 0.10,
+  netDebtToFCF: 0.10,
+  shareDilution: 0.10,
   revenue: 0.10,
-  eps: 0.10,
+  eps: 0.05,
 };
 
 export const SCORE_RANGES = {
@@ -278,6 +282,60 @@ export function scoreMarginStability(val: number | null | undefined): number | n
 }
 
 /**
+ * Score Net Debt / FCF (0-100)
+ * Guidelines:
+ * - Net cash position (< 0x) = 100 score (Excellent)
+ * - < 2.0x = 90 - 100 score (Excellent)
+ * - 2.0x - 4.0x = 70 - 89 score (Good)
+ * - 4.0x - 6.0x = 50 - 69 score (Moderate risk)
+ * - > 6.0x or FCF burn with net debt = 0 - 49 score (High leverage)
+ */
+export function scoreNetDebtToFCF(ratio: number | null | undefined): number | null {
+  if (ratio === null || ratio === undefined || isNaN(ratio)) return null;
+
+  if (ratio < 0) {
+    return 100;
+  }
+  if (ratio < 2.0) {
+    return Math.round(100 - (ratio / 2.0) * 10);
+  }
+  if (ratio <= 4.0) {
+    return Math.round(89 - ((ratio - 2.0) / 2.0) * 19);
+  }
+  if (ratio <= 6.0) {
+    return Math.round(69 - ((ratio - 4.0) / 2.0) * 19);
+  }
+  return Math.max(0, Math.round(49 - (ratio - 6.0) * 8));
+}
+
+/**
+ * Score Share Dilution (0-100)
+ * Guidelines:
+ * - <= -5.0% (meaningful buybacks) = 100 score (Excellent)
+ * - -5.0% to +2.0% (stable / modest buybacks) = 85 - 99 score (Strong)
+ * - +2.0% to +5.0% (slight dilution) = 60 - 84 score (Neutral)
+ * - +5.0% to +10.0% (moderate dilution) = 40 - 59 score (Penalty)
+ * - > +10.0% (significant dilution) = 0 - 39 score (Significant dilution concern)
+ */
+export function scoreShareDilution(dilutionPct: number | null | undefined): number | null {
+  if (dilutionPct === null || dilutionPct === undefined || isNaN(dilutionPct)) return null;
+
+  if (dilutionPct <= -5.0) {
+    return 100;
+  }
+  if (dilutionPct <= 2.0) {
+    return Math.round(99 - ((dilutionPct + 5.0) / 7.0) * 14);
+  }
+  if (dilutionPct <= 5.0) {
+    return Math.round(84 - ((dilutionPct - 2.0) / 3.0) * 24);
+  }
+  if (dilutionPct <= 10.0) {
+    return Math.round(59 - ((dilutionPct - 5.0) / 5.0) * 19);
+  }
+  return Math.max(0, Math.round(39 - (dilutionPct - 10.0) * 3));
+}
+
+/**
  * Calculate all metric scores
  */
 export function calculateMetricScores(
@@ -315,6 +373,8 @@ export function calculateMetricScores(
     fcfConsistency: scoreFCFConsistency(metrics.fcfConsistency),
     fcfConversion: scoreFCFConversion(metrics.fcfConversion),
     marginStability: scoreMarginStability(metrics.marginStability),
+    netDebtToFCF: scoreNetDebtToFCF(metrics.netDebtToFCF),
+    shareDilution: scoreShareDilution(metrics.shareDilution),
     roic: scoreROIC(metrics.roic),
     debt: scoreDebtToEquity(metrics.debtToEquity),
     profitability: scoreProfitability(

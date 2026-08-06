@@ -15,6 +15,10 @@ import {
   calculateFCFConversionHistory,
   calculateMarginStability,
   calculateMarginStabilityHistory,
+  calculateNetDebtToFCF,
+  calculateNetDebtToFCFHistory,
+  calculateShareDilution,
+  calculateShareDilutionHistory,
   calculateDividendCAGR,
   calculateROIC,
   calculateAverageROIC,
@@ -1427,5 +1431,107 @@ describe("calculateMarginStabilityHistory", () => {
   it("should return empty array for empty or null statements", () => {
     expect(calculateMarginStabilityHistory(null)).toEqual([]);
     expect(calculateMarginStabilityHistory([])).toEqual([]);
+  });
+});
+
+describe("calculateNetDebtToFCF", () => {
+  it("should calculate Net Debt / FCF ratio correctly for low leverage company", () => {
+    const balance = [{ date: "2024-12-31", totalDebt: 500, cashAndCashEquivalents: 100 }]; // Net Debt = 400
+    const cashFlow = [{ date: "2024-12-31", operatingCashFlow: 300, capitalExpenditure: 100 }]; // FCF = 200
+    // Net Debt / FCF = 400 / 200 = 2.0x
+    expect(calculateNetDebtToFCF(balance, cashFlow)).toBe(2.0);
+  });
+
+  it("should calculate high leverage ratio for high debt company", () => {
+    const balance = [{ date: "2024-12-31", totalDebt: 1500, cashAndCashEquivalents: 100 }]; // Net Debt = 1400
+    const cashFlow = [{ date: "2024-12-31", operatingCashFlow: 300, capitalExpenditure: 100 }]; // FCF = 200
+    // Net Debt / FCF = 1400 / 200 = 7.0x
+    expect(calculateNetDebtToFCF(balance, cashFlow)).toBe(7.0);
+  });
+
+  it("should return negative ratio for net cash company", () => {
+    const balance = [{ date: "2024-12-31", totalDebt: 200, cashAndCashEquivalents: 500 }]; // Net Debt = -300
+    const cashFlow = [{ date: "2024-12-31", operatingCashFlow: 300, capitalExpenditure: 100 }]; // FCF = 200
+    // Net Debt / FCF = -300 / 200 = -1.5x
+    expect(calculateNetDebtToFCF(balance, cashFlow)).toBe(-1.5);
+  });
+
+  it("should handle negative FCF company safely", () => {
+    const balance = [{ date: "2024-12-31", totalDebt: 500, cashAndCashEquivalents: 100 }]; // Net Debt = 400
+    const cashFlow = [{ date: "2024-12-31", operatingCashFlow: -50, capitalExpenditure: 50 }]; // FCF = -100 (FCF burn)
+    expect(calculateNetDebtToFCF(balance, cashFlow)).toBe(99.0);
+  });
+
+  it("should return null for null or missing input statements", () => {
+    expect(calculateNetDebtToFCF(null, null)).toBeNull();
+  });
+});
+
+describe("calculateShareDilution", () => {
+  it("should calculate negative percentage change for share buybacks", () => {
+    const income = [
+      { date: "2024-12-31", weightedAverageSharesDiluted: 90 },
+      { date: "2020-12-31", weightedAverageSharesDiluted: 100 },
+    ];
+    // (90 - 100) / 100 = -10% buyback
+    expect(calculateShareDilution(income)).toBe(-10.0);
+  });
+
+  it("should calculate zero percentage change for stable shares", () => {
+    const income = [
+      { date: "2024-12-31", weightedAverageSharesDiluted: 100 },
+      { date: "2020-12-31", weightedAverageSharesDiluted: 100 },
+    ];
+    expect(calculateShareDilution(income)).toBe(0.0);
+  });
+
+  it("should calculate positive percentage for moderate share dilution", () => {
+    const income = [
+      { date: "2024-12-31", weightedAverageSharesDiluted: 104 },
+      { date: "2020-12-31", weightedAverageSharesDiluted: 100 },
+    ];
+    // (104 - 100) / 100 = +4.0%
+    expect(calculateShareDilution(income)).toBe(4.0);
+  });
+
+  it("should calculate positive percentage for significant share dilution", () => {
+    const income = [
+      { date: "2024-12-31", weightedAverageSharesDiluted: 115 },
+      { date: "2020-12-31", weightedAverageSharesDiluted: 100 },
+    ];
+    // (115 - 100) / 100 = +15.0%
+    expect(calculateShareDilution(income)).toBe(15.0);
+  });
+
+  it("should handle missing share history safely and return null", () => {
+    expect(calculateShareDilution(null)).toBeNull();
+    expect(calculateShareDilution([])).toBeNull();
+    expect(calculateShareDilution([{ date: "2024-12-31" }])).toBeNull();
+  });
+
+  it("should generate Net Debt / FCF history array correctly", () => {
+    const balance = [
+      { date: "2024-12-31", totalDebt: 500, cashAndCashEquivalents: 100 },
+      { date: "2023-12-31", totalDebt: 600, cashAndCashEquivalents: 100 },
+    ];
+    const cashFlow = [
+      { date: "2024-12-31", operatingCashFlow: 300, capitalExpenditure: 100 },
+      { date: "2023-12-31", operatingCashFlow: 300, capitalExpenditure: 100 },
+    ];
+    const history = calculateNetDebtToFCFHistory(balance, cashFlow);
+    expect(history.length).toBe(2);
+    expect(history[0]).toEqual({ label: "2023", value: 2.5 });
+    expect(history[1]).toEqual({ label: "2024", value: 2.0 });
+  });
+
+  it("should generate Share Dilution history array correctly", () => {
+    const income = [
+      { date: "2024-12-31", weightedAverageSharesDiluted: 90 },
+      { date: "2023-12-31", weightedAverageSharesDiluted: 100 },
+    ];
+    const history = calculateShareDilutionHistory(income);
+    expect(history.length).toBe(2);
+    expect(history[0]).toEqual({ label: "2023", value: 100 });
+    expect(history[1]).toEqual({ label: "2024", value: 90 });
   });
 });
