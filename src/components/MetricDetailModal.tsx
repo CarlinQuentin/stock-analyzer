@@ -206,7 +206,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       case "fcfConversion":
         return {
           ...defaultData,
-          title: "FCF Conversion",
+          title: "Avg FCF Conversion",
           icon: "🔄",
           score: result.scores.fcfConversion,
           value: result.metrics.fcfConversion,
@@ -215,11 +215,11 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           chartValueType: "percent" as const,
           referenceLineValue: 100,
           referenceLineLabel: "100% Target",
-          description: "Measures long-term earnings quality and cash conversion by evaluating cumulative Free Cash Flow against cumulative Net Income over a multi-year period (up to 10 years).",
-          formula: "Cumulative FCF Conversion (%) = (Sum of Historical Free Cash Flow / Sum of Historical Net Income) * 100",
+          description: "Measures long-term earnings quality and cash conversion by evaluating multi-year average Free Cash Flow against average Net Income over a historical period (up to 10 years).",
+          formula: "Multi-Year Avg FCF Conversion (%) = (Sum of Historical Free Cash Flow / Sum of Historical Net Income) * 100",
           mathExplanation: [
-            `1. Cumulative FCF Conversion Ratio: ${result.metrics.fcfConversion !== null ? formatPercentageMetric(result.metrics.fcfConversion, true) : "N/A"}`,
-            `2. Evaluates total Free Cash Flow generated relative to total Net Income over the historical analysis period (up to 10 fiscal years). Requires at least 3 years of aligned data.`,
+            `1. 10-Yr Avg FCF Conversion Ratio: ${result.metrics.fcfConversion !== null ? formatPercentageMetric(result.metrics.fcfConversion, true) : "N/A"}`,
+            `2. Evaluates total multi-year average Free Cash Flow generated relative to Net Income over the historical analysis period (up to 10 fiscal years). Requires at least 3 years of aligned data.`,
             `3. Multi-year cumulative evaluation smooths out single-year cyclicality, working capital fluctuations, and one-off capex spikes.`,
           ],
           whyItMatters: "FCF conversion evaluates long-term earnings quality. Companies converting >100% of reported accounting net income into true cumulative cash flow over a multi-year horizon possess high-quality earnings and superior capital discipline.",

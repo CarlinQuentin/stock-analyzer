@@ -1012,12 +1012,12 @@ function App() {
                     directionStrategy="higherIsBetter"
                   />
                   <MetricCard
-                    title="FCF Conversion"
+                    title="Avg FCF Conversion"
                     value={result.metrics.fcfConversion}
                     unit="%"
                     score={result.scores.fcfConversion}
-                    description="Cumulative Multi-Year FCF / Net Income"
-                    tooltip="Measures long-term earnings quality and cash conversion by calculating cumulative Free Cash Flow divided by cumulative Net Income over a multi-year period (up to 10 fiscal years)."
+                    description="10-Yr Avg FCF / Net Income Ratio"
+                    tooltip="Measures long-term earnings quality and cash conversion by calculating the multi-year average Free Cash Flow divided by Net Income over up to 10 fiscal years."
                     icon="🔄"
                     chartData={result.fcfConversionHistory}
                     chartValueType="percent"

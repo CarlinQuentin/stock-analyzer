@@ -36,7 +36,7 @@ export const ScoreGauge = ({
     roic: "ROIC",
     fcfMargin: "FCF Margin",
     fcfConsistency: "FCF Consistency",
-    fcfConversion: "FCF Conversion",
+    fcfConversion: "Avg FCF Conversion",
     marginStability: "Margin Stability",
     netDebtToFCF: "Net Debt / FCF",
     shareDilution: "Share Dilution",

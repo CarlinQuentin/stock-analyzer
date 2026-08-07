@@ -6,7 +6,7 @@ export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
     roic: { name: "ROIC", weight: 0.20, description: "Return on Invested Capital" },
     fcfMargin: { name: "FCF Margin", weight: 0.10, description: "Free Cash Flow Margin" },
     fcfConsistency: { name: "FCF Consistency", weight: 0.10, description: "Reliability of FCF generation" },
-    fcfConversion: { name: "FCF Conversion", weight: 0.10, description: "Free Cash Flow to Net Income ratio" },
+    fcfConversion: { name: "Avg FCF Conversion", weight: 0.10, description: "Multi-year average Free Cash Flow to Net Income ratio" },
     marginStability: { name: "Margin Stability", weight: 0.15, description: "Operating profitability trend stability" },
     netDebtToFCF: { name: "Net Debt / FCF", weight: 0.10, description: "Solvency & debt coverage by free cash flow" },
     shareDilution: { name: "Share Dilution", weight: 0.05, description: "Shareholder ownership change over time" },
