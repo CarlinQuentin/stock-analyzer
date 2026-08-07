@@ -309,18 +309,24 @@ export function scoreNetDebtToFCF(ratio: number | null | undefined): number | nu
 }
 
 /**
- * Format raw share counts as shortened numbers with comma separators and NO percentage symbol.
- * Example: 22760000000 -> "22.76B", 450000000 -> "450.00M", 12500 -> "12,500"
+ * Format raw share counts as shortened numbers with 1 decimal place and NO percentage symbol.
+ * Examples: 242017000 -> "242.0M", 148404000 -> "148.4M", 2500000000 -> "2.5B"
  */
 export function formatShortenedShareCount(val: number | null | undefined): string {
   if (val === null || val === undefined || isNaN(val)) return "N/A";
   const abs = Math.abs(val);
   const sign = val < 0 ? "-" : "";
+  if (abs >= 1e12) {
+    return `${sign}${(abs / 1e12).toFixed(1)}T`;
+  }
   if (abs >= 1e9) {
-    return `${sign}${(abs / 1e9).toFixed(2)}B`;
+    return `${sign}${(abs / 1e9).toFixed(1)}B`;
   }
   if (abs >= 1e6) {
-    return `${sign}${(abs / 1e6).toFixed(2)}M`;
+    return `${sign}${(abs / 1e6).toFixed(1)}M`;
+  }
+  if (abs >= 1e3) {
+    return `${sign}${(abs / 1e3).toFixed(1)}K`;
   }
   return `${sign}${abs.toLocaleString()}`;
 }

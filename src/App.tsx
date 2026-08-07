@@ -1077,8 +1077,8 @@ function App() {
                     value={result.metrics.shareDilution}
                     unit=""
                     score={result.scores.shareDilution}
-                    description="Ownership change over time"
-                    tooltip="Measures whether management creates or reduces shareholder ownership value over time through share buybacks or equity issuance."
+                    description="Annualized Share Count Change (CAGR)"
+                    tooltip="Measures whether the company's share count has increased or decreased over time. Negative values indicate share reduction through buybacks, which can increase existing shareholder ownership. Positive values indicate share issuance and dilution."
                     icon="🪙"
                     chartData={result.shareDilutionHistory}
                     chartValueType="number"

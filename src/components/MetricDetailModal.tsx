@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { AnalysisResult, FinancialMetrics } from "../types";
 import { getFCFFormula } from "../utils/financialCalculations";
-import { formatPercentageMetric } from "../utils/scoring";
+import { formatPercentageMetric, formatShortenedShareCount } from "../utils/scoring";
 
 const getScoreCategory = (score: number): { label: string; color: string } => {
   if (score >= 85) return { label: "Excellent", color: "green" };
@@ -303,14 +303,14 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           directionStrategy: "lowerIsBetter" as const,
           referenceLineValue: 0,
           referenceLineLabel: "0% Baseline",
-          description: "Measures whether management creates or reduces shareholder ownership value over time through share buybacks or equity issuance.",
-          formula: "Annualized Share Dilution (CAGR %) = ((Latest Shares / Initial Shares)^(1 / Number of Years) - 1) * 100",
+          description: "Measures whether the company's share count has increased or decreased over time. Negative values indicate share reduction through buybacks, which can increase existing shareholder ownership. Positive values indicate share issuance and dilution.",
+          formula: "Annualized Share Count Change (CAGR %) = ((Latest Shares / Initial Shares)^(1 / Number of Years) - 1) * 100",
           mathExplanation: [
-            `1. Annualized Share Change (CAGR): ${result.metrics.shareDilution !== null ? (result.metrics.shareDilution > 0 ? `+${result.metrics.shareDilution.toFixed(2)}% / year` : `${result.metrics.shareDilution.toFixed(2)}% / year`) : "N/A"}`,
+            `1. Annualized Share Count Change (CAGR): ${result.metrics.shareDilution !== null ? (result.metrics.shareDilution > 0 ? `+${result.metrics.shareDilution.toFixed(2)}% / year` : `${result.metrics.shareDilution.toFixed(2)}% / year`) : "N/A"}`,
             `2. Data Source: FMP Diluted Weighted Average Shares (weightedAverageShsOutDil), with Basic Shares (weightedAverageShsOut) fallback.`,
-            `3. Negative CAGR indicates share count reduction through buybacks (accretive). Positive CAGR indicates share count growth (dilutive).`,
+            `3. Negative values indicate share reduction through buybacks. Positive values indicate share issuance and dilution.`,
           ],
-          whyItMatters: "Measures whether management creates or reduces shareholder ownership value over time. Consistent buybacks increase per-share equity value, while excessive stock issuance dilutes existing owners.",
+          whyItMatters: "Measures whether the company's share count has increased or decreased over time. Negative values indicate share reduction through buybacks, which can increase existing shareholder ownership. Positive values indicate share issuance and dilution.",
           tiers: [
             { label: "Excellent (Buybacks)", range: "<= -3.0%", color: "text-green-500" },
             { label: "Strong", range: "-3.0% to -1.0%", color: "text-blue-500" },
@@ -1401,6 +1401,53 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                 ))}
               </div>
             </div>
+
+            {/* Share Count Summary Section */}
+            {metricKey === "shareDilution" && result.shareDilutionHistory && result.shareDilutionHistory.length > 0 && (() => {
+              const history = result.shareDilutionHistory;
+              const initialShares = history[0].value;
+              const latestShares = history[history.length - 1].value;
+              const netChange = latestShares - initialShares;
+              const initialFormatted = formatShortenedShareCount(initialShares);
+              const latestFormatted = formatShortenedShareCount(latestShares);
+              const pctChange = initialShares > 0 ? ((latestShares - initialShares) / initialShares) * 100 : 0;
+              const netChangeFormatted = formatShortenedShareCount(netChange);
+              const totalChangeStr = `${netChangeFormatted} shares (${pctChange > 0 ? "+" : ""}${pctChange.toFixed(1)}%)`;
+
+              return (
+                <div className="mb-6 bg-slate-50 dark:bg-slate-800/80 p-4 border border-slate-200/80 dark:border-slate-700/60 rounded-xl">
+                  <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">
+                    Share Count Summary
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 shadow-sm">
+                      <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1">
+                        Starting Shares
+                      </span>
+                      <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100 font-mono">
+                        {initialFormatted}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 shadow-sm">
+                      <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1">
+                        Ending Shares
+                      </span>
+                      <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100 font-mono">
+                        {latestFormatted}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 shadow-sm">
+                      <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1">
+                        Total Change
+                      </span>
+                      <span className={`text-sm font-extrabold font-mono ${netChange < 0 ? "text-emerald-600 dark:text-emerald-400" : netChange > 0 ? "text-rose-600 dark:text-rose-400" : "text-slate-700 dark:text-slate-300"}`}>
+                        {totalChangeStr}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Educational Info */}
             <div className="mb-6">

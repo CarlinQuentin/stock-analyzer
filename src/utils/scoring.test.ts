@@ -402,13 +402,19 @@ describe("Share Dilution Metric & Formatting Tests", () => {
     expect(score).toBeLessThan(35); // Poor rating for heavy dilution
   });
 
-  it("5. Large raw share values are formatted as shortened numbers and NEVER appended with %", () => {
-    expect(formatShortenedShareCount(22760000000)).toBe("22.76B");
-    expect(formatShortenedShareCount(25960000000)).toBe("25.96B");
-    expect(formatShortenedShareCount(450000000)).toBe("450.00M");
-    expect(formatShortenedShareCount(12500)).toBe("12,500");
+  it("5. Raw share values are formatted as human-readable shortened numbers with 1 decimal place and NO %", () => {
+    expect(formatShortenedShareCount(242017000)).toBe("242.0M");
+    expect(formatShortenedShareCount(148404000)).toBe("148.4M");
+    expect(formatShortenedShareCount(2500000000)).toBe("2.5B");
+    expect(formatShortenedShareCount(22760000000)).toBe("22.8B");
+    expect(formatShortenedShareCount(12500)).toBe("12.5K");
 
-    expect(formatShortenedShareCount(22760000000)).not.toContain("%");
-    expect(formatShortenedShareCount(25960000000)).not.toContain("%");
+    expect(formatShortenedShareCount(242017000)).not.toContain("%");
+    expect(formatShortenedShareCount(148404000)).not.toContain("%");
+  });
+
+  it("6. STLD -4.77% annualized share count reduction scores approximately 99/100 Quality Score", () => {
+    const stldScore = scoreShareDilution(-4.77);
+    expect(stldScore).toBe(99);
   });
 });
