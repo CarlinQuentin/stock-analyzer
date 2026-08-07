@@ -444,25 +444,106 @@ class FinancialModelingPrepService {
     }
   }
 
+  /**
+   * Reusable method for retrieving stock peers from FMP API
+   * Normalizes ticker symbols, handles route variations, and logs error classifications
+   */
   async getStockPeers(ticker: string): Promise<string[]> {
+    if (!ticker || typeof ticker !== "string") {
+      return [];
+    }
+
+    const normalizedSymbol = encodeURIComponent(ticker.trim().toUpperCase());
+    if (!normalizedSymbol) {
+      return [];
+    }
+
+    const endpointUrl = `${BASE_URL}/stock_peers?symbol=${normalizedSymbol}`;
+
     try {
-      const response = await this.client.get("/stock_peers", {
-        params: { ...this.getParams(), symbol: ticker.toUpperCase() },
-      });
-      if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
+      let response;
+      try {
+        response = await this.client.get("/stock_peers", {
+          params: { ...this.getParams(), symbol: normalizedSymbol },
+        });
+      } catch (primaryErr: any) {
+        // Fall back to /stock-peers (hyphenated) if primary /stock_peers route returns 404
+        if (primaryErr?.response?.status === 404) {
+          try {
+            response = await this.client.get("/stock-peers", {
+              params: { ...this.getParams(), symbol: normalizedSymbol },
+            });
+          } catch (fallbackErr) {
+            throw primaryErr; // Rethrow primary error for classification
+          }
+        } else {
+          throw primaryErr;
+        }
+      }
+
+      if (!response || !response.data) {
         return [];
       }
-      const data = response.data[0];
-      if (data && Array.isArray(data.peersList)) {
-        return data.peersList;
+
+      // Format 1: Array of objects [{ symbol: "AAPL", peersList: ["MSFT", "GOOGL"] }]
+      if (Array.isArray(response.data) && response.data.length > 0) {
+        const firstItem = response.data[0];
+        if (firstItem && Array.isArray(firstItem.peersList)) {
+          return firstItem.peersList
+            .filter((s: any) => typeof s === "string" && s.trim().length > 0)
+            .map((s: string) => s.trim().toUpperCase());
+        }
+        if (typeof firstItem === "string") {
+          return response.data
+            .filter((s: any) => typeof s === "string" && s.trim().length > 0)
+            .map((s: string) => s.trim().toUpperCase());
+        }
       }
-      if (Array.isArray(data)) {
-        return data;
+
+      // Format 2: Object with peersList property
+      if (typeof response.data === "object" && Array.isArray(response.data.peersList)) {
+        return response.data.peersList
+          .filter((s: any) => typeof s === "string" && s.trim().length > 0)
+          .map((s: string) => s.trim().toUpperCase());
       }
+
       return [];
-    } catch (error) {
-      console.warn(`Could not fetch stock peers for ${ticker}:`, error);
+    } catch (error: any) {
+      this.logPeersError(normalizedSymbol, endpointUrl, error);
       return [];
+    }
+  }
+
+  private logPeersError(symbol: string, endpointUrl: string, error: any): void {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const data = error.response?.data;
+      const fmpMsg =
+        typeof data === "string"
+          ? data
+          : data?.["Error Message"] || data?.message || data?.error || JSON.stringify(data || {});
+
+      if (status === 404) {
+        console.info(
+          `[FMP Stock Peers] 404 Route/Data not found for '${symbol}' at ${endpointUrl}. Response: ${fmpMsg || "No peer data available"}`
+        );
+      } else if (status === 401 || status === 403) {
+        console.warn(
+          `[FMP Stock Peers] Auth Error (${status}) for '${symbol}' at ${endpointUrl}. Invalid API Key. Response: ${fmpMsg}`
+        );
+      } else if (status === 429) {
+        console.warn(
+          `[FMP Stock Peers] Rate Limit Exceeded (429) for '${symbol}'. Response: ${fmpMsg}`
+        );
+      } else {
+        console.warn(
+          `[FMP Stock Peers] HTTP ${status || "UNKNOWN"} error for '${symbol}' at ${endpointUrl}: ${fmpMsg}`
+        );
+      }
+    } else {
+      console.warn(
+        `[FMP Stock Peers] Network/Client failure for '${symbol}' at ${endpointUrl}: ${error?.message || error}`
+      );
     }
   }
 
