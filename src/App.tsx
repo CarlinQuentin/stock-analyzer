@@ -5,7 +5,6 @@ import { StockNews } from "./components/StockNews";
 import { ScoreGauge } from "./components/ScoreGauge";
 import { StockPriceChart } from "./components/StockPriceChart";
 import { MetricCard } from "./components/MetricCard";
-import { AnalysisTable } from "./components/AnalysisTable";
 import { ValuationTable } from "./components/ValuationTable";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import { ErrorMessage } from "./components/ErrorMessage";
@@ -16,11 +15,13 @@ import { UserHeader } from "./components/UserHeader";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { SavedStocksPage } from "./components/SavedStocksPage";
 import { LeadershipSection } from "./components/LeadershipSection";
+import { CompetitorsSection } from "./components/CompetitorsSection";
 import { authService, UserProfile } from "./services/authService";
 import { fmpService } from "./services/financialModelingPrep";
 import { savedStocksService } from "./services/savedStocksService";
 import { leadershipService } from "./services/leadershipService";
-import { LeadershipProfile } from "./types";
+import { competitorService } from "./services/competitorService";
+import { LeadershipProfile, CompetitorData } from "./types";
 import {
   calculateAllMetrics,
   calculateFCFMarginHistory,
@@ -70,6 +71,8 @@ function App() {
   );
   const [leadershipProfile, setLeadershipProfile] = useState<LeadershipProfile | null>(null);
   const [isLoadingLeadership, setIsLoadingLeadership] = useState(false);
+  const [competitorData, setCompetitorData] = useState<CompetitorData | null>(null);
+  const [isLoadingCompetitors, setIsLoadingCompetitors] = useState(false);
   const [showAllCharts, setShowAllCharts] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
@@ -150,6 +153,8 @@ function App() {
     setResult(null);
     setLeadershipProfile(null);
     setIsLoadingLeadership(true);
+    setCompetitorData(null);
+    setIsLoadingCompetitors(true);
     setActiveTab("fundamentals");
     setShowAllCharts(false);
     setSelectedMetric(null);
@@ -169,6 +174,13 @@ function App() {
         .then((leadProfile) => setLeadershipProfile(leadProfile))
         .catch((err) => console.warn("Leadership fetch failed:", err))
         .finally(() => setIsLoadingLeadership(false));
+
+      // Fetch Biggest Competitors asynchronously
+      competitorService
+        .fetchCompetitors(ticker, profile)
+        .then((compData) => setCompetitorData(compData))
+        .catch((err) => console.warn("Competitor fetch failed:", err))
+        .finally(() => setIsLoadingCompetitors(false));
 
       try {
         const {
@@ -1191,29 +1203,14 @@ function App() {
               </div>
             </div>
 
-            {/* Detailed Financial Analysis Table */}
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
-                Detailed Financial Analysis
-              </h2>
-              <AnalysisTable
-                metrics={result.metrics}
-                scores={result.scores}
-                revenueYears={
-                  result.revenueHistory && result.revenueHistory.length > 1
-                    ? result.revenueHistory.length - 1
-                    : undefined
-                }
-                epsYears={
-                  result.epsHistory && result.epsHistory.length > 1
-                    ? result.epsHistory.length - 1
-                    : undefined
-                }
-                fcfYears={
-                  result.fcfHistory && result.fcfHistory.length > 1
-                    ? result.fcfHistory.length - 1
-                    : undefined
-                }
+            {/* Biggest Competitors Section */}
+            <div className="mb-10">
+              <CompetitorsSection
+                competitorData={competitorData}
+                isLoading={isLoadingCompetitors}
+                targetSymbol={result.companyProfile.symbol || result.ticker}
+                targetCompanyName={result.companyProfile.companyName}
+                onSelectCompany={handleSearch}
               />
             </div>
 

@@ -272,3 +272,37 @@ export interface LeadershipProfile {
   source: string;
   lastUpdated: string;
 }
+
+export type CompetitorBadgeType =
+  | "Primary Competitor"
+  | "Direct Competitor"
+  | "Emerging Competitor"
+  | "Global Competitor"
+  | "Regional Competitor";
+
+export interface CompetitorProfile {
+  symbol: string;
+  companyName: string;
+  industry: string;
+  sector?: string;
+  description: string;
+  marketCap: number;
+  price?: number;
+  headquarters?: string;
+  logo?: string;
+  website?: string;
+  reasonForCompetition: string;
+  badge: CompetitorBadgeType;
+  marketCapComparisonRatio?: number;
+  revenueComparisonRatio?: number;
+  employeeCount?: number | string;
+}
+
+export interface CompetitorData {
+  targetSymbol: string;
+  targetCompanyName: string;
+  targetMarketCap: number;
+  competitors: CompetitorProfile[];
+  source: string;
+  lastUpdated: string;
+}

@@ -444,6 +444,28 @@ class FinancialModelingPrepService {
     }
   }
 
+  async getStockPeers(ticker: string): Promise<string[]> {
+    try {
+      const response = await this.client.get("/stock_peers", {
+        params: { ...this.getParams(), symbol: ticker.toUpperCase() },
+      });
+      if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
+        return [];
+      }
+      const data = response.data[0];
+      if (data && Array.isArray(data.peersList)) {
+        return data.peersList;
+      }
+      if (Array.isArray(data)) {
+        return data;
+      }
+      return [];
+    } catch (error) {
+      console.warn(`Could not fetch stock peers for ${ticker}:`, error);
+      return [];
+    }
+  }
+
   private handleError(error: any): ApiError {
     if (axios.isAxiosError(error)) {
       const rawData = error.response?.data;
