@@ -215,20 +215,21 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           chartValueType: "percent" as const,
           referenceLineValue: 100,
           referenceLineLabel: "100% Target",
-          description: "Measures the proportion of Net Income converted into Free Cash Flow.",
-          formula: "FCF Conversion = (Free Cash Flow / Net Income) * 100",
+          description: "Measures long-term earnings quality and cash conversion by evaluating cumulative Free Cash Flow against cumulative Net Income over a multi-year period (up to 10 years).",
+          formula: "Cumulative FCF Conversion (%) = (Sum of Historical Free Cash Flow / Sum of Historical Net Income) * 100",
           mathExplanation: [
-            `1. Latest FCF Conversion Ratio: ${result.metrics.fcfConversion !== null ? formatPercentageMetric(result.metrics.fcfConversion, true) : "N/A"}`,
-            `2. Conversion above 100% indicates earnings are backed by strong cash flow.`,
+            `1. Cumulative FCF Conversion Ratio: ${result.metrics.fcfConversion !== null ? formatPercentageMetric(result.metrics.fcfConversion, true) : "N/A"}`,
+            `2. Evaluates total Free Cash Flow generated relative to total Net Income over the historical analysis period (up to 10 fiscal years). Requires at least 3 years of aligned data.`,
+            `3. Multi-year cumulative evaluation smooths out single-year cyclicality, working capital fluctuations, and one-off capex spikes.`,
           ],
-          whyItMatters: "FCF conversion evaluates earnings quality. Companies converting >100% of reported accounting net income into true cash flow possess strong cash generation capabilities.",
+          whyItMatters: "FCF conversion evaluates long-term earnings quality. Companies converting >100% of reported accounting net income into true cumulative cash flow over a multi-year horizon possess high-quality earnings and superior capital discipline.",
           tiers: [
             { label: "Excellent", range: ">= 100%", color: "text-green-500" },
             { label: "Good", range: "80% - 100%", color: "text-blue-500" },
             { label: "Average", range: "50% - 80%", color: "text-amber-500" },
             { label: "Poor", range: "< 50%", color: "text-red-500" },
           ],
-          getInsights: () => ["High FCF conversion indicates high-quality earnings backed by real cash flow."],
+          getInsights: () => ["High long-term FCF conversion indicates high-quality earnings backed by real cash flow over full business cycles."],
         };
       case "marginStability":
         const avgMargin = result.marginStabilityHistory && result.marginStabilityHistory.length > 0

@@ -1016,8 +1016,8 @@ function App() {
                     value={result.metrics.fcfConversion}
                     unit="%"
                     score={result.scores.fcfConversion}
-                    description="FCF / Net Income Ratio"
-                    tooltip="Measures the percentage of net income converted into real cash flow (FCF / Net Income). Ratios near or above 100% indicate high earnings quality."
+                    description="Cumulative Multi-Year FCF / Net Income"
+                    tooltip="Measures long-term earnings quality and cash conversion by calculating cumulative Free Cash Flow divided by cumulative Net Income over a multi-year period (up to 10 fiscal years)."
                     icon="🔄"
                     chartData={result.fcfConversionHistory}
                     chartValueType="percent"

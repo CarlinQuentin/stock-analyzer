@@ -1291,22 +1291,77 @@ describe("calculateFCFConsistency", () => {
 });
 
 describe("calculateFCFConversion", () => {
-  it("should calculate FCF / Net Income ratio accurately", () => {
-    const income: FinancialStatement[] = [{ date: "2024-12-31", netIncome: 200 }];
-    const cashFlow: FinancialStatement[] = [
-      { date: "2024-12-31", operatingCashFlow: 250, capitalExpenditure: 50 },
+  it("1. Requires at least 3 years of aligned data and returns null if fewer than 3 years exist", () => {
+    const income2Years: FinancialStatement[] = [
+      { date: "2023-12-31", netIncome: 100 },
+      { date: "2024-12-31", netIncome: 120 },
     ];
-    // FCF = 200. Conversion = 200/200 * 100 = 100%
-    const conversion = calculateFCFConversion(income, cashFlow);
-    expect(conversion).toBe(100);
+    const cashFlow2Years: FinancialStatement[] = [
+      { date: "2023-12-31", operatingCashFlow: 120, capitalExpenditure: 20 },
+      { date: "2024-12-31", operatingCashFlow: 150, capitalExpenditure: 30 },
+    ];
+
+    expect(calculateFCFConversion(income2Years, cashFlow2Years)).toBeNull();
   });
 
-  it("should return null if net income <= 0 or missing", () => {
-    const income: FinancialStatement[] = [{ date: "2024-12-31", netIncome: -50 }];
-    const cashFlow: FinancialStatement[] = [
-      { date: "2024-12-31", operatingCashFlow: 100, capitalExpenditure: 10 },
+  it("2. Calculates cumulative FCF Conversion across up to 10 historical years correctly", () => {
+    // 5 years of data: Net Income = 100 each year (total 500), FCF = 110 each year (total 550)
+    // Conversion = 550 / 500 * 100 = 110%
+    const income: FinancialStatement[] = [
+      { date: "2020-12-31", netIncome: 100 },
+      { date: "2021-12-31", netIncome: 100 },
+      { date: "2022-12-31", netIncome: 100 },
+      { date: "2023-12-31", netIncome: 100 },
+      { date: "2024-12-31", netIncome: 100 },
     ];
-    expect(calculateFCFConversion(income, cashFlow)).toBeNull();
+    const cashFlow: FinancialStatement[] = [
+      { date: "2020-12-31", operatingCashFlow: 130, capitalExpenditure: 20 }, // FCF 110
+      { date: "2021-12-31", operatingCashFlow: 130, capitalExpenditure: 20 }, // FCF 110
+      { date: "2022-12-31", operatingCashFlow: 130, capitalExpenditure: 20 }, // FCF 110
+      { date: "2023-12-31", operatingCashFlow: 130, capitalExpenditure: 20 }, // FCF 110
+      { date: "2024-12-31", operatingCashFlow: 130, capitalExpenditure: 20 }, // FCF 110
+    ];
+
+    const conversion = calculateFCFConversion(income, cashFlow);
+    expect(conversion).toBe(110);
+  });
+
+  it("3. Does not heavily penalize a company with 1 temporary bad FCF year in an otherwise strong multi-year history", () => {
+    // 4 strong years (Net Income 100, FCF 120) + 1 bad capex year (Net Income 100, FCF -50)
+    // Total 5-yr Net Income = 500
+    // Total 5-yr FCF = (4 * 120) - 50 = 480 - 50 = 430
+    // Cumulative Conversion = 430 / 500 * 100 = 86%
+    const income: FinancialStatement[] = [
+      { date: "2020-12-31", netIncome: 100 },
+      { date: "2021-12-31", netIncome: 100 },
+      { date: "2022-12-31", netIncome: 100 },
+      { date: "2023-12-31", netIncome: 100 },
+      { date: "2024-12-31", netIncome: 100 },
+    ];
+    const cashFlow: FinancialStatement[] = [
+      { date: "2020-12-31", operatingCashFlow: 140, capitalExpenditure: 20 }, // FCF 120
+      { date: "2021-12-31", operatingCashFlow: 140, capitalExpenditure: 20 }, // FCF 120
+      { date: "2022-12-31", operatingCashFlow: 140, capitalExpenditure: 20 }, // FCF 120
+      { date: "2023-12-31", operatingCashFlow: 140, capitalExpenditure: 20 }, // FCF 120
+      { date: "2024-12-31", operatingCashFlow: 50, capitalExpenditure: 100 }, // FCF -50
+    ];
+
+    const conversion = calculateFCFConversion(income, cashFlow);
+    expect(conversion).toBe(86);
+  });
+
+  it("4. Returns 0 if cumulative net income is negative or zero", () => {
+    const income: FinancialStatement[] = [
+      { date: "2022-12-31", netIncome: -100 },
+      { date: "2023-12-31", netIncome: -50 },
+      { date: "2024-12-31", netIncome: 10 },
+    ];
+    const cashFlow: FinancialStatement[] = [
+      { date: "2022-12-31", operatingCashFlow: 50, capitalExpenditure: 10 },
+      { date: "2023-12-31", operatingCashFlow: 50, capitalExpenditure: 10 },
+      { date: "2024-12-31", operatingCashFlow: 50, capitalExpenditure: 10 },
+    ];
+    expect(calculateFCFConversion(income, cashFlow)).toBe(0);
   });
 });
 
@@ -1332,6 +1387,7 @@ describe("calculateAllMetrics", () => {
   it("should compile all financial metrics into an object including universal metrics", () => {
     const income: FinancialStatement[] = [
       { date: "2024-12-31", revenue: 2000, eps: 2.0, grossProfit: 800, operatingIncome: 400, netIncome: 300 },
+      { date: "2022-12-31", revenue: 1500, eps: 1.5, grossProfit: 600, operatingIncome: 300, netIncome: 220 },
       { date: "2020-12-31", revenue: 1000, eps: 1.0, grossProfit: 400, operatingIncome: 200, netIncome: 150 },
     ];
     const balance: FinancialStatement[] = [
@@ -1339,6 +1395,7 @@ describe("calculateAllMetrics", () => {
     ];
     const cashFlow: FinancialStatement[] = [
       { date: "2024-12-31", operatingCashFlow: 500, capitalExpenditure: 100 },
+      { date: "2022-12-31", operatingCashFlow: 350, capitalExpenditure: 70 },
       { date: "2020-12-31", operatingCashFlow: 250, capitalExpenditure: 50 },
     ];
     const dividendMetrics: DividendMetrics = {

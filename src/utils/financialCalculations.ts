@@ -926,8 +926,12 @@ export function calculateFCFConsistency(
 }
 
 /**
- * Calculate FCF Conversion = (Free Cash Flow / Net Income) * 100
- * Handles negative net income, missing values, and invalid calculations.
+ * Calculate Multi-Year Cumulative FCF Conversion (%)
+ * Formula: (Sum of Free Cash Flow over up to 10 historical years / Sum of Net Income over same period) * 100
+ * Requirements:
+ * - Uses up to 10 most recent available fiscal years.
+ * - Requires at least 3 years of aligned data. Returns null if fewer than 3 years.
+ * - Returns 0 if cumulative Net Income is non-positive (<= 0).
  */
 export function calculateFCFConversion(
   incomeStatements: FinancialStatement[] | null | undefined,
@@ -937,40 +941,59 @@ export function calculateFCFConversion(
     return null;
   }
 
-  const sortedIncome = [...incomeStatements]
-    .filter((s) => s && s.date && typeof s.netIncome === "number" && !isNaN(s.netIncome) && isFinite(s.netIncome))
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // 1. Group income statements by fiscal year (YYYY)
+  const incomeByYear = new Map<string, number>();
+  for (const s of incomeStatements) {
+    if (s && s.date && typeof s.netIncome === "number" && !isNaN(s.netIncome) && isFinite(s.netIncome)) {
+      const year = new Date(s.date).getFullYear().toString();
+      incomeByYear.set(year, s.netIncome);
+    }
+  }
 
-  const sortedCashFlow = [...cashFlowStatements]
-    .filter((s) => s && s.date && s.operatingCashFlow !== undefined && s.capitalExpenditure !== undefined)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // 2. Group cash flow statements by fiscal year (YYYY) and compute FCF
+  const fcfByYear = new Map<string, number>();
+  for (const c of cashFlowStatements) {
+    if (c && c.date && typeof c.operatingCashFlow === "number" && typeof c.capitalExpenditure === "number") {
+      const fcf = calculateFCF(c.operatingCashFlow, c.capitalExpenditure);
+      if (fcf !== null && !isNaN(fcf) && isFinite(fcf)) {
+        const year = new Date(c.date).getFullYear().toString();
+        fcfByYear.set(year, fcf);
+      }
+    }
+  }
 
-  if (sortedIncome.length === 0 || sortedCashFlow.length === 0) {
+  // 3. Find common fiscal years present in both datasets and sort descending (most recent first)
+  const commonYears = Array.from(incomeByYear.keys())
+    .filter((y) => fcfByYear.has(y))
+    .sort((a, b) => b.localeCompare(a));
+
+  // Minimum requirement: at least 3 years of aligned data
+  if (commonYears.length < 3) {
     return null;
   }
 
-  const latestIncome = sortedIncome[0];
-  const netIncome = latestIncome.netIncome;
+  // Take up to 10 most recent fiscal years
+  const targetYears = commonYears.slice(0, 10);
 
-  if (netIncome === undefined || netIncome === null || isNaN(netIncome) || netIncome <= 0) {
+  let cumulativeNetIncome = 0;
+  let cumulativeFCF = 0;
+
+  for (const year of targetYears) {
+    cumulativeNetIncome += incomeByYear.get(year)!;
+    cumulativeFCF += fcfByYear.get(year)!;
+  }
+
+  // If cumulative net income is zero or negative, return 0
+  if (cumulativeNetIncome <= 0) {
+    return 0;
+  }
+
+  const conversionPct = (cumulativeFCF / cumulativeNetIncome) * 100;
+  if (!isFinite(conversionPct)) {
     return null;
   }
 
-  const latestYear = new Date(latestIncome.date).getFullYear();
-  let matchingCashFlow = sortedCashFlow.find(
-    (c) => new Date(c.date).getFullYear() === latestYear,
-  );
-
-  if (!matchingCashFlow) {
-    matchingCashFlow = sortedCashFlow[0];
-  }
-
-  const fcf = calculateFCF(matchingCashFlow.operatingCashFlow, matchingCashFlow.capitalExpenditure);
-  if (fcf === null) {
-    return null;
-  }
-
-  return (fcf / netIncome) * 100;
+  return Number(conversionPct.toFixed(2));
 }
 
 /**
