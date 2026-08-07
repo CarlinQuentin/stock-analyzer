@@ -1314,7 +1314,7 @@ export function calculateShareDilution(
 export function calculateShareDilutionHistory(
   incomeStatements: FinancialStatement[] | null | undefined,
   balanceSheets?: FinancialStatement[] | null | undefined,
-): { label: string; value: number }[] {
+): { label: string; value: number; yoyChange?: number | null }[] {
   if ((!incomeStatements || incomeStatements.length === 0) && (!balanceSheets || balanceSheets.length === 0)) {
     return [];
   }
@@ -1332,12 +1332,23 @@ export function calculateShareDilutionHistory(
     }
   }
 
-  const result: { label: string; value: number }[] = [];
-  for (const [year, val] of yearlyMap.entries()) {
-    result.push({ label: year, value: val });
+  const sortedYears = Array.from(yearlyMap.keys()).sort();
+  const result: { label: string; value: number; yoyChange?: number | null }[] = [];
+
+  for (let i = 0; i < sortedYears.length; i++) {
+    const year = sortedYears[i];
+    const val = yearlyMap.get(year)!;
+    let yoyChange: number | null = null;
+    if (i > 0) {
+      const prevVal = yearlyMap.get(sortedYears[i - 1])!;
+      if (prevVal > 0) {
+        yoyChange = Number((((val - prevVal) / prevVal) * 100).toFixed(2));
+      }
+    }
+    result.push({ label: year, value: val, yoyChange });
   }
 
-  return result.sort((a, b) => a.label.localeCompare(b.label));
+  return result;
 }
 
 /**

@@ -102,6 +102,7 @@ export interface ChartDataPoint {
   fcf?: number;
   revenue?: number;
   operatingIncome?: number;
+  yoyChange?: number | null;
 }
 
 export interface AnalysisResult {

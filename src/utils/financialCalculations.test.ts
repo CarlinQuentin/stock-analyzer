@@ -1523,14 +1523,37 @@ describe("calculateShareDilution", () => {
     expect(history[1]).toEqual({ label: "2024", value: 2.0 });
   });
 
-  it("should generate Share Dilution history array correctly using FMP fields", () => {
+  it("should generate Share Dilution history array correctly using FMP fields with YoY % changes", () => {
     const income = [
       { date: "2024-12-31", weightedAverageShsOutDil: 90 },
       { date: "2023-12-31", weightedAverageShsOutDil: 100 },
     ];
     const history = calculateShareDilutionHistory(income);
     expect(history.length).toBe(2);
-    expect(history[0]).toEqual({ label: "2023", value: 100 });
-    expect(history[1]).toEqual({ label: "2024", value: 90 });
+    expect(history[0]).toEqual({ label: "2023", value: 100, yoyChange: null });
+    expect(history[1]).toEqual({ label: "2024", value: 90, yoyChange: -10 });
+  });
+
+  it("should correctly compute 10% share reduction, flat shares, and 5% dilution CAGR", () => {
+    // 10% share reduction over 5 years (100 in 2020 -> 90 in 2025)
+    const incomeBuyback = [
+      { date: "2020-12-31", weightedAverageShsOutDil: 100 },
+      { date: "2025-12-31", weightedAverageShsOutDil: 90 },
+    ];
+    expect(calculateShareDilution(incomeBuyback)).toBe(-2.09);
+
+    // Flat share count
+    const incomeFlat = [
+      { date: "2020-12-31", weightedAverageShsOutDil: 100 },
+      { date: "2025-12-31", weightedAverageShsOutDil: 100 },
+    ];
+    expect(calculateShareDilution(incomeFlat)).toBe(0);
+
+    // 5% annual dilution over 5 years (100 in 2020 -> 127.63 in 2025)
+    const incomeDilution = [
+      { date: "2020-12-31", weightedAverageShsOutDil: 100 },
+      { date: "2025-12-31", weightedAverageShsOutDil: 127.628 },
+    ];
+    expect(calculateShareDilution(incomeDilution)).toBe(5);
   });
 });

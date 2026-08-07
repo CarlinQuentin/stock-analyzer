@@ -3,6 +3,7 @@ import {
   SCORE_WEIGHTS,
   DEFAULT_SCORING_CONFIG,
   formatPercentageMetric,
+  formatShortenedShareCount,
   scoreRevenueGrowth,
   scoreEPSGrowth,
   scoreFCFConsistency,
@@ -158,11 +159,11 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
     });
 
     it("scoreShareDilution should score share dilution and buybacks accurately", () => {
-      expect(scoreShareDilution(-8.0)).toBe(100); // <= -5% (Meaningful buyback)
-      expect(scoreShareDilution(-1.5)).toBe(92);  // -5% to +2% (Strong)
-      expect(scoreShareDilution(3.5)).toBe(72);   // 2% to 5% (Neutral)
-      expect(scoreShareDilution(7.5)).toBe(50);   // 5% to 10% (Penalty)
-      expect(scoreShareDilution(15.0)).toBe(24);  // > 10% (Significant dilution)
+      expect(scoreShareDilution(-8.0)).toBe(100); // <= -3.0% (Meaningful buyback)
+      expect(scoreShareDilution(-1.5)).toBe(79);  // -3.0% to -1.0% (Strong)
+      expect(scoreShareDilution(0.0)).toBe(65);   // -1.0% to +1.0% (Neutral)
+      expect(scoreShareDilution(2.0)).toBe(45);   // +1.0% to +3.0% (Weak)
+      expect(scoreShareDilution(5.0)).toBe(17);   // > +3.0% (Poor / Heavy dilution)
       expect(scoreShareDilution(null)).toBeNull();
     });
   });
@@ -372,5 +373,42 @@ describe("Universal Business Quality Score Architecture & Engine", () => {
 
     const industryScore = calculateIndustryScore(scores, bankingIndustryConfig);
     expect(industryScore).toBe(88);
+  });
+});
+
+describe("Share Dilution Metric & Formatting Tests", () => {
+  it("1. Scores share reduction (buybacks <= -3.0%) as Excellent (>= 90)", () => {
+    // 10% share reduction over 5 years -> CAGR approx -2.08%/yr -> score >= 75
+    // -4.0% annual buyback -> score >= 90
+    expect(scoreShareDilution(-4.0)).toBeGreaterThanOrEqual(90);
+    expect(scoreShareDilution(-3.0)).toBe(90);
+  });
+
+  it("2. Scores 10% share reduction over 5 years (CAGR -2.08%) as Strong (83)", () => {
+    // ((0.90 / 1.0)^(1/5) - 1) * 100 = -2.085%
+    const cagr = (Math.pow(0.9, 1 / 5) - 1) * 100; // -2.085%
+    const score = scoreShareDilution(cagr);
+    expect(score).toBeGreaterThanOrEqual(75);
+    expect(score).toBeLessThanOrEqual(89);
+  });
+
+  it("3. Scores flat share count (0% CAGR) as Neutral (65)", () => {
+    const score = scoreShareDilution(0);
+    expect(score).toBe(65); // Neutral
+  });
+
+  it("4. Scores 5% annual dilution (+5.0% CAGR) as Poor (17)", () => {
+    const score = scoreShareDilution(5.0);
+    expect(score).toBeLessThan(35); // Poor rating for heavy dilution
+  });
+
+  it("5. Large raw share values are formatted as shortened numbers and NEVER appended with %", () => {
+    expect(formatShortenedShareCount(22760000000)).toBe("22.76B");
+    expect(formatShortenedShareCount(25960000000)).toBe("25.96B");
+    expect(formatShortenedShareCount(450000000)).toBe("450.00M");
+    expect(formatShortenedShareCount(12500)).toBe("12,500");
+
+    expect(formatShortenedShareCount(22760000000)).not.toContain("%");
+    expect(formatShortenedShareCount(25960000000)).not.toContain("%");
   });
 });

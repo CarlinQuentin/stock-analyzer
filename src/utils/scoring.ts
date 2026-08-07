@@ -309,30 +309,47 @@ export function scoreNetDebtToFCF(ratio: number | null | undefined): number | nu
 }
 
 /**
- * Score Share Dilution (0-100)
- * Guidelines:
- * - <= -5.0% (meaningful buybacks) = 100 score (Excellent)
- * - -5.0% to +2.0% (stable / modest buybacks) = 85 - 99 score (Strong)
- * - +2.0% to +5.0% (slight dilution) = 60 - 84 score (Neutral)
- * - +5.0% to +10.0% (moderate dilution) = 40 - 59 score (Penalty)
- * - > +10.0% (significant dilution) = 0 - 39 score (Significant dilution concern)
+ * Format raw share counts as shortened numbers with comma separators and NO percentage symbol.
+ * Example: 22760000000 -> "22.76B", 450000000 -> "450.00M", 12500 -> "12,500"
+ */
+export function formatShortenedShareCount(val: number | null | undefined): string {
+  if (val === null || val === undefined || isNaN(val)) return "N/A";
+  const abs = Math.abs(val);
+  const sign = val < 0 ? "-" : "";
+  if (abs >= 1e9) {
+    return `${sign}${(abs / 1e9).toFixed(2)}B`;
+  }
+  if (abs >= 1e6) {
+    return `${sign}${(abs / 1e6).toFixed(2)}M`;
+  }
+  return `${sign}${abs.toLocaleString()}`;
+}
+
+/**
+ * Score Share Dilution (Annual CAGR %) (0-100)
+ * Tiers:
+ * - <= -3.0% (buybacks / accretive) = 90 - 100 score (Excellent)
+ * - -3.0% to -1.0% (strong buybacks) = 75 - 89 score (Strong)
+ * - -1.0% to +1.0% (neutral / stable) = 55 - 74 score (Neutral / Fair)
+ * - +1.0% to +3.0% (mild dilution) = 35 - 54 score (Weak)
+ * - > +3.0% (high dilution) = 0 - 34 score (Poor)
  */
 export function scoreShareDilution(dilutionPct: number | null | undefined): number | null {
   if (dilutionPct === null || dilutionPct === undefined || isNaN(dilutionPct)) return null;
 
-  if (dilutionPct <= -5.0) {
-    return 100;
+  if (dilutionPct <= -3.0) {
+    return Math.min(100, Math.round(90 + Math.min(2.0, -3.0 - dilutionPct) * 5));
   }
-  if (dilutionPct <= 2.0) {
-    return Math.round(99 - ((dilutionPct + 5.0) / 7.0) * 14);
+  if (dilutionPct <= -1.0) {
+    return Math.round(75 + ((-1.0 - dilutionPct) / 2.0) * 14);
   }
-  if (dilutionPct <= 5.0) {
-    return Math.round(84 - ((dilutionPct - 2.0) / 3.0) * 24);
+  if (dilutionPct <= 1.0) {
+    return Math.round(55 + ((1.0 - dilutionPct) / 2.0) * 19);
   }
-  if (dilutionPct <= 10.0) {
-    return Math.round(59 - ((dilutionPct - 5.0) / 5.0) * 19);
+  if (dilutionPct <= 3.0) {
+    return Math.round(35 + ((3.0 - dilutionPct) / 2.0) * 19);
   }
-  return Math.max(0, Math.round(39 - (dilutionPct - 10.0) * 3));
+  return Math.max(0, Math.round(34 - ((dilutionPct - 3.0) / 4.0) * 34));
 }
 
 /**
