@@ -466,6 +466,23 @@ class FinancialModelingPrepService {
     }
   }
 
+  async getIndustryPeers(industry?: string, sector?: string): Promise<any[]> {
+    try {
+      const params: any = { ...this.getParams(), limit: 30 };
+      if (industry) params.industry = industry;
+      if (sector && !industry) params.sector = sector;
+
+      const response = await this.client.get("/stock_screener", { params });
+      if (!response.data || !Array.isArray(response.data)) {
+        return [];
+      }
+      return response.data;
+    } catch (error) {
+      console.warn("Could not fetch industry peers from screener:", error);
+      return [];
+    }
+  }
+
   private handleError(error: any): ApiError {
     if (axios.isAxiosError(error)) {
       const rawData = error.response?.data;

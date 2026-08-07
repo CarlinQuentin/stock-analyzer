@@ -169,14 +169,20 @@ const CompetitorCard: React.FC<CompetitorCardProps> = ({
           </span>
         </div>
 
-        {/* Meta Info: Industry & Sector */}
+        {/* Meta Info: Industry, Headquarters & Employees */}
         <div className="flex flex-wrap items-center gap-1.5 mb-3 text-[11px]">
           <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold border border-slate-200/60 dark:border-slate-700/50 truncate max-w-[180px]">
             {competitor.industry}
           </span>
-          {competitor.sector && (
+          {competitor.headquarters && (
+            <span className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-0.5">
+              <span>📍</span>
+              <span>{competitor.headquarters}</span>
+            </span>
+          )}
+          {competitor.employeeCount && (
             <span className="text-slate-400 dark:text-slate-500 font-medium">
-              • {competitor.sector}
+              • {typeof competitor.employeeCount === "number" ? competitor.employeeCount.toLocaleString() : competitor.employeeCount} employees
             </span>
           )}
         </div>
@@ -186,11 +192,16 @@ const CompetitorCard: React.FC<CompetitorCardProps> = ({
           {competitor.description}
         </p>
 
-        {/* Competitive Overlap Box */}
+        {/* Competitive Overlap & Score Breakdown Box */}
         <div className="p-3 bg-slate-50 dark:bg-slate-900/70 rounded-xl border border-slate-100 dark:border-slate-700/50 mb-3">
-          <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-wider block mb-1">
-            Competitive Overlap
-          </span>
+          <div className="flex items-center justify-between gap-1 mb-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-wider">
+              Dynamic Competitor Signal
+            </span>
+            <span className="text-[10px] font-extrabold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800">
+              Ranked Competitor
+            </span>
+          </div>
           <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-tight font-medium">
             {competitor.reasonForCompetition}
           </p>

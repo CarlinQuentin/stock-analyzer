@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { competitorService } from "./competitorService";
+import { competitorDiscoveryService } from "./competitorDiscoveryService";
 import { fmpService } from "./financialModelingPrep";
 import { CompanyProfile } from "../types";
 
@@ -15,7 +16,7 @@ describe("CompetitorService Unit Tests", () => {
   };
 
   beforeEach(() => {
-    (competitorService as any).cache.clear();
+    (competitorDiscoveryService as any).inMemoryCache.clear();
     vi.restoreAllMocks();
   });
 
