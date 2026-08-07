@@ -1057,12 +1057,12 @@ function App() {
                     directionStrategy="higherIsBetter"
                   />
                   <MetricCard
-                    title="Net Debt / FCF"
+                    title="Net Debt / Normalized FCF"
                     value={result.metrics.netDebtToFCF}
                     unit="x"
                     score={result.scores.netDebtToFCF}
-                    description="Solvency & leverage ratio"
-                    tooltip="Measures financial flexibility and ability to repay obligations using internally generated cash flow. Lower ratios indicate strong balance sheet health."
+                    description="Net Debt / 5-Yr Avg FCF"
+                    tooltip="Measures financial flexibility by comparing net debt against normalized free cash flow. Using multi-year average free cash flow reduces distortion from business cycles and unusual yearly fluctuations. Lower ratios indicate stronger balance sheet health."
                     icon="🏦"
                     chartData={result.netDebtToFCFHistory}
                     chartValueType="number"

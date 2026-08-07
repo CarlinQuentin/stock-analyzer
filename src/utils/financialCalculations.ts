@@ -1147,10 +1147,11 @@ export function calculateMarginStabilityHistory(
 }
 
 /**
- * Financial Strength Metric: Net Debt / FCF
- * Measures financial flexibility and ability to repay obligations using internally generated free cash flow.
+ * Financial Strength Metric: Net Debt / Normalized FCF
+ * Measures financial flexibility by comparing net debt against normalized free cash flow.
  * Net Debt = Total Debt - Cash & Cash Equivalents
- * Ratio = Net Debt / FCF
+ * Normalized FCF = Average annual Free Cash Flow over up to 5 most recent fiscal years (minimum 3 years required).
+ * Ratio = Net Debt / Normalized FCF
  */
 export function calculateNetDebtToFCF(
   balanceSheets: FinancialStatement[] | null | undefined,
@@ -1164,11 +1165,7 @@ export function calculateNetDebtToFCF(
     .filter((s) => s && s.date)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const sortedCashFlow = [...cashFlowStatements]
-    .filter((s) => s && s.date && s.operatingCashFlow !== undefined && s.capitalExpenditure !== undefined)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-  if (sortedBalance.length === 0 || sortedCashFlow.length === 0) {
+  if (sortedBalance.length === 0) {
     return null;
   }
 
@@ -1182,19 +1179,41 @@ export function calculateNetDebtToFCF(
 
   const netDebt = totalDebt - cash;
 
-  const latestYear = new Date(latestBalance.date).getFullYear();
-  let matchCF = sortedCashFlow.find((c) => new Date(c.date).getFullYear() === latestYear);
-  if (!matchCF) matchCF = sortedCashFlow[0];
+  // Extract FCF for all available fiscal years
+  const fcfByYear = new Map<string, number>();
+  for (const c of cashFlowStatements) {
+    if (c && c.date && typeof c.operatingCashFlow === "number" && typeof c.capitalExpenditure === "number") {
+      const fcf = calculateFCF(c.operatingCashFlow, c.capitalExpenditure);
+      if (fcf !== null && !isNaN(fcf) && isFinite(fcf)) {
+        const year = new Date(c.date).getFullYear().toString();
+        fcfByYear.set(year, fcf);
+      }
+    }
+  }
 
-  const fcf = calculateFCF(matchCF.operatingCashFlow, matchCF.capitalExpenditure);
-  if (fcf === null) return null;
+  // Sort fiscal years descending (most recent first)
+  const availableYears = Array.from(fcfByYear.keys()).sort((a, b) => b.localeCompare(a));
 
-  if (fcf <= 0) {
-    if (netDebt <= 0) return Number((netDebt / Math.abs(fcf || 1)).toFixed(2));
+  // Minimum requirement: require at least 3 years of historical FCF data before calculating
+  if (availableYears.length < 3) {
+    return null;
+  }
+
+  // Use up to 5 most recent available fiscal years
+  const targetYears = availableYears.slice(0, 5);
+  let fcfSum = 0;
+  for (const year of targetYears) {
+    fcfSum += fcfByYear.get(year)!;
+  }
+
+  const normalizedFCF = fcfSum / targetYears.length;
+
+  if (normalizedFCF <= 0) {
+    if (netDebt <= 0) return Number((netDebt / Math.abs(normalizedFCF || 1)).toFixed(2));
     return 99.0;
   }
 
-  return Number((netDebt / fcf).toFixed(2));
+  return Number((netDebt / normalizedFCF).toFixed(2));
 }
 
 /**

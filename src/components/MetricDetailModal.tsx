@@ -264,7 +264,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       case "netDebtToFCF":
         return {
           ...defaultData,
-          title: "Net Debt / FCF",
+          title: "Net Debt / Normalized FCF",
           icon: "🏦",
           score: result.scores.netDebtToFCF,
           value: result.metrics.netDebtToFCF,
@@ -274,20 +274,21 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           directionStrategy: "lowerIsBetter" as const,
           referenceLineValue: 2.0,
           referenceLineLabel: "2.0x Target",
-          description: "Measures financial flexibility and ability to repay obligations using internally generated cash.",
-          formula: "Net Debt / FCF = (Total Debt - Cash & Equivalents) / Free Cash Flow",
+          description: "Measures financial flexibility by comparing net debt against normalized free cash flow. Using multi-year average free cash flow reduces distortion from business cycles and unusual yearly fluctuations. Lower ratios indicate stronger balance sheet health.",
+          formula: "Net Debt / Normalized FCF = (Total Debt - Cash & Equivalents) / Average Annual Free Cash Flow over last 5 fiscal years",
           mathExplanation: [
-            `1. Net Debt / FCF Ratio: ${result.metrics.netDebtToFCF !== null ? `${result.metrics.netDebtToFCF.toFixed(2)}x` : "N/A"}`,
-            `2. Measures financial flexibility and ability to repay obligations using internally generated cash.`,
+            `1. Net Debt / Normalized FCF Ratio: ${result.metrics.netDebtToFCF !== null ? `${result.metrics.netDebtToFCF.toFixed(2)}x` : "N/A"}`,
+            `2. Normalized FCF represents the average annual Free Cash Flow generated over up to 5 available fiscal years (minimum 3 years required).`,
+            `3. Multi-year normalization prevents single-year business cycle distortions or temporary capex spikes from misrepresenting balance sheet health.`,
           ],
-          whyItMatters: "Measures financial flexibility and ability to repay obligations using internally generated cash. Ratios under 2.0x reflect strong solvency and low financial risk.",
+          whyItMatters: "Measures sustainable debt capacity by comparing net debt against multi-year normalized free cash flow. Ratios under 2.0x reflect strong balance sheet health and debt repayment capacity over full business cycles.",
           tiers: [
             { label: "Excellent", range: "< 2.0x (or Net Cash)", color: "text-green-500" },
             { label: "Good", range: "2.0x - 4.0x", color: "text-blue-500" },
             { label: "Moderate Risk", range: "4.0x - 6.0x", color: "text-amber-500" },
             { label: "High Leverage", range: "> 6.0x", color: "text-red-500" },
           ],
-          getInsights: () => ["Lower Net Debt / FCF ratios indicate strong balance sheet health and debt repayment capacity."],
+          getInsights: () => ["Lower Net Debt / Normalized FCF ratios indicate strong balance sheet health and sustainable debt repayment capacity."],
         };
       case "shareDilution":
         return {

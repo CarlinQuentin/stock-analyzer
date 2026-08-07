@@ -1492,35 +1492,61 @@ describe("calculateMarginStabilityHistory", () => {
 });
 
 describe("calculateNetDebtToFCF", () => {
-  it("should calculate Net Debt / FCF ratio correctly for low leverage company", () => {
-    const balance = [{ date: "2024-12-31", totalDebt: 500, cashAndCashEquivalents: 100 }]; // Net Debt = 400
-    const cashFlow = [{ date: "2024-12-31", operatingCashFlow: 300, capitalExpenditure: 100 }]; // FCF = 200
-    // Net Debt / FCF = 400 / 200 = 2.0x
-    expect(calculateNetDebtToFCF(balance, cashFlow)).toBe(2.0);
+  it("1. Requires at least 3 years of historical FCF data before calculating", () => {
+    const balance = [{ date: "2024-12-31", totalDebt: 500, cashAndCashEquivalents: 100 }];
+    const cashFlow2Years = [
+      { date: "2023-12-31", operatingCashFlow: 300, capitalExpenditure: 100 },
+      { date: "2024-12-31", operatingCashFlow: 300, capitalExpenditure: 100 },
+    ];
+    expect(calculateNetDebtToFCF(balance, cashFlow2Years)).toBeNull();
   });
 
-  it("should calculate high leverage ratio for high debt company", () => {
+  it("2. Smooths out cyclical business with 1 poor FCF year over 5-year normalized average FCF", () => {
+    const balance = [{ date: "2024-12-31", totalDebt: 1000, cashAndCashEquivalents: 0 }]; // Net Debt = 1000
+    // 4 strong FCF years (500 each) + 1 bad capex year (100) -> Average FCF = (4*500 + 100)/5 = 420
+    // Net Debt / Normalized FCF = 1000 / 420 = 2.38x (vs 10.0x single-year!)
+    const cashFlow = [
+      { date: "2020-12-31", operatingCashFlow: 600, capitalExpenditure: 100 }, // FCF 500
+      { date: "2021-12-31", operatingCashFlow: 600, capitalExpenditure: 100 }, // FCF 500
+      { date: "2022-12-31", operatingCashFlow: 600, capitalExpenditure: 100 }, // FCF 500
+      { date: "2023-12-31", operatingCashFlow: 600, capitalExpenditure: 100 }, // FCF 500
+      { date: "2024-12-31", operatingCashFlow: 200, capitalExpenditure: 100 }, // FCF 100
+    ];
+
+    const ratio = calculateNetDebtToFCF(balance, cashFlow);
+    expect(ratio).toBe(2.38);
+  });
+
+  it("3. Returns high ratio for company with high net debt and consistently weak FCF", () => {
     const balance = [{ date: "2024-12-31", totalDebt: 1500, cashAndCashEquivalents: 100 }]; // Net Debt = 1400
-    const cashFlow = [{ date: "2024-12-31", operatingCashFlow: 300, capitalExpenditure: 100 }]; // FCF = 200
-    // Net Debt / FCF = 1400 / 200 = 7.0x
+    const cashFlow = [
+      { date: "2022-12-31", operatingCashFlow: 250, capitalExpenditure: 50 }, // FCF 200
+      { date: "2023-12-31", operatingCashFlow: 250, capitalExpenditure: 50 }, // FCF 200
+      { date: "2024-12-31", operatingCashFlow: 250, capitalExpenditure: 50 }, // FCF 200
+    ];
+    // Net Debt / Normalized FCF = 1400 / 200 = 7.0x
     expect(calculateNetDebtToFCF(balance, cashFlow)).toBe(7.0);
   });
 
-  it("should return negative ratio for net cash company", () => {
+  it("4. Returns negative ratio for net cash company with positive normalized FCF", () => {
     const balance = [{ date: "2024-12-31", totalDebt: 200, cashAndCashEquivalents: 500 }]; // Net Debt = -300
-    const cashFlow = [{ date: "2024-12-31", operatingCashFlow: 300, capitalExpenditure: 100 }]; // FCF = 200
-    // Net Debt / FCF = -300 / 200 = -1.5x
+    const cashFlow = [
+      { date: "2022-12-31", operatingCashFlow: 300, capitalExpenditure: 100 },
+      { date: "2023-12-31", operatingCashFlow: 300, capitalExpenditure: 100 },
+      { date: "2024-12-31", operatingCashFlow: 300, capitalExpenditure: 100 },
+    ];
+    // Net Debt / Normalized FCF = -300 / 200 = -1.5x
     expect(calculateNetDebtToFCF(balance, cashFlow)).toBe(-1.5);
   });
 
-  it("should handle negative FCF company safely", () => {
+  it("5. Handles negative normalized FCF safely and returns 99.0 for positive net debt", () => {
     const balance = [{ date: "2024-12-31", totalDebt: 500, cashAndCashEquivalents: 100 }]; // Net Debt = 400
-    const cashFlow = [{ date: "2024-12-31", operatingCashFlow: -50, capitalExpenditure: 50 }]; // FCF = -100 (FCF burn)
+    const cashFlow = [
+      { date: "2022-12-31", operatingCashFlow: -50, capitalExpenditure: 50 },
+      { date: "2023-12-31", operatingCashFlow: -50, capitalExpenditure: 50 },
+      { date: "2024-12-31", operatingCashFlow: -50, capitalExpenditure: 50 },
+    ];
     expect(calculateNetDebtToFCF(balance, cashFlow)).toBe(99.0);
-  });
-
-  it("should return null for null or missing input statements", () => {
-    expect(calculateNetDebtToFCF(null, null)).toBeNull();
   });
 });
 

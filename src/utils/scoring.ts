@@ -8,7 +8,7 @@ export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
     fcfConsistency: { name: "FCF Consistency", weight: 0.10, description: "Reliability of FCF generation" },
     fcfConversion: { name: "Avg FCF Conversion", weight: 0.10, description: "Multi-year average Free Cash Flow to Net Income ratio" },
     marginStability: { name: "Margin Stability", weight: 0.15, description: "Operating profitability trend stability" },
-    netDebtToFCF: { name: "Net Debt / FCF", weight: 0.10, description: "Solvency & debt coverage by free cash flow" },
+    netDebtToFCF: { name: "Net Debt / Normalized FCF", weight: 0.10, description: "Solvency & debt coverage by normalized 5-year average free cash flow" },
     shareDilution: { name: "Share Dilution", weight: 0.05, description: "Shareholder ownership change over time" },
     revenue: { name: "Revenue Growth", weight: 0.15, description: "Compound annual revenue growth rate" },
     eps: { name: "EPS Growth", weight: 0.05, description: "Earnings per share growth" },
