@@ -409,6 +409,10 @@ describe("Share Dilution Metric & Formatting Tests", () => {
     expect(formatShortenedShareCount(22760000000)).toBe("22.8B");
     expect(formatShortenedShareCount(12500)).toBe("12.5K");
 
+    // Regression check: ensure raw numeric string is replaced by shortened M/B format
+    expect(formatShortenedShareCount(242017000)).not.toBe("242017000");
+    expect(formatShortenedShareCount(242017000)).not.toBe("242017000.00");
+    expect(formatShortenedShareCount(148404000)).not.toBe("148404000");
     expect(formatShortenedShareCount(242017000)).not.toContain("%");
     expect(formatShortenedShareCount(148404000)).not.toContain("%");
   });

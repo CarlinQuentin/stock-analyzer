@@ -512,6 +512,9 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       return `${val.toFixed(1)}%`;
     }
     if (type === "number") {
+      if (config.title.toLowerCase().includes("dilution") || config.title.toLowerCase().includes("share")) {
+        return formatShortenedShareCount(val);
+      }
       return val.toFixed(2);
     }
     const isNegative = val < 0;
