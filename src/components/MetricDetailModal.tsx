@@ -509,7 +509,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
 
   const formatChartValue = (val: number, type: "currency" | "percent" | "number" = "currency"): string => {
     if (type === "percent") {
-      return `${val.toFixed(1)}%`;
+      return formatPercentageMetric(val, true);
     }
     if (type === "number") {
       if (config.title.toLowerCase().includes("dilution") || config.title.toLowerCase().includes("share")) {

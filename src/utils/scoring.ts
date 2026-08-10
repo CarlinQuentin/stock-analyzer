@@ -58,13 +58,7 @@ export function formatPercentageMetric(
   let numVal: number;
 
   if (isAlreadyPercentage) {
-    // If value is passed as a decimal ratio (e.g. 0.96 for 96%, 1.05 for 105%, 0.80 for 80%), convert to whole percentage
-    if (Math.abs(value) > 0 && Math.abs(value) <= 2.0 && !Number.isInteger(value)) {
-      numVal = value * 100;
-    } else {
-      numVal = value;
-    }
-
+    numVal = value;
     if (Number.isInteger(numVal)) {
       return `${numVal}%`;
     }

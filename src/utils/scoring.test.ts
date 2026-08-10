@@ -11,6 +11,7 @@ import {
   scoreMarginStability,
   scoreNetDebtToFCF,
   scoreShareDilution,
+  scoreROIC,
   calculateMetricScores,
   calculateUniversalBusinessScore,
   calculateIndustryScore,
@@ -51,40 +52,46 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
 
     it("7. Formats Share Dilution percentage values correctly without double conversion", () => {
       expect(formatPercentageMetric(-4.77, true)).toBe("-4.77%");
-      expect(formatPercentageMetric(-0.0477, true)).toBe("-4.77%");
-      expect(formatPercentageMetric(0.0215, true)).toBe("2.15%");
       expect(formatPercentageMetric(2.15, true)).toBe("2.15%");
       expect(formatPercentageMetric(-10.0, true)).toBe("-10%");
     });
 
-    it("7. ROIC = 25 displays as 25%", () => {
+    it("8. ROIC values format accurately for small percentages and large percentages", () => {
+      // Small ROIC values (already-scaled percentage scale, isAlreadyPercentage = true)
+      expect(formatPercentageMetric(0.3443, true)).toBe("0.34%");
+      expect(formatPercentageMetric(0.5, true)).toBe("0.50%");
+      expect(formatPercentageMetric(0.99, true)).toBe("0.99%");
+      expect(formatPercentageMetric(1.5, true)).toBe("1.50%");
+      expect(formatPercentageMetric(45.2, true)).toBe("45.20%");
       expect(formatPercentageMetric(25, true)).toBe("25%");
-    });
-
-    it("8. ROIC = -166.45 displays as -166.45%", () => {
       expect(formatPercentageMetric(-166.45, true)).toBe("-166.45%");
+
+      // Verify already-scaled values are NOT accidentally multiplied by 100 again
+      expect(formatPercentageMetric(0.3443, true)).not.toBe("34.43%");
+      expect(formatPercentageMetric(0.5, true)).not.toBe("50.00%");
+      expect(formatPercentageMetric(0.99, true)).not.toBe("99.00%");
     });
 
-    it("9. FCF Consistency score formatting requirements", () => {
-      // FCF Consistency score = 96 displays "96%"
+    it("9. Decimal ratios convert to percentages accurately (isAlreadyPercentage = false)", () => {
+      expect(formatPercentageMetric(0.003443, false)).toBe("0.34%");
+      expect(formatPercentageMetric(0.005, false)).toBe("0.50%");
+      expect(formatPercentageMetric(0.0099, false)).toBe("0.99%");
+      expect(formatPercentageMetric(0.01, false)).toBe("1.00%");
+      expect(formatPercentageMetric(0.452, false)).toBe("45.20%");
+    });
+
+    it("10. FCF Consistency, Conversion, and Margin Stability score formatting requirements", () => {
       expect(formatPercentageMetric(96, true)).toBe("96%");
-      // FCF Consistency score = 0.96 displays "96%"
-      expect(formatPercentageMetric(0.96, true)).toBe("96%");
-      // FCF Consistency score = 100 displays "100%"
       expect(formatPercentageMetric(100, true)).toBe("100%");
-      // FCF Consistency score = 0 displays "0%"
       expect(formatPercentageMetric(0, true)).toBe("0%");
+      expect(formatPercentageMetric(105, true)).toBe("105%");
+      expect(formatPercentageMetric(80, true)).toBe("80%");
+      expect(formatPercentageMetric(15.5, true)).toBe("15.50%");
     });
 
-    it("10. Other percentage-based metrics format consistently", () => {
-      // FCF Conversion: 105 or 1.05 displays as "105%"
-      expect(formatPercentageMetric(105, true)).toBe("105%");
-      expect(formatPercentageMetric(1.05, true)).toBe("105%");
-      // Margin Stability: 80 or 0.80 displays as "80%"
-      expect(formatPercentageMetric(80, true)).toBe("80%");
-      expect(formatPercentageMetric(0.80, true)).toBe("80%");
-      // FCF Margin: 15.5 displays as "15.50%"
-      expect(formatPercentageMetric(15.5, true)).toBe("15.50%");
+    it("11. Verifies ROIC Quality Score is preserved for AAL (0.3443% -> 22/100) and Case 2 (45.20% -> 100/100)", () => {
+      expect(scoreROIC(0.3443)).toBe(22);
+      expect(scoreROIC(45.2)).toBe(100);
     });
   });
 
