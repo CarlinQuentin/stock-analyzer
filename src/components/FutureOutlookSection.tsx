@@ -136,7 +136,7 @@ export const FutureOutlookSection: React.FC<FutureOutlookSectionProps> = ({
       <div>
         <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
           <span className="w-2 h-6 bg-blue-600 rounded-full inline-block"></span>
-          Section 1 — Forward Growth Outlook
+          Forward Growth Outlook
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -227,7 +227,7 @@ export const FutureOutlookSection: React.FC<FutureOutlookSectionProps> = ({
       <div>
         <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
           <span className="w-2 h-6 bg-indigo-600 rounded-full inline-block"></span>
-          Section 2 — Consensus Fiscal Year Estimates
+          Consensus Fiscal Year Estimates
         </h3>
 
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700/60 overflow-hidden">
@@ -295,7 +295,7 @@ export const FutureOutlookSection: React.FC<FutureOutlookSectionProps> = ({
       <div>
         <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
           <span className="w-2 h-6 bg-emerald-600 rounded-full inline-block"></span>
-          Section 3 — Analyst Price Targets
+          Analyst Price Targets
         </h3>
 
         <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-lg border border-slate-200 dark:border-slate-700/60">
@@ -353,7 +353,7 @@ export const FutureOutlookSection: React.FC<FutureOutlookSectionProps> = ({
       <div>
         <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
           <span className="w-2 h-6 bg-purple-600 rounded-full inline-block"></span>
-          Section 4 — Estimate Revisions & Analyst Actions
+          Estimate Revisions & Analyst Actions
         </h3>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
