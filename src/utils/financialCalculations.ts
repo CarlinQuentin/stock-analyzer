@@ -3,7 +3,41 @@ import {
   FinancialMetrics,
   DividendMetrics,
   FCFTrendResult,
+  HistoricalPeriod,
 } from "../types";
+
+/**
+ * Get maximum annual statement count limit for a given HistoricalPeriod.
+ * - 10Y: up to 11 annual statements (10 year intervals)
+ * - 5Y: up to 6 annual statements (5 year intervals)
+ * - 3Y: up to 4 annual statements (3 year intervals)
+ */
+export function getPeriodStatementLimit(period: HistoricalPeriod): number {
+  switch (period) {
+    case "3Y":
+      return 4;
+    case "5Y":
+      return 6;
+    case "10Y":
+    default:
+      return 11;
+  }
+}
+
+/**
+ * Slice financial statements to match the lookback limit of a given HistoricalPeriod.
+ * Preserves original statement sorting (newest first).
+ */
+export function sliceStatementsForPeriod<T>(
+  statements: T[] | null | undefined,
+  period: HistoricalPeriod,
+): T[] {
+  if (!statements || !Array.isArray(statements) || statements.length === 0) {
+    return [];
+  }
+  const limit = getPeriodStatementLimit(period);
+  return statements.slice(0, limit);
+}
 
 /**
  * Calculate Compound Annual Growth Rate (CAGR)

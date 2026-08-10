@@ -17,12 +17,24 @@ import { SavedStocksPage } from "./components/SavedStocksPage";
 import { LeadershipSection } from "./components/LeadershipSection";
 import { CompetitorsSection } from "./components/CompetitorsSection";
 import { FutureOutlookSection } from "./components/FutureOutlookSection";
+import { PeriodSelector } from "./components/PeriodSelector";
 import { authService, UserProfile } from "./services/authService";
 import { fmpService } from "./services/financialModelingPrep";
 import { savedStocksService } from "./services/savedStocksService";
 import { leadershipService } from "./services/leadershipService";
 import { competitorService } from "./services/competitorService";
-import { LeadershipProfile, CompetitorData, FutureOutlookData } from "./types";
+import {
+  LeadershipProfile,
+  CompetitorData,
+  FutureOutlookData,
+  HistoricalPeriod,
+  AnalysisResult,
+  SavedStock,
+  CompanyProfile,
+  HistoricalPricePoint,
+  FinancialStatement,
+  DividendMetrics,
+} from "./types";
 import {
   calculateAllMetrics,
   calculateFCFMarginHistory,
@@ -30,6 +42,7 @@ import {
   calculateMarginStabilityHistory,
   calculateNetDebtToFCFHistory,
   calculateShareDilutionHistory,
+  sliceStatementsForPeriod,
 } from "./utils/financialCalculations";
 import {
   calculateMetricScores,
@@ -45,7 +58,6 @@ import {
   getUnavailableValuationMetrics,
   getValuationAnalysis,
 } from "./utils/valuationScoring";
-import { AnalysisResult, SavedStock } from "./types";
 
 import { initAnonymousAuth } from "./services/supabaseClient";
 import { stockAnalysisService } from "./services/stockAnalysisService";
@@ -70,6 +82,21 @@ function App() {
   const [activeTab, setActiveTab] = useState<"fundamentals" | "valuation" | "leadership" | "futureOutlook">(
     "fundamentals",
   );
+  const [selectedPeriod, setSelectedPeriod] = useState<HistoricalPeriod>("10Y");
+  const [rawStatementData, setRawStatementData] = useState<{
+    ticker: string;
+    profile: CompanyProfile;
+    historicalPrices: HistoricalPricePoint[];
+    statementData: {
+      incomeStatements: FinancialStatement[];
+      balanceSheets: FinancialStatement[];
+      cashFlowStatements: FinancialStatement[];
+      dividendHistory: any[];
+      dividendMetrics: DividendMetrics;
+      keyMetrics: any[];
+      financialRatios: any[];
+    };
+  } | null>(null);
   const [leadershipProfile, setLeadershipProfile] = useState<LeadershipProfile | null>(null);
   const [isLoadingLeadership, setIsLoadingLeadership] = useState(false);
   const [competitorData, setCompetitorData] = useState<CompetitorData | null>(null);
@@ -81,6 +108,273 @@ function App() {
 
   const [savedStocks, setSavedStocks] = useState<SavedStock[]>([]);
   const [currentView, setCurrentView] = useState<"analyze" | "saved">("analyze");
+
+  const computeAnalysisResult = useCallback(
+    (
+      rawData: {
+        ticker: string;
+        profile: CompanyProfile;
+        historicalPrices: HistoricalPricePoint[];
+        statementData: {
+          incomeStatements: FinancialStatement[];
+          balanceSheets: FinancialStatement[];
+          cashFlowStatements: FinancialStatement[];
+          dividendHistory: any[];
+          dividendMetrics: DividendMetrics;
+          keyMetrics: any[];
+          financialRatios: any[];
+        };
+      },
+      period: HistoricalPeriod,
+    ): AnalysisResult => {
+      const {
+        incomeStatements,
+        balanceSheets,
+        cashFlowStatements,
+        dividendMetrics,
+        keyMetrics,
+        financialRatios,
+      } = rawData.statementData;
+
+      const slicedIncome = sliceStatementsForPeriod(incomeStatements, period);
+      const slicedBalance = sliceStatementsForPeriod(balanceSheets, period);
+      const slicedCashFlow = sliceStatementsForPeriod(cashFlowStatements, period);
+      const slicedKeyMetrics = sliceStatementsForPeriod(keyMetrics, period);
+      const slicedFinancialRatios = sliceStatementsForPeriod(financialRatios, period);
+
+      const metrics = calculateAllMetrics(
+        slicedIncome,
+        slicedBalance,
+        slicedCashFlow,
+        dividendMetrics,
+      );
+      const scores = calculateMetricScores(metrics, slicedCashFlow);
+      const overallScore = calculateOverallScore(scores);
+      const dataConfidenceScore = calculateDataConfidenceScore(scores);
+      const unavailableMetrics = getUnavailableMetrics(scores);
+
+      const valuationMetrics = calculateValuationMetrics(
+        rawData.profile,
+        slicedIncome,
+        slicedBalance,
+        slicedCashFlow,
+        slicedKeyMetrics,
+        slicedFinancialRatios,
+      );
+      const valuationScores = calculateValuationScores(valuationMetrics);
+      const overallValuationScore = calculateOverallValuationScore(valuationScores);
+      const valuationConfidenceScore = calculateValuationConfidenceScore(valuationScores);
+      const unavailableValuationMetrics = getUnavailableValuationMetrics(valuationScores);
+
+      const fcfHistory = [...slicedCashFlow].reverse().map((s) => {
+        const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+        const fcf = (s.operatingCashFlow || 0) - Math.abs(s.capitalExpenditure || 0);
+        return { label: year, value: fcf };
+      });
+
+      const revenueHistory = [...slicedIncome].reverse().map((s) => {
+        const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+        return { label: year, value: s.revenue || 0 };
+      });
+
+      const epsHistory = [...slicedIncome].reverse().map((s) => {
+        const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+        return { label: year, value: s.eps || 0 };
+      });
+
+      const roicHistory = [...slicedIncome]
+        .reverse()
+        .map((s) => {
+          const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+          const matchBalance = slicedBalance.find(
+            (b) => b.date && new Date(b.date).getFullYear().toString() === year,
+          );
+          let roicVal = 0;
+          if (
+            matchBalance &&
+            s.operatingIncome &&
+            matchBalance.totalEquity &&
+            matchBalance.totalDebt
+          ) {
+            const investedCapital = matchBalance.totalEquity + matchBalance.totalDebt;
+            let taxRate = 0.25;
+            if (s.netIncome && s.operatingIncome > 0) {
+              taxRate = Math.max(0, 1 - s.netIncome / s.operatingIncome);
+              taxRate = Math.min(1, taxRate);
+            }
+            const nopat = s.operatingIncome * (1 - taxRate);
+            roicVal = (nopat / investedCapital) * 100;
+          }
+          return { label: year, value: roicVal };
+        })
+        .filter((item) => item.value !== 0);
+
+      const debtEquityHistory = [...slicedBalance].reverse().map((s) => {
+        const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+        const debtToEquity = s.totalEquity ? (s.totalDebt || 0) / s.totalEquity : 0;
+        return { label: year, value: debtToEquity };
+      });
+
+      const profitabilityHistory = [...slicedIncome]
+        .reverse()
+        .map((s) => {
+          const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+          const netMargin = s.revenue ? ((s.netIncome || 0) / s.revenue) * 100 : 0;
+          return { label: year, value: netMargin };
+        });
+
+      const fcfMarginHistory = calculateFCFMarginHistory(slicedIncome, slicedCashFlow);
+      const fcfConversionHistory = calculateFCFConversionHistory(slicedIncome, slicedCashFlow);
+      const marginStabilityHistory = calculateMarginStabilityHistory(slicedIncome);
+      const netDebtToFCFHistory = calculateNetDebtToFCFHistory(slicedBalance, slicedCashFlow);
+      const shareDilutionHistory = calculateShareDilutionHistory(slicedIncome, slicedBalance);
+
+      const peHistory = [...slicedIncome]
+        .reverse()
+        .map((s) => {
+          const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+          const matchRatio = slicedFinancialRatios
+            ? slicedFinancialRatios.find(
+                (r: any) => r.date && new Date(r.date).getFullYear().toString() === year,
+              )
+            : null;
+          let val = matchRatio?.priceToEarningsRatio;
+          if (!val || val <= 0) {
+            if (rawData.profile.price && s.eps && s.eps > 0) {
+              val = rawData.profile.price / s.eps;
+            } else if (rawData.profile.mktCap && s.netIncome && s.netIncome > 0) {
+              val = rawData.profile.mktCap / s.netIncome;
+            }
+          }
+          return { label: year, value: val && val > 0 ? val : null };
+        })
+        .filter((item): item is { label: string; value: number } => item.value !== null && isFinite(item.value));
+
+      const psHistory = [...slicedIncome]
+        .reverse()
+        .map((s) => {
+          const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+          const matchRatio = slicedFinancialRatios
+            ? slicedFinancialRatios.find(
+                (r: any) => r.date && new Date(r.date).getFullYear().toString() === year,
+              )
+            : null;
+          let val = matchRatio?.priceToSalesRatio;
+          if (!val || val <= 0) {
+            if (rawData.profile.mktCap && s.revenue && s.revenue > 0) {
+              val = rawData.profile.mktCap / s.revenue;
+            }
+          }
+          return { label: year, value: val && val > 0 ? val : null };
+        })
+        .filter((item): item is { label: string; value: number } => item.value !== null && isFinite(item.value));
+
+      const evsHistory = [...slicedIncome]
+        .reverse()
+        .map((s) => {
+          const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+          const matchMetric = slicedKeyMetrics
+            ? slicedKeyMetrics.find(
+                (m: any) => m.date && new Date(m.date).getFullYear().toString() === year,
+              )
+            : null;
+          let val = matchMetric?.evToSales;
+          if (!val || val <= 0) {
+            const matchBalance = slicedBalance.find(
+              (b) => b.date && new Date(b.date).getFullYear().toString() === year,
+            );
+            if (rawData.profile.mktCap && s.revenue && s.revenue > 0 && matchBalance) {
+              const totalDebt = matchBalance.totalDebt || 0;
+              const cash = matchBalance.cashAndCashEquivalents || 0;
+              const ev = rawData.profile.mktCap + totalDebt - cash;
+              val = ev / s.revenue;
+            }
+          }
+          return { label: year, value: val && val > 0 ? val : null };
+        })
+        .filter((item): item is { label: string; value: number } => item.value !== null && isFinite(item.value));
+
+      const pfcfHistory = [...slicedCashFlow]
+        .reverse()
+        .map((s) => {
+          const year = s.date ? new Date(s.date).getFullYear().toString() : "N/A";
+          const matchRatio = slicedFinancialRatios
+            ? slicedFinancialRatios.find(
+                (r: any) => r.date && new Date(r.date).getFullYear().toString() === year,
+              )
+            : null;
+          let val = matchRatio?.priceToFreeCashFlowRatio;
+          if (!val || val <= 0) {
+            const fcf = (s.operatingCashFlow || 0) - Math.abs(s.capitalExpenditure || 0);
+            if (rawData.profile.mktCap && fcf > 0) {
+              val = rawData.profile.mktCap / fcf;
+            }
+          }
+          return { label: year, value: val && val > 0 ? val : null };
+        })
+        .filter((item): item is { label: string; value: number } => item.value !== null && isFinite(item.value));
+
+      const peAvg = peHistory.length > 0 ? peHistory.reduce((a, b) => a + b.value, 0) / peHistory.length : null;
+      const psAvg = psHistory.length > 0 ? psHistory.reduce((a, b) => a + b.value, 0) / psHistory.length : null;
+      const valuationPremiumHistory = peHistory.map((item) => {
+        const matchPs = psHistory.find((p) => p.label === item.label);
+        let sum = 0;
+        let count = 0;
+        if (peAvg && item.value) {
+          sum += ((item.value - peAvg) / peAvg) * 100;
+          count++;
+        }
+        if (psAvg && matchPs) {
+          sum += ((matchPs.value - psAvg) / psAvg) * 100;
+          count++;
+        }
+        return { label: item.label, value: count > 0 ? sum / count : 0 };
+      });
+
+      return {
+        ticker: rawData.ticker,
+        companyProfile: rawData.profile,
+        metrics,
+        scores,
+        overallScore,
+        analysis: `${rawData.profile.companyName} has a quality score of ${overallScore}/100`,
+        dataConfidenceScore,
+        unavailableMetrics,
+        selectedPeriod: period,
+        priceHistory: rawData.historicalPrices,
+        fcfHistory,
+        revenueHistory,
+        epsHistory,
+        roicHistory,
+        debtEquityHistory,
+        profitabilityHistory,
+        fcfMarginHistory,
+        fcfConversionHistory,
+        marginStabilityHistory,
+        netDebtToFCFHistory,
+        shareDilutionHistory,
+        valuationMetrics,
+        valuationScores,
+        overallValuationScore,
+        valuationConfidenceScore,
+        unavailableValuationMetrics,
+        peHistory,
+        psHistory,
+        evsHistory,
+        pfcfHistory,
+        valuationPremiumHistory,
+      };
+    },
+    [],
+  );
+
+  const handlePeriodChange = (newPeriod: HistoricalPeriod) => {
+    setSelectedPeriod(newPeriod);
+    if (rawStatementData) {
+      const updatedResult = computeAnalysisResult(rawStatementData, newPeriod);
+      setResult(updatedResult);
+    }
+  };
 
   useEffect(() => {
     // Automatically initialize anonymous Supabase auth session for new visitors
@@ -192,333 +486,39 @@ function App() {
         .finally(() => setIsLoadingCompetitors(false));
 
       try {
-        const {
-          incomeStatements,
-          balanceSheets,
-          cashFlowStatements,
-          dividendMetrics,
-          keyMetrics,
-          financialRatios,
-        } = await fmpService.getStatementData(ticker);
+        const statementData = await fmpService.getStatementData(ticker);
 
-        const metrics = calculateAllMetrics(
-          incomeStatements,
-          balanceSheets,
-          cashFlowStatements,
-          dividendMetrics,
-        );
-        const scores = calculateMetricScores(metrics, cashFlowStatements);
-        const overallScore = calculateOverallScore(scores);
-        const dataConfidenceScore = calculateDataConfidenceScore(scores);
-        const unavailableMetrics = getUnavailableMetrics(scores);
+        const rawData = {
+          ticker,
+          profile,
+          historicalPrices,
+          statementData,
+        };
+
+        setSelectedPeriod("10Y");
+        setRawStatementData(rawData);
+
+        const initialResult = computeAnalysisResult(rawData, "10Y");
+        setResult(initialResult);
 
         // Fetch Future Outlook asynchronously using calculated historical CAGRs
         fmpService
-          .getFutureOutlookData(ticker, profile.price, metrics.epsGrowth, metrics.revenueCAGR)
+          .getFutureOutlookData(
+            ticker,
+            profile.price,
+            initialResult.metrics.epsGrowth,
+            initialResult.metrics.revenueCAGR,
+          )
           .then((foData) => setFutureOutlookData(foData))
           .catch((err) => console.warn("Future Outlook fetch failed:", err))
           .finally(() => setIsLoadingFutureOutlook(false));
-
-        const valuationMetrics = calculateValuationMetrics(
-          profile,
-          incomeStatements,
-          balanceSheets,
-          cashFlowStatements,
-          keyMetrics,
-          financialRatios,
-        );
-        const valuationScores = calculateValuationScores(valuationMetrics);
-        const overallValuationScore =
-          calculateOverallValuationScore(valuationScores);
-        const valuationConfidenceScore =
-          calculateValuationConfidenceScore(valuationScores);
-        const unavailableValuationMetrics =
-          getUnavailableValuationMetrics(valuationScores);
-
-        const fcfHistory = [...cashFlowStatements].reverse().map((s) => {
-          const year = s.date
-            ? new Date(s.date).getFullYear().toString()
-            : "N/A";
-          const fcf =
-            (s.operatingCashFlow || 0) - Math.abs(s.capitalExpenditure || 0);
-          return { label: year, value: fcf };
-        });
-
-        const revenueHistory = [...incomeStatements].reverse().map((s) => {
-          const year = s.date
-            ? new Date(s.date).getFullYear().toString()
-            : "N/A";
-          return { label: year, value: s.revenue || 0 };
-        });
-
-        const epsHistory = [...incomeStatements].reverse().map((s) => {
-          const year = s.date
-            ? new Date(s.date).getFullYear().toString()
-            : "N/A";
-          return { label: year, value: s.eps || 0 };
-        });
-
-        const roicHistory = [...incomeStatements]
-          .reverse()
-          .map((s) => {
-            const year = s.date
-              ? new Date(s.date).getFullYear().toString()
-              : "N/A";
-            const matchBalance = balanceSheets.find(
-              (b) =>
-                b.date && new Date(b.date).getFullYear().toString() === year,
-            );
-            let roicVal = 0;
-            if (
-              matchBalance &&
-              s.operatingIncome &&
-              matchBalance.totalEquity &&
-              matchBalance.totalDebt
-            ) {
-              const investedCapital =
-                matchBalance.totalEquity + matchBalance.totalDebt;
-              let taxRate = 0.25;
-              if (s.netIncome && s.operatingIncome > 0) {
-                taxRate = Math.max(0, 1 - s.netIncome / s.operatingIncome);
-                taxRate = Math.min(1, taxRate);
-              }
-              const nopat = s.operatingIncome * (1 - taxRate);
-              roicVal = (nopat / investedCapital) * 100;
-            }
-            return { label: year, value: roicVal };
-          })
-          .filter((item) => item.value !== 0);
-
-        const debtEquityHistory = [...balanceSheets].reverse().map((s) => {
-          const year = s.date
-            ? new Date(s.date).getFullYear().toString()
-            : "N/A";
-          const debtToEquity = s.totalEquity
-            ? (s.totalDebt || 0) / s.totalEquity
-            : 0;
-          return { label: year, value: debtToEquity };
-        });
-
-        const profitabilityHistory = [...incomeStatements]
-          .reverse()
-          .map((s) => {
-            const year = s.date
-              ? new Date(s.date).getFullYear().toString()
-              : "N/A";
-            const netMargin = s.revenue
-              ? ((s.netIncome || 0) / s.revenue) * 100
-              : 0;
-            return { label: year, value: netMargin };
-          });
-
-        const fcfMarginHistory = calculateFCFMarginHistory(
-          incomeStatements,
-          cashFlowStatements,
-        );
-        const fcfConversionHistory = calculateFCFConversionHistory(
-          incomeStatements,
-          cashFlowStatements,
-        );
-        const marginStabilityHistory =
-          calculateMarginStabilityHistory(incomeStatements);
-        const netDebtToFCFHistory = calculateNetDebtToFCFHistory(
-          balanceSheets,
-          cashFlowStatements,
-        );
-        const shareDilutionHistory = calculateShareDilutionHistory(
-          incomeStatements,
-          balanceSheets,
-        );
-
-        // 1. P/E Ratio History
-        const peHistory = [...incomeStatements]
-          .reverse()
-          .map((s) => {
-            const year = s.date
-              ? new Date(s.date).getFullYear().toString()
-              : "N/A";
-            const matchRatio = financialRatios
-              ? financialRatios.find(
-                  (r: any) =>
-                    r.date &&
-                    new Date(r.date).getFullYear().toString() === year,
-                )
-              : null;
-            let val = matchRatio?.priceToEarningsRatio;
-            if (!val || val <= 0) {
-              if (profile.price && s.eps && s.eps > 0) {
-                val = profile.price / s.eps;
-              } else if (profile.mktCap && s.netIncome && s.netIncome > 0) {
-                val = profile.mktCap / s.netIncome;
-              }
-            }
-            return { label: year, value: val && val > 0 ? val : null };
-          })
-          .filter(
-            (item): item is { label: string; value: number } =>
-              item.value !== null && isFinite(item.value),
-          );
-
-        // 2. P/S Ratio History
-        const psHistory = [...incomeStatements]
-          .reverse()
-          .map((s) => {
-            const year = s.date
-              ? new Date(s.date).getFullYear().toString()
-              : "N/A";
-            const matchRatio = financialRatios
-              ? financialRatios.find(
-                  (r: any) =>
-                    r.date &&
-                    new Date(r.date).getFullYear().toString() === year,
-                )
-              : null;
-            let val = matchRatio?.priceToSalesRatio;
-            if (!val || val <= 0) {
-              if (profile.mktCap && s.revenue && s.revenue > 0) {
-                val = profile.mktCap / s.revenue;
-              }
-            }
-            return { label: year, value: val && val > 0 ? val : null };
-          })
-          .filter(
-            (item): item is { label: string; value: number } =>
-              item.value !== null && isFinite(item.value),
-          );
-
-        // 3. EV/Sales History
-        const evsHistory = [...incomeStatements]
-          .reverse()
-          .map((s) => {
-            const year = s.date
-              ? new Date(s.date).getFullYear().toString()
-              : "N/A";
-            const matchMetric = keyMetrics
-              ? keyMetrics.find(
-                  (m: any) =>
-                    m.date &&
-                    new Date(m.date).getFullYear().toString() === year,
-                )
-              : null;
-            let val = matchMetric?.evToSales;
-            if (!val || val <= 0) {
-              const matchBalance = balanceSheets.find(
-                (b) =>
-                  b.date && new Date(b.date).getFullYear().toString() === year,
-              );
-              if (
-                profile.mktCap &&
-                s.revenue &&
-                s.revenue > 0 &&
-                matchBalance
-              ) {
-                const totalDebt = matchBalance.totalDebt || 0;
-                const cash = matchBalance.cashAndCashEquivalents || 0;
-                const ev = profile.mktCap + totalDebt - cash;
-                val = ev / s.revenue;
-              }
-            }
-            return { label: year, value: val && val > 0 ? val : null };
-          })
-          .filter(
-            (item): item is { label: string; value: number } =>
-              item.value !== null && isFinite(item.value),
-          );
-
-        // 4. P/FCF Ratio History
-        const pfcfHistory = [...cashFlowStatements]
-          .reverse()
-          .map((s) => {
-            const year = s.date
-              ? new Date(s.date).getFullYear().toString()
-              : "N/A";
-            const matchRatio = financialRatios
-              ? financialRatios.find(
-                  (r: any) =>
-                    r.date &&
-                    new Date(r.date).getFullYear().toString() === year,
-                )
-              : null;
-            let val = matchRatio?.priceToFreeCashFlowRatio;
-            if (!val || val <= 0) {
-              const fcf =
-                (s.operatingCashFlow || 0) -
-                Math.abs(s.capitalExpenditure || 0);
-              if (profile.mktCap && fcf > 0) {
-                val = profile.mktCap / fcf;
-              }
-            }
-            return { label: year, value: val && val > 0 ? val : null };
-          })
-          .filter(
-            (item): item is { label: string; value: number } =>
-              item.value !== null && isFinite(item.value),
-          );
-
-        // 5. Valuation Premium History (% premium vs average)
-        const peAvg =
-          peHistory.length > 0
-            ? peHistory.reduce((a, b) => a + b.value, 0) / peHistory.length
-            : null;
-        const psAvg =
-          psHistory.length > 0
-            ? psHistory.reduce((a, b) => a + b.value, 0) / psHistory.length
-            : null;
-        const valuationPremiumHistory = peHistory.map((item) => {
-          const matchPs = psHistory.find((p) => p.label === item.label);
-          let sum = 0;
-          let count = 0;
-          if (peAvg && item.value) {
-            sum += ((item.value - peAvg) / peAvg) * 100;
-            count++;
-          }
-          if (psAvg && matchPs) {
-            sum += ((matchPs.value - psAvg) / psAvg) * 100;
-            count++;
-          }
-          return { label: item.label, value: count > 0 ? sum / count : 0 };
-        });
-
-        setResult({
-          ticker,
-          companyProfile: profile,
-          metrics,
-          scores,
-          overallScore,
-          analysis: `${profile.companyName} has a quality score of ${overallScore}/100`,
-          dataConfidenceScore,
-          unavailableMetrics,
-          priceHistory: historicalPrices,
-          fcfHistory,
-          revenueHistory,
-          epsHistory,
-          roicHistory,
-          debtEquityHistory,
-          profitabilityHistory,
-          fcfMarginHistory,
-          fcfConversionHistory,
-          marginStabilityHistory,
-          netDebtToFCFHistory,
-          shareDilutionHistory,
-
-          valuationMetrics,
-          valuationScores,
-          overallValuationScore,
-          valuationConfidenceScore,
-          unavailableValuationMetrics,
-          peHistory,
-          psHistory,
-          evsHistory,
-          pfcfHistory,
-          valuationPremiumHistory,
-        });
 
         if (savedStocksService.isStockSaved(ticker, savedStocks)) {
           const updatedStocks = await savedStocksService.saveStock(
             {
               ticker,
               companyName: profile.companyName,
-              score: overallScore,
+              score: initialResult.overallScore,
               sector: profile.sector,
               industry: profile.industry,
               image: profile.image,
@@ -894,52 +894,61 @@ function App() {
           />
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex border-b border-slate-200 dark:border-slate-700 mb-6 overflow-x-auto scrollbar-none text-xs sm:text-sm">
-          <button
-            onClick={() => setActiveTab("fundamentals")}
-            className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
-              activeTab === "fundamentals"
-                ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
-                : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
-            }`}
-          >
-            <span>📊</span>
-            <span>Business Quality (Fundamentals)</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("valuation")}
-            className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
-              activeTab === "valuation"
-                ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
-                : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
-            }`}
-          >
-            <span>💰</span>
-            <span>Stock Valuation (Price)</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("futureOutlook")}
-            className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
-              activeTab === "futureOutlook"
-                ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
-                : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
-            }`}
-          >
-            <span>🔮</span>
-            <span>Future Outlook</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("leadership")}
-            className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
-              activeTab === "leadership"
-                ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
-                : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
-            }`}
-          >
-            <span>👔</span>
-            <span>Senior Leadership</span>
-          </button>
+        {/* Navigation Tabs & Period Selector Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700 mb-6 pb-2 sm:pb-0">
+          <div className="flex border-b-0 overflow-x-auto scrollbar-none text-xs sm:text-sm">
+            <button
+              onClick={() => setActiveTab("fundamentals")}
+              className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
+                activeTab === "fundamentals"
+                  ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
+                  : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+              }`}
+            >
+              <span>📊</span>
+              <span>Business Quality (Fundamentals)</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("valuation")}
+              className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
+                activeTab === "valuation"
+                  ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
+                  : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+              }`}
+            >
+              <span>💰</span>
+              <span>Stock Valuation (Price)</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("futureOutlook")}
+              className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
+                activeTab === "futureOutlook"
+                  ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
+                  : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+              }`}
+            >
+              <span>🔮</span>
+              <span>Future Outlook</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("leadership")}
+              className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
+                activeTab === "leadership"
+                  ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
+                  : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+              }`}
+            >
+              <span>👔</span>
+              <span>Senior Leadership</span>
+            </button>
+          </div>
+
+          <div className="pb-2 md:pb-3 flex justify-end">
+            <PeriodSelector
+              selectedPeriod={selectedPeriod}
+              onPeriodChange={handlePeriodChange}
+            />
+          </div>
         </div>
 
         {/* Fundamentals Tab Content */}

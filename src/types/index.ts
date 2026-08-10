@@ -105,6 +105,8 @@ export interface ChartDataPoint {
   yoyChange?: number | null;
 }
 
+export type HistoricalPeriod = "10Y" | "5Y" | "3Y";
+
 export interface AnalysisResult {
   ticker: string;
   companyProfile: CompanyProfile;
@@ -114,6 +116,7 @@ export interface AnalysisResult {
   analysis: string;
   dataConfidenceScore: number;
   unavailableMetrics: string[];
+  selectedPeriod?: HistoricalPeriod;
   priceHistory?: HistoricalPricePoint[];
   fcfHistory?: ChartDataPoint[];
   revenueHistory?: ChartDataPoint[];
