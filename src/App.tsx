@@ -896,7 +896,7 @@ function App() {
 
         {/* Navigation Tabs & Period Selector Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700 mb-6 pb-2 sm:pb-0">
-          <div className="flex border-b-0 overflow-x-auto scrollbar-none text-xs sm:text-sm">
+          <div className="flex flex-wrap border-b-0 overflow-x-auto scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden text-xs sm:text-sm">
             <button
               onClick={() => setActiveTab("fundamentals")}
               className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${

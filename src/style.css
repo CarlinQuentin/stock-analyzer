@@ -8,6 +8,15 @@
   }
 }
 
+/* Hide scrollbars across all browsers */
+.scrollbar-none {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
 /* ==========================================================================
    GOLD THEME (Executive Obsidian Charcoal & Rich Metallic Gold)
    ========================================================================== */
