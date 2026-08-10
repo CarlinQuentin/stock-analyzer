@@ -919,17 +919,6 @@ function App() {
             <span>Stock Valuation (Price)</span>
           </button>
           <button
-            onClick={() => setActiveTab("leadership")}
-            className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
-              activeTab === "leadership"
-                ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
-                : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
-            }`}
-          >
-            <span>👔</span>
-            <span>Senior Leadership</span>
-          </button>
-          <button
             onClick={() => setActiveTab("futureOutlook")}
             className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
               activeTab === "futureOutlook"
@@ -939,6 +928,17 @@ function App() {
           >
             <span>🔮</span>
             <span>Future Outlook</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("leadership")}
+            className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === "leadership"
+                ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
+                : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+            }`}
+          >
+            <span>👔</span>
+            <span>Senior Leadership</span>
           </button>
         </div>
 
@@ -1479,20 +1479,20 @@ function App() {
           </>
         )}
 
+        {/* Future Outlook Tab Content */}
+        {activeTab === "futureOutlook" && (
+          <FutureOutlookSection
+            data={futureOutlookData}
+            loading={isLoadingFutureOutlook}
+          />
+        )}
+
         {/* Leadership Tab Content */}
         {activeTab === "leadership" && (
           <LeadershipSection
             leadership={leadershipProfile}
             isLoading={isLoadingLeadership}
             symbol={result.companyProfile.symbol || result.ticker}
-          />
-        )}
-
-        {/* Future Outlook Tab Content */}
-        {activeTab === "futureOutlook" && (
-          <FutureOutlookSection
-            data={futureOutlookData}
-            loading={isLoadingFutureOutlook}
           />
         )}
 
