@@ -1,15 +1,91 @@
 import { AnalystGradeItem } from "../types";
 
 export type AnalystActionType = "UPGRADED" | "DOWNGRADED" | "REITERATED" | "INITIATED";
+export type AnalystSentiment = "Bullish" | "Neutral" | "Bearish" | "Unclassified";
 
 export interface ProcessedAnalystAction {
   actionType: AnalystActionType;
+  actionLabel: string; // e.g. "Reiterated", "Upgraded", "Downgraded", "Initiated"
   gradingCompany: string;
   dateStr: string;
   formattedDate: string;
   previousGrade?: string;
   newGrade: string;
+  sentiment: AnalystSentiment;
+  sentimentIcon: string;
+  headerText: string; // e.g. "Morgan Stanley — Bullish"
+  ratingLine: string; // e.g. "Equal Weight" or "Equal Weight → Overweight"
   displayText: string;
+}
+
+export interface OverallAnalystConsensus {
+  label: string; // e.g. "Very Bullish", "Moderately Bullish", "Neutral", "Bearish", "Insufficient analyst coverage"
+  icon: string; // 🟢, 🟡, 🔴
+  bullishCount: number;
+  neutralCount: number;
+  bearishCount: number;
+  summaryText: string; // e.g. "3 Bullish · 5 Neutral · 1 Bearish"
+}
+
+/**
+ * Maps Wall Street analyst rating terminology to plain-English investor sentiment
+ * Bullish: Strong Buy, Buy, Outperform, Overweight, Positive, Accumulate
+ * Neutral: Hold, Equal Weight, Neutral, Market Perform, Sector Perform, In Line, Peer Perform
+ * Bearish: Sell, Strong Sell, Underperform, Underweight, Reduce, Negative
+ */
+export function getRatingSentiment(rating?: string): AnalystSentiment {
+  if (!rating || typeof rating !== "string") return "Unclassified";
+  const norm = rating.toLowerCase().trim();
+  if (!norm) return "Unclassified";
+
+  if (
+    norm.includes("strong buy") ||
+    norm.includes("buy") ||
+    norm.includes("outperform") ||
+    norm.includes("overweight") ||
+    norm.includes("positive") ||
+    norm.includes("accumulate")
+  ) {
+    return "Bullish";
+  }
+
+  if (
+    norm.includes("hold") ||
+    norm.includes("equal") ||
+    norm.includes("neutral") ||
+    norm.includes("market perform") ||
+    norm.includes("peer perform") ||
+    norm.includes("sector perform") ||
+    norm.includes("in line") ||
+    norm.includes("in-line")
+  ) {
+    return "Neutral";
+  }
+
+  if (
+    norm.includes("sell") ||
+    norm.includes("underperform") ||
+    norm.includes("underweight") ||
+    norm.includes("reduce") ||
+    norm.includes("negative")
+  ) {
+    return "Bearish";
+  }
+
+  return "Unclassified";
+}
+
+export function getSentimentIcon(sentiment: AnalystSentiment): string {
+  switch (sentiment) {
+    case "Bullish":
+      return "🟢";
+    case "Bearish":
+      return "🔴";
+    case "Neutral":
+    case "Unclassified":
+    default:
+      return "🟡";
+  }
 }
 
 /**
@@ -30,7 +106,6 @@ function getRatingRank(rating: string): number {
  */
 export function formatAnalystDate(dateStr: string): string {
   if (!dateStr) return "";
-  // Split manually for timezone independence (YYYY-MM-DD)
   const parts = dateStr.split("T")[0].split("-");
   if (parts.length === 3) {
     const year = parseInt(parts[0], 10);
@@ -50,8 +125,8 @@ export function formatAnalystDate(dateStr: string): string {
 }
 
 /**
- * Categorizes an analyst grade item into UPGRADED, DOWNGRADED, REITERATED, or INITIATED
- * and formats the action label cleanly.
+ * Categorizes an analyst grade item into UPGRADED, DOWNGRADED, REITERATED, or INITIATED,
+ * calculates sentiment, and formats display lines.
  */
 export function processAnalystAction(item: AnalystGradeItem): ProcessedAnalystAction {
   const gradingCompany = item.gradingCompany || "Analyst";
@@ -109,30 +184,117 @@ export function processAnalystAction(item: AnalystGradeItem): ProcessedAnalystAc
     actionType = "INITIATED";
   }
 
-  // Build clean display text
-  let displayText = "";
-  if (actionType === "REITERATED") {
-    displayText = `REITERATED — ${curr || prev || "Rating"}`;
-  } else if (actionType === "INITIATED") {
-    displayText = `INITIATED — ${curr || "Rating"}`;
-  } else if (actionType === "UPGRADED") {
-    displayText = prev && curr && prevNorm !== currNorm
-      ? `UPGRADED — ${prev} → ${curr}`
-      : `UPGRADED — ${curr || "Rating"}`;
-  } else if (actionType === "DOWNGRADED") {
-    displayText = prev && curr && prevNorm !== currNorm
-      ? `DOWNGRADED — ${prev} → ${curr}`
-      : `DOWNGRADED — ${curr || "Rating"}`;
+  // Derive plain-English sentiment for current grade
+  const targetGradeForSentiment = curr || prev;
+  const sentiment = getRatingSentiment(targetGradeForSentiment);
+  const sentimentIcon = getSentimentIcon(sentiment);
+
+  // Friendly action label string
+  let actionLabel = "Reiterated";
+  if (actionType === "UPGRADED") actionLabel = "Upgraded";
+  else if (actionType === "DOWNGRADED") actionLabel = "Downgraded";
+  else if (actionType === "INITIATED") actionLabel = "Initiated";
+
+  // Build ratingLine (e.g. "Overweight" vs "Equal Weight → Overweight")
+  let ratingLine = curr || prev || "Rating";
+  if ((actionType === "UPGRADED" || actionType === "DOWNGRADED") && prev && curr && prevNorm !== currNorm) {
+    ratingLine = `${prev} → ${curr}`;
   }
+
+  const headerText = `${gradingCompany} — ${sentiment}`;
+  const displayText = `${ratingLine} · ${actionLabel} · ${formattedDate}`;
 
   return {
     actionType,
+    actionLabel,
     gradingCompany,
     dateStr,
     formattedDate,
     previousGrade: prev || undefined,
     newGrade: curr || "N/A",
+    sentiment,
+    sentimentIcon,
+    headerText,
+    ratingLine,
     displayText,
+  };
+}
+
+/**
+ * Calculates overall aggregate analyst consensus from current analyst ratings
+ */
+export function calculateOverallAnalystConsensus(
+  actions: ProcessedAnalystAction[]
+): OverallAnalystConsensus {
+  if (!actions || actions.length === 0) {
+    return {
+      label: "Insufficient analyst coverage",
+      icon: "⚪",
+      bullishCount: 0,
+      neutralCount: 0,
+      bearishCount: 0,
+      summaryText: "No recent ratings available",
+    };
+  }
+
+  let bullishCount = 0;
+  let neutralCount = 0;
+  let bearishCount = 0;
+
+  actions.forEach((a) => {
+    if (a.sentiment === "Bullish") bullishCount++;
+    else if (a.sentiment === "Bearish") bearishCount++;
+    else neutralCount++;
+  });
+
+  const total = bullishCount + neutralCount + bearishCount;
+
+  if (total === 0) {
+    return {
+      label: "Insufficient analyst coverage",
+      icon: "⚪",
+      bullishCount: 0,
+      neutralCount: 0,
+      bearishCount: 0,
+      summaryText: "No recent ratings available",
+    };
+  }
+
+  const bullPct = bullishCount / total;
+  const bearPct = bearishCount / total;
+
+  let label = "Neutral";
+  let icon = "🟡";
+
+  if (bullPct >= 0.65) {
+    label = "Very Bullish";
+    icon = "🟢";
+  } else if (bullPct >= 0.50 || (bullishCount > bearishCount && bullPct >= 0.40)) {
+    label = "Moderately Bullish";
+    icon = "🟢";
+  } else if (bearPct >= 0.50) {
+    label = "Bearish";
+    icon = "🔴";
+  } else if (bearPct >= 0.35 && bearPct > bullPct) {
+    label = "Moderately Bearish";
+    icon = "🔴";
+  } else {
+    label = "Neutral";
+    icon = "🟡";
+  }
+
+  const parts: string[] = [];
+  if (bullishCount > 0) parts.push(`${bullishCount} Bullish`);
+  if (neutralCount > 0) parts.push(`${neutralCount} Neutral`);
+  if (bearishCount > 0) parts.push(`${bearishCount} Bearish`);
+
+  return {
+    label,
+    icon,
+    bullishCount,
+    neutralCount,
+    bearishCount,
+    summaryText: parts.join(" · "),
   };
 }
 

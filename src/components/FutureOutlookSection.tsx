@@ -1,8 +1,8 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { FutureOutlookData } from "../types";
 import {
   processAnalystAction,
-  getAnalystActionSummary,
+  calculateOverallAnalystConsensus,
 } from "../utils/analystActions";
 
 interface FutureOutlookSectionProps {
@@ -14,13 +14,15 @@ export const FutureOutlookSection: React.FC<FutureOutlookSectionProps> = ({
   data,
   loading = false,
 }) => {
+  const [showTermGuide, setShowTermGuide] = useState(false);
+
   const processedGrades = useMemo(() => {
     if (!data?.recentGrades) return [];
     return data.recentGrades.map(processAnalystAction);
   }, [data?.recentGrades]);
 
-  const analystActionsSummary = useMemo(() => {
-    return getAnalystActionSummary(processedGrades);
+  const overallConsensus = useMemo(() => {
+    return calculateOverallAnalystConsensus(processedGrades);
   }, [processedGrades]);
   if (loading) {
     return (
@@ -392,36 +394,99 @@ export const FutureOutlookSection: React.FC<FutureOutlookSectionProps> = ({
           </div>
 
           {/* Recent Analyst Actions Card */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-5 shadow-lg border border-slate-200 dark:border-slate-700/60 flex flex-col h-full">
-            <div className="mb-4">
-              <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                Recent Analyst Actions
-              </h4>
-              {analystActionsSummary ? (
-                <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-1">
-                  {analystActionsSummary}
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-5 shadow-lg border border-slate-200 dark:border-slate-700/60 flex flex-col h-full relative">
+            {/* Card Header & Title */}
+            <div className="mb-4 pb-3 border-b border-slate-100 dark:border-slate-700/60">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                    Recent Analyst Actions
+                  </h4>
+                  <div className="relative inline-block">
+                    <button
+                      type="button"
+                      onClick={() => setShowTermGuide(!showTermGuide)}
+                      onMouseEnter={() => setShowTermGuide(true)}
+                      onMouseLeave={() => setShowTermGuide(false)}
+                      className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center justify-center text-xs font-bold transition-colors"
+                      title="Wall Street Terminology Guide"
+                      aria-label="Wall Street Terminology Guide"
+                    >
+                      ⓘ
+                    </button>
+
+                    {/* Wall Street Terminology Popover Tooltip */}
+                    {showTermGuide && (
+                      <div className="absolute left-0 top-7 w-72 p-3 bg-slate-900 text-slate-100 dark:bg-slate-950 dark:text-slate-200 text-xs rounded-xl shadow-2xl border border-slate-700/80 z-50 animate-in fade-in zoom-in-95 duration-150">
+                        <div className="font-bold text-white border-b border-slate-700/60 pb-1.5 mb-2 flex items-center justify-between">
+                          <span>Wall Street Terminology Guide</span>
+                        </div>
+                        <div className="space-y-2 text-[11px] leading-relaxed">
+                          <div>
+                            <span className="font-bold text-emerald-400">Overweight / Outperform (Bullish):</span>
+                            <p className="text-slate-300">Analyst expects the stock to outperform its sector/benchmark.</p>
+                          </div>
+                          <div>
+                            <span className="font-bold text-amber-400">Equal Weight / Neutral:</span>
+                            <p className="text-slate-300">Analyst expects roughly sector/market-level performance.</p>
+                          </div>
+                          <div>
+                            <span className="font-bold text-rose-400">Underweight / Underperform (Bearish):</span>
+                            <p className="text-slate-300">Analyst expects the stock to underperform its sector/benchmark.</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              ) : null}
+              </div>
+
+              {/* Overall Analyst Sentiment Summary Header */}
+              {processedGrades.length > 0 ? (
+                <div className="mt-3 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-slate-100">
+                    <span className="text-base">{overallConsensus.icon}</span>
+                    <span>Analyst Sentiment:</span>
+                    <span
+                      className={
+                        overallConsensus.label.includes("Bullish")
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : overallConsensus.label.includes("Bearish")
+                            ? "text-rose-600 dark:text-rose-400"
+                            : "text-amber-600 dark:text-amber-400"
+                      }
+                    >
+                      {overallConsensus.label}
+                    </span>
+                  </div>
+                  <div className="font-medium text-slate-500 dark:text-slate-400 text-[11px]">
+                    {overallConsensus.summaryText}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-2 text-xs font-semibold text-slate-400 dark:text-slate-500">
+                  Insufficient analyst coverage
+                </div>
+              )}
             </div>
 
-            <div className="space-y-2.5 max-h-64 overflow-y-auto scrollbar-thin pr-1 flex-1">
+            {/* Analyst Actions List */}
+            <div className="space-y-2.5 max-h-72 overflow-y-auto scrollbar-thin pr-1 flex-1">
               {processedGrades.length === 0 ? (
                 <div className="text-center py-8 text-xs text-slate-400 dark:text-slate-500">
                   No recent analyst actions available.
                 </div>
               ) : (
                 processedGrades.map((g, idx) => {
-                  let badgeStyle =
-                    "bg-slate-200/80 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700";
-                  if (g.actionType === "UPGRADED") {
-                    badgeStyle =
-                      "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-700/80 font-bold";
-                  } else if (g.actionType === "DOWNGRADED") {
-                    badgeStyle =
-                      "bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-300/80 dark:border-rose-700/80 font-bold";
-                  } else if (g.actionType === "INITIATED") {
-                    badgeStyle =
-                      "bg-sky-100 text-sky-800 dark:bg-sky-950/80 dark:text-sky-300 border border-sky-300/80 dark:border-sky-700/80 font-bold";
+                  let sentimentColorClass = "text-amber-600 dark:text-amber-400";
+                  let sentimentBgClass = "bg-amber-500/10 border-amber-500/20";
+
+                  if (g.sentiment === "Bullish") {
+                    sentimentColorClass = "text-emerald-600 dark:text-emerald-400";
+                    sentimentBgClass = "bg-emerald-500/10 border-emerald-500/20";
+                  } else if (g.sentiment === "Bearish") {
+                    sentimentColorClass = "text-rose-600 dark:text-rose-400";
+                    sentimentBgClass = "bg-rose-500/10 border-rose-500/20";
                   }
 
                   return (
@@ -429,22 +494,23 @@ export const FutureOutlookSection: React.FC<FutureOutlookSectionProps> = ({
                       key={idx}
                       className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200/70 dark:border-slate-700/50 text-xs transition-colors hover:bg-slate-100/70 dark:hover:bg-slate-900/80"
                     >
-                      <div className="flex justify-between items-center mb-1.5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 dark:text-slate-100">
-                            {g.gradingCompany}
-                          </span>
-                          <span className="text-slate-400 dark:text-slate-500 text-[11px]">
-                            {g.formattedDate}
-                          </span>
+                      {/* Header: Sentiment Icon + Analyst Firm — Sentiment */}
+                      <div className="flex justify-between items-center mb-1">
+                        <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm">
+                          <span>{g.sentimentIcon}</span>
+                          <span>{g.gradingCompany}</span>
+                          <span className="text-slate-400 dark:text-slate-500 font-normal">—</span>
+                          <span className={sentimentColorClass}>{g.sentiment}</span>
                         </div>
                         <span
-                          className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wide ${badgeStyle}`}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${sentimentBgClass} ${sentimentColorClass}`}
                         >
-                          {g.actionType}
+                          {g.actionLabel}
                         </span>
                       </div>
-                      <div className="font-semibold text-slate-700 dark:text-slate-300">
+
+                      {/* Subline: Rating · Action · Date */}
+                      <div className="text-slate-600 dark:text-slate-300 font-medium text-[11px] sm:text-xs">
                         {g.displayText}
                       </div>
                     </div>
