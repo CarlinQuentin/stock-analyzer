@@ -307,3 +307,71 @@ export interface CompetitorData {
   source: string;
   lastUpdated: string;
 }
+
+export interface AnalystEstimatePoint {
+  symbol: string;
+  date: string;
+  fiscalYear: string;
+  epsAvg: number | null;
+  epsHigh: number | null;
+  epsLow: number | null;
+  numAnalystsEps: number | null;
+  revenueAvg: number | null;
+  revenueHigh: number | null;
+  revenueLow: number | null;
+  numAnalystsRevenue: number | null;
+  ebitdaAvg: number | null;
+  ebitdaHigh: number | null;
+  ebitdaLow: number | null;
+  epsYoYGrowthPct?: number | null;
+  revenueYoYGrowthPct?: number | null;
+  ebitdaYoYGrowthPct?: number | null;
+}
+
+export interface PriceTargetData {
+  symbol: string;
+  targetHigh: number | null;
+  targetLow: number | null;
+  targetConsensus: number | null;
+  targetMedian: number | null;
+  currentPrice: number | null;
+  impliedUpsidePct: number | null;
+  analystCount?: number | null;
+  lastMonthAvgPriceTarget?: number | null;
+  lastQuarterAvgPriceTarget?: number | null;
+  lastYearAvgPriceTarget?: number | null;
+}
+
+export interface PriceTargetNewsItem {
+  publishedDate: string;
+  newsTitle: string;
+  priceTarget?: number | null;
+  priceWhenPosted?: number | null;
+  analystCompany?: string;
+  newsPublisher?: string;
+}
+
+export interface AnalystGradeItem {
+  date: string;
+  gradingCompany: string;
+  previousGrade?: string;
+  newGrade?: string;
+  action?: string;
+}
+
+export interface FutureOutlookData {
+  symbol: string;
+  companyName?: string;
+  estimates: AnalystEstimatePoint[];
+  priceTarget: PriceTargetData | null;
+  recentPriceTargetNews: PriceTargetNewsItem[];
+  recentGrades: AnalystGradeItem[];
+  forwardEpsGrowthPct: number | null;
+  forwardRevenueGrowthPct: number | null;
+  forwardEbitdaGrowthPct: number | null;
+  historicalEpsCagr: number | null;
+  historicalRevenueCagr: number | null;
+  epsTrendStatus: "Accelerating" | "Stable" | "Decelerating" | "N/A";
+  revenueTrendStatus: "Accelerating" | "Stable" | "Decelerating" | "N/A";
+  lastUpdated: string;
+}

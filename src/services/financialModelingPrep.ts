@@ -6,6 +6,11 @@ import {
   HistoricalPricePoint,
   MarketMover,
   ApiError,
+  AnalystEstimatePoint,
+  PriceTargetData,
+  PriceTargetNewsItem,
+  AnalystGradeItem,
+  FutureOutlookData,
 } from "../types";
 
 const BASE_URL = "https://financialmodelingprep.com/stable";
@@ -562,6 +567,252 @@ class FinancialModelingPrepService {
       console.warn("Could not fetch industry peers from screener:", error);
       return [];
     }
+  }
+
+  /**
+   * Fetch Analyst Statement Estimates (annual forecasts)
+   */
+  async getAnalystEstimates(ticker: string): Promise<AnalystEstimatePoint[]> {
+    try {
+      const response = await this.client.get("/analyst-estimates", {
+        params: { ...this.getParams(), symbol: ticker.toUpperCase(), period: "annual" },
+      });
+
+      if (!response.data || !Array.isArray(response.data)) {
+        return [];
+      }
+
+      // Sort items chronologically by date
+      const rawPoints = [...response.data]
+        .filter((item) => item && item.date)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      const points: AnalystEstimatePoint[] = rawPoints.map((item) => {
+        const year = new Date(item.date).getFullYear().toString();
+        return {
+          symbol: item.symbol || ticker,
+          date: item.date,
+          fiscalYear: `FY ${year}`,
+          epsAvg: typeof item.epsAvg === "number" ? item.epsAvg : null,
+          epsHigh: typeof item.epsHigh === "number" ? item.epsHigh : null,
+          epsLow: typeof item.epsLow === "number" ? item.epsLow : null,
+          numAnalystsEps: typeof item.numAnalystsEps === "number" ? item.numAnalystsEps : null,
+          revenueAvg: typeof item.revenueAvg === "number" ? item.revenueAvg : null,
+          revenueHigh: typeof item.revenueHigh === "number" ? item.revenueHigh : null,
+          revenueLow: typeof item.revenueLow === "number" ? item.revenueLow : null,
+          numAnalystsRevenue: typeof item.numAnalystsRevenue === "number" ? item.numAnalystsRevenue : null,
+          ebitdaAvg: typeof item.ebitdaAvg === "number" ? item.ebitdaAvg : null,
+          ebitdaHigh: typeof item.ebitdaHigh === "number" ? item.ebitdaHigh : null,
+          ebitdaLow: typeof item.ebitdaLow === "number" ? item.ebitdaLow : null,
+        };
+      });
+
+      // Calculate YoY growth between consecutive fiscal years
+      for (let i = 1; i < points.length; i++) {
+        const prev = points[i - 1];
+        const curr = points[i];
+
+        if (curr.epsAvg !== null && prev.epsAvg !== null && prev.epsAvg > 0) {
+          curr.epsYoYGrowthPct = Number((((curr.epsAvg - prev.epsAvg) / prev.epsAvg) * 100).toFixed(1));
+        }
+        if (curr.revenueAvg !== null && prev.revenueAvg !== null && prev.revenueAvg > 0) {
+          curr.revenueYoYGrowthPct = Number((((curr.revenueAvg - prev.revenueAvg) / prev.revenueAvg) * 100).toFixed(1));
+        }
+        if (curr.ebitdaAvg !== null && prev.ebitdaAvg !== null && prev.ebitdaAvg > 0) {
+          curr.ebitdaYoYGrowthPct = Number((((curr.ebitdaAvg - prev.ebitdaAvg) / prev.ebitdaAvg) * 100).toFixed(1));
+        }
+      }
+
+      return points;
+    } catch (error) {
+      console.warn("Could not fetch analyst estimates:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Fetch Price Target Consensus & Summary Data
+   */
+  async getPriceTargetConsensus(ticker: string, currentPrice?: number): Promise<PriceTargetData | null> {
+    try {
+      const [consensusRes, summaryRes] = await Promise.all([
+        this.client.get("/price-target-consensus", {
+          params: { ...this.getParams(), symbol: ticker.toUpperCase() },
+        }).catch(() => ({ data: [] })),
+        this.client.get("/price-target-summary", {
+          params: { ...this.getParams(), symbol: ticker.toUpperCase() },
+        }).catch(() => ({ data: [] })),
+      ]);
+
+      const consensusData = Array.isArray(consensusRes.data) && consensusRes.data.length > 0 ? consensusRes.data[0] : null;
+      const summaryData = Array.isArray(summaryRes.data) && summaryRes.data.length > 0 ? summaryRes.data[0] : null;
+
+      if (!consensusData && !summaryData) {
+        return null;
+      }
+
+      const targetConsensus = consensusData?.targetConsensus ?? summaryData?.lastQuarterAvgPriceTarget ?? summaryData?.lastYearAvgPriceTarget ?? null;
+      const targetHigh = consensusData?.targetHigh ?? null;
+      const targetLow = consensusData?.targetLow ?? null;
+      const targetMedian = consensusData?.targetMedian ?? null;
+      const price = currentPrice || null;
+
+      let impliedUpsidePct: number | null = null;
+      if (price !== null && price > 0 && targetConsensus !== null && targetConsensus > 0) {
+        impliedUpsidePct = Number((((targetConsensus - price) / price) * 100).toFixed(1));
+      }
+
+      return {
+        symbol: ticker.toUpperCase(),
+        targetHigh,
+        targetLow,
+        targetConsensus,
+        targetMedian,
+        currentPrice: price,
+        impliedUpsidePct,
+        analystCount: summaryData?.lastQuarterCount || summaryData?.lastYearCount || summaryData?.lastMonthCount || null,
+        lastMonthAvgPriceTarget: summaryData?.lastMonthAvgPriceTarget ?? null,
+        lastQuarterAvgPriceTarget: summaryData?.lastQuarterAvgPriceTarget ?? null,
+        lastYearAvgPriceTarget: summaryData?.lastYearAvgPriceTarget ?? null,
+      };
+    } catch (error) {
+      console.warn("Could not fetch price target consensus:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch Recent Price Target News / Updates
+   */
+  async getRecentPriceTargetNews(ticker: string): Promise<PriceTargetNewsItem[]> {
+    try {
+      const response = await this.client.get("/price-target-news", {
+        params: { ...this.getParams(), symbol: ticker.toUpperCase() },
+      });
+
+      if (!response.data || !Array.isArray(response.data)) {
+        return [];
+      }
+
+      return response.data.slice(0, 10).map((item) => ({
+        publishedDate: item.publishedDate || "",
+        newsTitle: item.newsTitle || "",
+        priceTarget: typeof item.priceTarget === "number" ? item.priceTarget : null,
+        priceWhenPosted: typeof item.priceWhenPosted === "number" ? item.priceWhenPosted : null,
+        analystCompany: item.analystCompany || item.newsPublisher || "",
+        newsPublisher: item.newsPublisher || "",
+      }));
+    } catch (error) {
+      console.warn("Could not fetch price target news:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Fetch Recent Analyst Rating Grades (Upgrades/Downgrades/Maintains)
+   */
+  async getAnalystGrades(ticker: string): Promise<AnalystGradeItem[]> {
+    try {
+      const response = await this.client.get("/grades", {
+        params: { ...this.getParams(), symbol: ticker.toUpperCase() },
+      });
+
+      if (!response.data || !Array.isArray(response.data)) {
+        return [];
+      }
+
+      return response.data.slice(0, 10).map((item) => ({
+        date: item.date || "",
+        gradingCompany: item.gradingCompany || "",
+        previousGrade: item.previousGrade || "",
+        newGrade: item.newGrade || "",
+        action: item.action || "",
+      }));
+    } catch (error) {
+      console.warn("Could not fetch analyst grades:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Aggregator: Fetch Complete Future Outlook Dataset
+   */
+  async getFutureOutlookData(
+    ticker: string,
+    currentPrice?: number,
+    historicalEpsCagr?: number | null,
+    historicalRevenueCagr?: number | null
+  ): Promise<FutureOutlookData> {
+    const [estimates, priceTarget, recentPriceTargetNews, recentGrades] = await Promise.all([
+      this.getAnalystEstimates(ticker),
+      this.getPriceTargetConsensus(ticker, currentPrice),
+      this.getRecentPriceTargetNews(ticker),
+      this.getAnalystGrades(ticker),
+    ]);
+
+    // Identify current and future fiscal year entries
+    const currentYearNum = new Date().getFullYear();
+    const futureEstimates = estimates.filter((e) => {
+      const yearNum = parseInt(e.fiscalYear.replace("FY ", ""), 10);
+      return !isNaN(yearNum) && yearNum >= currentYearNum;
+    });
+
+    // Compute expected forward growth rates
+    let forwardEpsGrowthPct: number | null = null;
+    let forwardRevenueGrowthPct: number | null = null;
+    let forwardEbitdaGrowthPct: number | null = null;
+
+    if (futureEstimates.length >= 2) {
+      const e2 = futureEstimates[1];
+
+      if (e2.epsYoYGrowthPct !== undefined && e2.epsYoYGrowthPct !== null) {
+        forwardEpsGrowthPct = e2.epsYoYGrowthPct;
+      }
+      if (e2.revenueYoYGrowthPct !== undefined && e2.revenueYoYGrowthPct !== null) {
+        forwardRevenueGrowthPct = e2.revenueYoYGrowthPct;
+      }
+      if (e2.ebitdaYoYGrowthPct !== undefined && e2.ebitdaYoYGrowthPct !== null) {
+        forwardEbitdaGrowthPct = e2.ebitdaYoYGrowthPct;
+      }
+    } else if (futureEstimates.length === 1 && futureEstimates[0].epsYoYGrowthPct != null) {
+      forwardEpsGrowthPct = futureEstimates[0].epsYoYGrowthPct ?? null;
+      forwardRevenueGrowthPct = futureEstimates[0].revenueYoYGrowthPct ?? null;
+      forwardEbitdaGrowthPct = futureEstimates[0].ebitdaYoYGrowthPct ?? null;
+    }
+
+    // Determine trend status vs historical CAGR
+    const determineTrend = (
+      forwardPct: number | null,
+      histCagr: number | null
+    ): "Accelerating" | "Stable" | "Decelerating" | "N/A" => {
+      if (forwardPct === null || histCagr === null || isNaN(forwardPct) || isNaN(histCagr)) {
+        return "N/A";
+      }
+      const histPct = histCagr * 100;
+      const diff = forwardPct - histPct;
+      if (diff > 2.0) return "Accelerating";
+      if (diff < -2.0) return "Decelerating";
+      return "Stable";
+    };
+
+    const epsTrendStatus = determineTrend(forwardEpsGrowthPct, historicalEpsCagr ?? null);
+    const revenueTrendStatus = determineTrend(forwardRevenueGrowthPct, historicalRevenueCagr ?? null);
+
+    return {
+      symbol: ticker.toUpperCase(),
+      estimates,
+      priceTarget,
+      recentPriceTargetNews,
+      recentGrades,
+      forwardEpsGrowthPct,
+      forwardRevenueGrowthPct,
+      forwardEbitdaGrowthPct,
+      historicalEpsCagr: historicalEpsCagr ?? null,
+      historicalRevenueCagr: historicalRevenueCagr ?? null,
+      epsTrendStatus,
+      revenueTrendStatus,
+      lastUpdated: new Date().toISOString(),
+    };
   }
 
   private handleError(error: any): ApiError {

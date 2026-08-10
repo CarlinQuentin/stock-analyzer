@@ -16,12 +16,13 @@ import { ThemeToggle } from "./components/ThemeToggle";
 import { SavedStocksPage } from "./components/SavedStocksPage";
 import { LeadershipSection } from "./components/LeadershipSection";
 import { CompetitorsSection } from "./components/CompetitorsSection";
+import { FutureOutlookSection } from "./components/FutureOutlookSection";
 import { authService, UserProfile } from "./services/authService";
 import { fmpService } from "./services/financialModelingPrep";
 import { savedStocksService } from "./services/savedStocksService";
 import { leadershipService } from "./services/leadershipService";
 import { competitorService } from "./services/competitorService";
-import { LeadershipProfile, CompetitorData } from "./types";
+import { LeadershipProfile, CompetitorData, FutureOutlookData } from "./types";
 import {
   calculateAllMetrics,
   calculateFCFMarginHistory,
@@ -66,13 +67,15 @@ function App() {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"fundamentals" | "valuation" | "leadership">(
+  const [activeTab, setActiveTab] = useState<"fundamentals" | "valuation" | "leadership" | "futureOutlook">(
     "fundamentals",
   );
   const [leadershipProfile, setLeadershipProfile] = useState<LeadershipProfile | null>(null);
   const [isLoadingLeadership, setIsLoadingLeadership] = useState(false);
   const [competitorData, setCompetitorData] = useState<CompetitorData | null>(null);
   const [isLoadingCompetitors, setIsLoadingCompetitors] = useState(false);
+  const [futureOutlookData, setFutureOutlookData] = useState<FutureOutlookData | null>(null);
+  const [isLoadingFutureOutlook, setIsLoadingFutureOutlook] = useState(false);
   const [showAllCharts, setShowAllCharts] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
@@ -167,8 +170,14 @@ function App() {
         fmpService.getCompanyProfile(ticker),
         fmpService.getHistoricalPrices(ticker),
       ]);
+      setIsLoadingLeadership(true);
+      setLeadershipProfile(null);
+      setIsLoadingCompetitors(true);
+      setCompetitorData(null);
+      setIsLoadingFutureOutlook(true);
+      setFutureOutlookData(null);
 
-      // Fetch Senior Leadership profile asynchronously
+      // Fetch Senior Leadership asynchronously
       leadershipService
         .fetchLeadershipProfile(ticker, profile.companyName)
         .then((leadProfile) => setLeadershipProfile(leadProfile))
@@ -202,6 +211,13 @@ function App() {
         const overallScore = calculateOverallScore(scores);
         const dataConfidenceScore = calculateDataConfidenceScore(scores);
         const unavailableMetrics = getUnavailableMetrics(scores);
+
+        // Fetch Future Outlook asynchronously using calculated historical CAGRs
+        fmpService
+          .getFutureOutlookData(ticker, profile.price, metrics.epsGrowth, metrics.revenueCAGR)
+          .then((foData) => setFutureOutlookData(foData))
+          .catch((err) => console.warn("Future Outlook fetch failed:", err))
+          .finally(() => setIsLoadingFutureOutlook(false));
 
         const valuationMetrics = calculateValuationMetrics(
           profile,
@@ -913,6 +929,17 @@ function App() {
             <span>👔</span>
             <span>Senior Leadership</span>
           </button>
+          <button
+            onClick={() => setActiveTab("futureOutlook")}
+            className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === "futureOutlook"
+                ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
+                : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+            }`}
+          >
+            <span>🔮</span>
+            <span>Future Outlook</span>
+          </button>
         </div>
 
         {/* Fundamentals Tab Content */}
@@ -1458,6 +1485,14 @@ function App() {
             leadership={leadershipProfile}
             isLoading={isLoadingLeadership}
             symbol={result.companyProfile.symbol || result.ticker}
+          />
+        )}
+
+        {/* Future Outlook Tab Content */}
+        {activeTab === "futureOutlook" && (
+          <FutureOutlookSection
+            data={futureOutlookData}
+            loading={isLoadingFutureOutlook}
           />
         )}
 

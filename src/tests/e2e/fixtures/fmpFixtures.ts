@@ -364,3 +364,86 @@ export const mockRawFmpHistoricalPrices = [
     changePercent: 1.098,
   },
 ];
+
+/** Raw FMP Analyst Estimates Response */
+export const mockRawFmpAnalystEstimates = [
+  {
+    symbol: "AAPL",
+    date: "2026-12-31",
+    epsAvg: 8.8,
+    epsHigh: 9.5,
+    epsLow: 8.2,
+    numAnalystsEps: 29,
+    revenueAvg: 477480180873,
+    revenueHigh: 500000000000,
+    revenueLow: 450000000000,
+    numAnalystsRevenue: 28,
+    ebitdaAvg: 156400000000,
+    ebitdaHigh: 170000000000,
+    ebitdaLow: 145000000000,
+  },
+  {
+    symbol: "AAPL",
+    date: "2027-12-31",
+    epsAvg: 9.6,
+    epsHigh: 10.5,
+    epsLow: 8.9,
+    numAnalystsEps: 31,
+    revenueAvg: 520726659294,
+    revenueHigh: 550000000000,
+    revenueLow: 490000000000,
+    numAnalystsRevenue: 30,
+    ebitdaAvg: 172000000000,
+    ebitdaHigh: 185000000000,
+    ebitdaLow: 160000000000,
+  },
+];
+
+/** Raw FMP Price Target Consensus Response */
+export const mockRawFmpPriceTargetConsensus = [
+  {
+    symbol: "AAPL",
+    targetHigh: 400,
+    targetLow: 245,
+    targetConsensus: 337.43,
+    targetMedian: 355,
+  },
+];
+
+/** Raw FMP Price Target Summary Response */
+export const mockRawFmpPriceTargetSummary = [
+  {
+    symbol: "AAPL",
+    lastMonthCount: 12,
+    lastMonthAvgPriceTarget: 324.06,
+    lastQuarterCount: 18,
+    lastQuarterAvgPriceTarget: 332.15,
+    lastYearCount: 70,
+    lastYearAvgPriceTarget: 306.06,
+  },
+];
+
+/** Raw FMP Price Target News Response */
+export const mockRawFmpPriceTargetNews = [
+  {
+    symbol: "AAPL",
+    publishedDate: "2026-07-31T10:36:01.000Z",
+    newsTitle: "Apple price target raised to $350 from $310 at Wells Fargo",
+    priceTarget: 350,
+    priceWhenPosted: 313.33,
+    newsPublisher: "TheFly",
+    analystCompany: "Wells Fargo",
+  },
+];
+
+/** Raw FMP Analyst Rating Grades Response */
+export const mockRawFmpGrades = [
+  {
+    symbol: "AAPL",
+    date: "2026-07-31",
+    gradingCompany: "JP Morgan",
+    previousGrade: "Overweight",
+    newGrade: "Overweight",
+    action: "maintain",
+  },
+];
