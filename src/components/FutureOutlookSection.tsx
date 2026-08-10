@@ -1,5 +1,9 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { FutureOutlookData } from "../types";
+import {
+  processAnalystAction,
+  getAnalystActionSummary,
+} from "../utils/analystActions";
 
 interface FutureOutlookSectionProps {
   data: FutureOutlookData | null;
@@ -10,6 +14,14 @@ export const FutureOutlookSection: React.FC<FutureOutlookSectionProps> = ({
   data,
   loading = false,
 }) => {
+  const processedGrades = useMemo(() => {
+    if (!data?.recentGrades) return [];
+    return data.recentGrades.map(processAnalystAction);
+  }, [data?.recentGrades]);
+
+  const analystActionsSummary = useMemo(() => {
+    return getAnalystActionSummary(processedGrades);
+  }, [processedGrades]);
   if (loading) {
     return (
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-8 border border-slate-200 dark:border-slate-700 text-center animate-pulse">
@@ -379,32 +391,65 @@ export const FutureOutlookSection: React.FC<FutureOutlookSectionProps> = ({
             </div>
           </div>
 
-          {/* Recent Analyst Rating Grades */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-5 shadow-lg border border-slate-200 dark:border-slate-700/60">
-            <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm mb-4">
-              Recent Analyst Ratings & Upgrades/Downgrades
-            </h4>
+          {/* Recent Analyst Actions Card */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-5 shadow-lg border border-slate-200 dark:border-slate-700/60 flex flex-col h-full">
+            <div className="mb-4">
+              <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                Recent Analyst Actions
+              </h4>
+              {analystActionsSummary ? (
+                <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-1">
+                  {analystActionsSummary}
+                </div>
+              ) : null}
+            </div>
 
-            <div className="space-y-2 max-h-56 overflow-y-auto scrollbar-thin">
-              {data.recentGrades.length === 0 ? (
-                <div className="text-center py-8 text-xs text-slate-400">
-                  No recent analyst rating changes available.
+            <div className="space-y-2.5 max-h-64 overflow-y-auto scrollbar-thin pr-1 flex-1">
+              {processedGrades.length === 0 ? (
+                <div className="text-center py-8 text-xs text-slate-400 dark:text-slate-500">
+                  No recent analyst actions available.
                 </div>
               ) : (
-                data.recentGrades.map((g, idx) => (
-                  <div key={idx} className="flex justify-between items-center p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700/50 text-xs">
-                    <div>
-                      <span className="font-bold text-slate-900 dark:text-slate-100">{g.gradingCompany}</span>
-                      <span className="text-slate-400 ml-2">{g.date}</span>
+                processedGrades.map((g, idx) => {
+                  let badgeStyle =
+                    "bg-slate-200/80 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700";
+                  if (g.actionType === "UPGRADED") {
+                    badgeStyle =
+                      "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-700/80 font-bold";
+                  } else if (g.actionType === "DOWNGRADED") {
+                    badgeStyle =
+                      "bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-300/80 dark:border-rose-700/80 font-bold";
+                  } else if (g.actionType === "INITIATED") {
+                    badgeStyle =
+                      "bg-sky-100 text-sky-800 dark:bg-sky-950/80 dark:text-sky-300 border border-sky-300/80 dark:border-sky-700/80 font-bold";
+                  }
+
+                  return (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200/70 dark:border-slate-700/50 text-xs transition-colors hover:bg-slate-100/70 dark:hover:bg-slate-900/80"
+                    >
+                      <div className="flex justify-between items-center mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 dark:text-slate-100">
+                            {g.gradingCompany}
+                          </span>
+                          <span className="text-slate-400 dark:text-slate-500 text-[11px]">
+                            {g.formattedDate}
+                          </span>
+                        </div>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wide ${badgeStyle}`}
+                        >
+                          {g.actionType}
+                        </span>
+                      </div>
+                      <div className="font-semibold text-slate-700 dark:text-slate-300">
+                        {g.displayText}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 font-semibold">
-                      <span className="text-slate-500">{g.previousGrade ? `${g.previousGrade} →` : ""}</span>
-                      <span className={g.action === "upgrade" ? "text-emerald-600 font-bold" : g.action === "downgrade" ? "text-rose-600 font-bold" : "text-blue-600"}>
-                        {g.newGrade || g.action}
-                      </span>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
