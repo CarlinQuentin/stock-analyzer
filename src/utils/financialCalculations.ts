@@ -1319,20 +1319,23 @@ export function calculateShareDilution(
 
   if (combined.length < 2) return null;
 
-  const yearlyMap = new Map<string, number>();
+  const yearlyMap = new Map<string, { shares: number; fieldUsed: "diluted" | "basic" }>();
   for (const s of combined) {
     const year = new Date(s.date).getFullYear().toString();
     const extracted = extractSharesFromStatement(s);
     if (extracted !== null) {
-      yearlyMap.set(year, extracted.shares);
+      const existing = yearlyMap.get(year);
+      if (!existing || (existing.fieldUsed === "basic" && extracted.fieldUsed === "diluted")) {
+        yearlyMap.set(year, extracted);
+      }
     }
   }
 
   const sortedYears = Array.from(yearlyMap.keys()).sort();
   if (sortedYears.length < 2) return null;
 
-  const initialShares = yearlyMap.get(sortedYears[0])!;
-  const latestShares = yearlyMap.get(sortedYears[sortedYears.length - 1])!;
+  const initialShares = yearlyMap.get(sortedYears[0])!.shares;
+  const latestShares = yearlyMap.get(sortedYears[sortedYears.length - 1])!.shares;
 
   if (initialShares <= 0 || latestShares <= 0) return null;
 
