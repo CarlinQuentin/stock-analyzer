@@ -377,12 +377,6 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
                 Total Return CAGR: N/A
               </span>
             )}
-
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              {hoveredIndex !== null && activePoint
-                ? `on ${new Date(activePoint.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
-                : `${timeframe} Range`}
-            </span>
           </div>
         </div>
 
