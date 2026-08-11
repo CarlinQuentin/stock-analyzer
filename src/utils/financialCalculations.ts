@@ -1658,3 +1658,28 @@ export function calculateAllMetrics(
     ...calculateAverageMargins(incomeStatements),
   };
 }
+
+/**
+ * Calculate Stock Price Compound Annual Growth Rate (CAGR %)
+ * Formula: ((Ending Price / Starting Price) ^ (1 / Years) - 1) * 100
+ */
+export function calculateStockPriceCAGR(
+  startPrice: number | null | undefined,
+  endPrice: number | null | undefined,
+  years: number,
+): number | null {
+  if (
+    startPrice === null ||
+    startPrice === undefined ||
+    endPrice === null ||
+    endPrice === undefined ||
+    startPrice <= 0 ||
+    endPrice <= 0 ||
+    years <= 0.1
+  ) {
+    return null;
+  }
+
+  const cagr = (Math.pow(endPrice / startPrice, 1 / years) - 1) * 100;
+  return Number(cagr.toFixed(2));
+}

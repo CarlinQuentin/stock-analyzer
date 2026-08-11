@@ -1,19 +1,30 @@
-import React, { useState, useMemo } from "react";
-import { HistoricalPricePoint, CompanyProfile } from "../types";
+import React, { useState, useMemo, useEffect } from "react";
+import { HistoricalPricePoint, CompanyProfile, HistoricalPeriod } from "../types";
+import { calculateStockPriceCAGR } from "../utils/financialCalculations";
 
 interface StockPriceChartProps {
   priceHistory: HistoricalPricePoint[];
   profile: CompanyProfile;
+  selectedPeriod?: HistoricalPeriod;
 }
 
-type Timeframe = "1M" | "3M" | "6M" | "YTD" | "1Y" | "3Y" | "5Y" | "ALL";
+type Timeframe = "1M" | "3M" | "6M" | "YTD" | "1Y" | "3Y" | "5Y" | "10Y" | "ALL";
 
 export const StockPriceChart: React.FC<StockPriceChartProps> = ({
   priceHistory,
   profile,
+  selectedPeriod,
 }) => {
-  const [timeframe, setTimeframe] = useState<Timeframe>("1Y");
+  const [timeframe, setTimeframe] = useState<Timeframe>(selectedPeriod || "10Y");
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  // Sync timeframe with selectedPeriod when global selector changes
+  useEffect(() => {
+    if (selectedPeriod) {
+      setTimeframe(selectedPeriod);
+      setHoveredIndex(null);
+    }
+  }, [selectedPeriod]);
 
   // Filter historical data based on selected timeframe
   const filteredData = useMemo(() => {
@@ -46,6 +57,9 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
       case "5Y":
         cutoffDate.setFullYear(cutoffDate.getFullYear() - 5);
         break;
+      case "10Y":
+        cutoffDate.setFullYear(cutoffDate.getFullYear() - 10);
+        break;
       case "ALL":
       default:
         return priceHistory;
@@ -64,6 +78,7 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
         endPrice: currentPrice,
         change: 0,
         changePercent: 0,
+        annualCAGR: null,
         high: currentPrice,
         low: currentPrice,
         avgVolume: 0,
@@ -72,10 +87,33 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
     }
 
     const startPrice = filteredData[0].close;
+    const startDateStr = filteredData[0].date;
     const endPoint = filteredData[filteredData.length - 1];
     const endPrice = endPoint.close;
+    const endDateStr = endPoint.date;
+
     const change = endPrice - startPrice;
     const changePercent = startPrice > 0 ? (change / startPrice) * 100 : 0;
+
+    let years = 0;
+    if (startDateStr && endDateStr) {
+      const startMs = new Date(startDateStr).getTime();
+      const endMs = new Date(endDateStr).getTime();
+      const diffMs = endMs - startMs;
+      years = diffMs / (1000 * 60 * 60 * 24 * 365.25);
+    }
+
+    if (years <= 0.1) {
+      if (timeframe === "10Y") years = 10;
+      else if (timeframe === "5Y") years = 5;
+      else if (timeframe === "3Y") years = 3;
+      else if (timeframe === "1Y") years = 1;
+      else if (timeframe === "6M") years = 0.5;
+      else if (timeframe === "3M") years = 0.25;
+      else if (timeframe === "1M") years = 1 / 12;
+    }
+
+    const annualCAGR = calculateStockPriceCAGR(startPrice, endPrice, years);
 
     let high = -Infinity;
     let low = Infinity;
@@ -96,12 +134,13 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
       endPrice,
       change,
       changePercent,
+      annualCAGR,
       high: high === -Infinity ? endPrice : high,
       low: low === Infinity ? endPrice : low,
       avgVolume,
       isPositive: change >= 0,
     };
-  }, [filteredData, profile]);
+  }, [filteredData, profile, timeframe]);
 
   // Chart dimensions & scaling
   const width = 800;
@@ -254,7 +293,7 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
     return num.toLocaleString();
   };
 
-  const timeframes: Timeframe[] = ["1M", "3M", "6M", "YTD", "1Y", "3Y", "5Y", "ALL"];
+  const timeframes: Timeframe[] = ["1M", "3M", "6M", "YTD", "1Y", "3Y", "5Y", "10Y", "ALL"];
 
   return (
     <div className="w-full bg-white dark:bg-slate-800/90 backdrop-blur-md rounded-2xl p-4 sm:p-6 shadow-xl border border-slate-200/80 dark:border-slate-700/60 transition-all duration-300 mb-8">
@@ -293,6 +332,22 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
                 {(hoveredIndex !== null ? activeChangePercent : stats.changePercent).toFixed(2)}%)
               </span>
             </div>
+
+            {stats.annualCAGR !== null && (
+              <span
+                className={`text-xs sm:text-sm font-extrabold font-mono px-2.5 py-1 rounded-full border ${
+                  stats.annualCAGR > 0
+                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800"
+                    : stats.annualCAGR < 0
+                    ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border-rose-300 dark:border-rose-800"
+                    : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300"
+                }`}
+              >
+                Annual CAGR: {stats.annualCAGR > 0 ? "+" : ""}
+                {stats.annualCAGR.toFixed(2)}% / yr
+              </span>
+            )}
+
             <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
               {hoveredIndex !== null && activePoint
                 ? `on ${new Date(activePoint.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
@@ -323,7 +378,27 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
       </div>
 
       {/* Range Quick Metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-4 my-2 border-b border-slate-100 dark:border-slate-700/60 text-xs">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 py-4 my-2 border-b border-slate-100 dark:border-slate-700/60 text-xs">
+        <div>
+          <span className="text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
+            Annual CAGR ({timeframe})
+          </span>
+          <span
+            className={`font-extrabold text-sm font-mono ${
+              stats.annualCAGR === null
+                ? "text-slate-500"
+                : stats.annualCAGR > 0
+                ? "text-emerald-600 dark:text-emerald-400"
+                : stats.annualCAGR < 0
+                ? "text-rose-600 dark:text-rose-400"
+                : "text-slate-700 dark:text-slate-300"
+            }`}
+          >
+            {stats.annualCAGR !== null
+              ? `${stats.annualCAGR > 0 ? "+" : ""}${stats.annualCAGR.toFixed(2)}% / yr`
+              : "N/A"}
+          </span>
+        </div>
         <div>
           <span className="text-slate-500 dark:text-slate-400 block mb-0.5">High ({timeframe})</span>
           <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm">

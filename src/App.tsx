@@ -842,6 +842,7 @@ function App() {
         <StockPriceChart
           priceHistory={result.priceHistory || []}
           profile={result.companyProfile}
+          selectedPeriod={(result.selectedPeriod || selectedPeriod)}
         />
 
         {/* Info Banner explaining Valuation vs Business Quality */}
