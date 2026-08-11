@@ -57,6 +57,11 @@ describe("ROIC Consistency & Period-Selector System (Mirroring FCF Consistency)"
 
     expect(analysis.averageROIC).toBeCloseTo(2.86, 2);
     expect(consistencyPct).toBe(100);
+
+    // Exact score split verification: Average ROIC ~2.4/14 pts + Consistency 6.0/6.0 pts = ~8.4/20 pts
+    expect(analysis.levelScorePoints).toBeCloseTo(2.4, 1);
+    expect(analysis.consistencyScorePoints).toBe(6.0);
+    expect(analysis.totalROICPoints).toBeCloseTo(8.4, 1);
   });
 
   it("3. Highly volatile ROIC: produces substantially lower consistency percentage", () => {
