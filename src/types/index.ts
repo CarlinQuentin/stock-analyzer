@@ -73,6 +73,7 @@ export interface HistoricalPricePoint {
   high?: number;
   low?: number;
   close: number;
+  adjClose?: number;
   volume?: number;
   change?: number;
   changePercent?: number;

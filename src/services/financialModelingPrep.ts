@@ -271,6 +271,11 @@ class FinancialModelingPrepService {
           high: typeof item.high === "number" ? item.high : item.price,
           low: typeof item.low === "number" ? item.low : item.price,
           close: typeof item.close === "number" ? item.close : item.price,
+          adjClose: typeof item.adjClose === "number"
+            ? item.adjClose
+            : typeof item.adjClose === "string" && !isNaN(parseFloat(item.adjClose))
+            ? parseFloat(item.adjClose)
+            : undefined,
           volume: typeof item.volume === "number" ? item.volume : 0,
           change: typeof item.change === "number" ? item.change : 0,
           changePercent: typeof item.changePercent === "number" ? item.changePercent : 0,

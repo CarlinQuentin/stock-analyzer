@@ -1683,3 +1683,32 @@ export function calculateStockPriceCAGR(
   const cagr = (Math.pow(endPrice / startPrice, 1 / years) - 1) * 100;
   return Number(cagr.toFixed(2));
 }
+
+/**
+ * Calculate Stock Total Return Compound Annual Growth Rate (CAGR %) including dividend reinvestment
+ * Formula: ((Ending adjClose / Starting adjClose) ^ (1 / Years) - 1) * 100
+ * Requirements:
+ * - Uses adjusted closing prices (adjClose) incorporating stock splits and dividend reinvestments.
+ * - Returns null if adjClose is unavailable, null, undefined, or non-positive.
+ * - Does NOT substitute raw close for adjClose to prevent incorrect total return figures.
+ */
+export function calculateTotalReturnCAGR(
+  startAdjClose: number | null | undefined,
+  endAdjClose: number | null | undefined,
+  years: number,
+): number | null {
+  if (
+    startAdjClose === null ||
+    startAdjClose === undefined ||
+    endAdjClose === null ||
+    endAdjClose === undefined ||
+    startAdjClose <= 0 ||
+    endAdjClose <= 0 ||
+    years <= 0.1
+  ) {
+    return null;
+  }
+
+  const cagr = (Math.pow(endAdjClose / startAdjClose, 1 / years) - 1) * 100;
+  return Number(cagr.toFixed(2));
+}

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { HistoricalPricePoint, CompanyProfile, HistoricalPeriod } from "../types";
-import { calculateStockPriceCAGR } from "../utils/financialCalculations";
+import { calculateStockPriceCAGR, calculateTotalReturnCAGR } from "../utils/financialCalculations";
 
 interface StockPriceChartProps {
   priceHistory: HistoricalPricePoint[];
@@ -78,6 +78,8 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
         endPrice: currentPrice,
         change: 0,
         changePercent: 0,
+        priceCAGR: null,
+        totalReturnCAGR: null,
         annualCAGR: null,
         high: currentPrice,
         low: currentPrice,
@@ -87,9 +89,11 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
     }
 
     const startPrice = filteredData[0].close;
+    const startAdjClose = filteredData[0].adjClose;
     const startDateStr = filteredData[0].date;
     const endPoint = filteredData[filteredData.length - 1];
     const endPrice = endPoint.close;
+    const endAdjClose = endPoint.adjClose;
     const endDateStr = endPoint.date;
 
     const change = endPrice - startPrice;
@@ -112,7 +116,8 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
       else if (timeframe === "1M") years = 1 / 12;
     }
 
-    const annualCAGR = calculateStockPriceCAGR(startPrice, endPrice, years);
+    const priceCAGR = calculateStockPriceCAGR(startPrice, endPrice, years);
+    const totalReturnCAGR = calculateTotalReturnCAGR(startAdjClose, endAdjClose, years);
 
     let high = -Infinity;
     let low = Infinity;
@@ -133,7 +138,9 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
       endPrice,
       change,
       changePercent,
-      annualCAGR,
+      priceCAGR,
+      totalReturnCAGR,
+      annualCAGR: priceCAGR,
       high: high === -Infinity ? endPrice : high,
       low: low === Infinity ? endPrice : low,
       avgVolume,
@@ -332,18 +339,42 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
               </span>
             </div>
 
-            {stats.annualCAGR !== null && (
+            {stats.priceCAGR !== null && (
               <span
+                title="Stock price appreciation only (excluding dividends)"
                 className={`text-xs sm:text-sm font-extrabold font-mono px-2.5 py-1 rounded-full border ${
-                  stats.annualCAGR > 0
+                  stats.priceCAGR > 0
                     ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800"
-                    : stats.annualCAGR < 0
+                    : stats.priceCAGR < 0
                     ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border-rose-300 dark:border-rose-800"
                     : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300"
                 }`}
               >
-                Annual CAGR: {stats.annualCAGR > 0 ? "+" : ""}
-                {stats.annualCAGR.toFixed(2)}% / yr
+                Price CAGR: {stats.priceCAGR > 0 ? "+" : ""}
+                {stats.priceCAGR.toFixed(2)}% / yr
+              </span>
+            )}
+
+            {stats.totalReturnCAGR !== null ? (
+              <span
+                title="Includes dividends with reinvestment using adjusted closing prices"
+                className={`text-xs sm:text-sm font-extrabold font-mono px-2.5 py-1 rounded-full border ${
+                  stats.totalReturnCAGR > 0
+                    ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-300 dark:border-blue-800"
+                    : stats.totalReturnCAGR < 0
+                    ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border-rose-300 dark:border-rose-800"
+                    : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300"
+                }`}
+              >
+                Total Return CAGR: {stats.totalReturnCAGR > 0 ? "+" : ""}
+                {stats.totalReturnCAGR.toFixed(2)}% / yr
+              </span>
+            ) : (
+              <span
+                title="Adjusted price data unavailable for total return calculation"
+                className="text-xs sm:text-sm font-bold font-mono px-2.5 py-1 rounded-full border bg-slate-100 text-slate-400 dark:bg-slate-800/60 dark:text-slate-500 border-slate-200 dark:border-slate-700"
+              >
+                Total Return CAGR: N/A
               </span>
             )}
 
@@ -377,25 +408,52 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
       </div>
 
       {/* Range Quick Metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 py-4 my-2 border-b border-slate-100 dark:border-slate-700/60 text-xs">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 py-4 my-2 border-b border-slate-100 dark:border-slate-700/60 text-xs">
         <div>
           <span className="text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
-            Annual CAGR ({timeframe})
+            Price CAGR ({timeframe})
           </span>
           <span
             className={`font-extrabold text-sm font-mono ${
-              stats.annualCAGR === null
+              stats.priceCAGR === null
                 ? "text-slate-500"
-                : stats.annualCAGR > 0
+                : stats.priceCAGR > 0
                 ? "text-emerald-600 dark:text-emerald-400"
-                : stats.annualCAGR < 0
+                : stats.priceCAGR < 0
                 ? "text-rose-600 dark:text-rose-400"
                 : "text-slate-700 dark:text-slate-300"
             }`}
           >
-            {stats.annualCAGR !== null
-              ? `${stats.annualCAGR > 0 ? "+" : ""}${stats.annualCAGR.toFixed(2)}% / yr`
+            {stats.priceCAGR !== null
+              ? `${stats.priceCAGR > 0 ? "+" : ""}${stats.priceCAGR.toFixed(2)}% / yr`
               : "N/A"}
+          </span>
+        </div>
+        <div>
+          <span
+            title="Includes dividends with reinvestment using adjusted closing prices"
+            className="text-slate-500 dark:text-slate-400 block mb-0.5 font-medium cursor-help flex items-center gap-1"
+          >
+            <span>Total Return CAGR</span>
+            <span className="text-[10px] text-blue-500 font-bold">ℹ</span>
+          </span>
+          <span
+            className={`font-extrabold text-sm font-mono ${
+              stats.totalReturnCAGR === null
+                ? "text-slate-400 dark:text-slate-500"
+                : stats.totalReturnCAGR > 0
+                ? "text-blue-600 dark:text-blue-400"
+                : stats.totalReturnCAGR < 0
+                ? "text-rose-600 dark:text-rose-400"
+                : "text-slate-700 dark:text-slate-300"
+            }`}
+          >
+            {stats.totalReturnCAGR !== null
+              ? `${stats.totalReturnCAGR > 0 ? "+" : ""}${stats.totalReturnCAGR.toFixed(2)}% / yr`
+              : "N/A"}
+          </span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
+            Incl. Dividends
           </span>
         </div>
         <div>
