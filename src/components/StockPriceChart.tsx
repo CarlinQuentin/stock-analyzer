@@ -8,20 +8,25 @@ interface StockPriceChartProps {
   selectedPeriod?: HistoricalPeriod;
 }
 
-type Timeframe = "1M" | "3M" | "6M" | "YTD" | "1Y" | "3Y" | "5Y" | "10Y" | "ALL";
+type Timeframe = "1M" | "3M" | "6M" | "YTD" | "1Y" | "3Y" | "5Y";
+
+const mapPeriodToTimeframe = (p?: HistoricalPeriod): Timeframe => {
+  if (p === "3Y") return "3Y";
+  return "5Y"; // 5Y is maximum available for stock price data
+};
 
 export const StockPriceChart: React.FC<StockPriceChartProps> = ({
   priceHistory,
   profile,
   selectedPeriod,
 }) => {
-  const [timeframe, setTimeframe] = useState<Timeframe>(selectedPeriod || "10Y");
+  const [timeframe, setTimeframe] = useState<Timeframe>(mapPeriodToTimeframe(selectedPeriod));
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   // Sync timeframe with selectedPeriod when global selector changes
   useEffect(() => {
     if (selectedPeriod) {
-      setTimeframe(selectedPeriod);
+      setTimeframe(mapPeriodToTimeframe(selectedPeriod));
       setHoveredIndex(null);
     }
   }, [selectedPeriod]);
@@ -55,14 +60,9 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
         cutoffDate.setFullYear(cutoffDate.getFullYear() - 3);
         break;
       case "5Y":
+      default:
         cutoffDate.setFullYear(cutoffDate.getFullYear() - 5);
         break;
-      case "10Y":
-        cutoffDate.setFullYear(cutoffDate.getFullYear() - 10);
-        break;
-      case "ALL":
-      default:
-        return priceHistory;
     }
 
     const filtered = priceHistory.filter((pt) => new Date(pt.date) >= cutoffDate);
@@ -104,8 +104,7 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
     }
 
     if (years <= 0.1) {
-      if (timeframe === "10Y") years = 10;
-      else if (timeframe === "5Y") years = 5;
+      if (timeframe === "5Y") years = 5;
       else if (timeframe === "3Y") years = 3;
       else if (timeframe === "1Y") years = 1;
       else if (timeframe === "6M") years = 0.5;
@@ -293,7 +292,7 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
     return num.toLocaleString();
   };
 
-  const timeframes: Timeframe[] = ["1M", "3M", "6M", "YTD", "1Y", "3Y", "5Y", "10Y", "ALL"];
+  const timeframes: Timeframe[] = ["1M", "3M", "6M", "YTD", "1Y", "3Y", "5Y"];
 
   return (
     <div className="w-full bg-white dark:bg-slate-800/90 backdrop-blur-md rounded-2xl p-4 sm:p-6 shadow-xl border border-slate-200/80 dark:border-slate-700/60 transition-all duration-300 mb-8">
