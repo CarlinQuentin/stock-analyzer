@@ -4,6 +4,9 @@ import {
   DividendMetrics,
   FCFTrendResult,
   HistoricalPeriod,
+  ROICAnalysisDetail,
+  ROICTrendDirection,
+  ROICConsistencyLevel,
 } from "../types";
 
 /**
@@ -664,52 +667,229 @@ export function calculateROIC(
 }
 
 /**
+ * Calculate annual paired ROIC series from income statements and balance sheets
+ */
+export function calculateROICSeries(
+  incomeStatements: FinancialStatement[],
+  balanceSheets: FinancialStatement[],
+): { year: string; roic: number }[] {
+  if (!incomeStatements || !balanceSheets || incomeStatements.length === 0 || balanceSheets.length === 0) {
+    return [];
+  }
+
+  const sortedIncome = [...incomeStatements].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+
+  const series: { year: string; roic: number }[] = [];
+
+  for (const inc of sortedIncome) {
+    if (!inc.date || inc.operatingIncome === undefined) continue;
+    const yearNum = new Date(inc.date).getFullYear();
+
+    const bal = balanceSheets.find(
+      (b) => b.date && new Date(b.date).getFullYear() === yearNum
+    );
+
+    if (!bal || bal.totalEquity === undefined || bal.totalDebt === undefined) continue;
+
+    const investedCapital = bal.totalEquity + bal.totalDebt;
+    if (investedCapital <= 0) continue;
+
+    const roic = calculateROIC(inc.operatingIncome, inc.netIncome, investedCapital);
+    if (roic !== null && !isNaN(roic) && isFinite(roic)) {
+      series.push({ year: yearNum.toString(), roic });
+    }
+  }
+
+  return series;
+}
+
+/**
+ * Calculate average ROIC for a specific historical period (10Y, 5Y, 3Y)
+ */
+export function calculateROICAverageForPeriod(
+  incomeStatements: FinancialStatement[],
+  balanceSheets: FinancialStatement[],
+  period: HistoricalPeriod
+): number | null {
+  const series = calculateROICSeries(incomeStatements, balanceSheets);
+  if (series.length === 0) return null;
+
+  let limit = 10;
+  let minRequired = 4;
+
+  if (period === "3Y") {
+    limit = 3;
+    minRequired = 2;
+  } else if (period === "5Y") {
+    limit = 5;
+    minRequired = 3;
+  } else if (period === "10Y") {
+    limit = 10;
+    minRequired = 4;
+  }
+
+  const periodSeries = series.slice(0, limit);
+  if (periodSeries.length < minRequired) {
+    return null;
+  }
+
+  const sum = periodSeries.reduce((acc, curr) => acc + curr.roic, 0);
+  return sum / periodSeries.length;
+}
+
+/**
+ * Full Multi-Period ROIC Analysis: Level (10 pts) + Trend (5 pts) + Consistency (5 pts) = 20 pts max
+ */
+export function calculateROICAnalysis(
+  incomeStatements: FinancialStatement[],
+  balanceSheets: FinancialStatement[],
+  _selectedPeriod: HistoricalPeriod = "10Y"
+): ROICAnalysisDetail {
+  const series = calculateROICSeries(incomeStatements, balanceSheets);
+  const latestROIC = series.length > 0 ? series[0].roic : null;
+
+  const roic3Y = calculateROICAverageForPeriod(incomeStatements, balanceSheets, "3Y");
+  const roic5Y = calculateROICAverageForPeriod(incomeStatements, balanceSheets, "5Y");
+  const roic10Y = calculateROICAverageForPeriod(incomeStatements, balanceSheets, "10Y");
+
+  // Determine effective ROIC Level
+  let effectiveROIC: number | null = null;
+  if (roic3Y !== null && roic5Y !== null && roic10Y !== null) {
+    effectiveROIC = 0.50 * roic3Y + 0.30 * roic5Y + 0.20 * roic10Y;
+  } else if (roic3Y !== null && roic5Y !== null) {
+    effectiveROIC = 0.60 * roic3Y + 0.40 * roic5Y;
+  } else {
+    effectiveROIC = roic3Y ?? roic5Y ?? roic10Y ?? latestROIC;
+  }
+
+  // 1. ROIC Level Score (0 to 10.0 points)
+  let levelScorePoints = 0;
+  if (effectiveROIC !== null) {
+    if (effectiveROIC >= 25) {
+      levelScorePoints = 10.0;
+    } else if (effectiveROIC >= 20) {
+      levelScorePoints = 8.5 + ((effectiveROIC - 20) / 5) * 1.5;
+    } else if (effectiveROIC >= 15) {
+      levelScorePoints = 7.0 + ((effectiveROIC - 15) / 5) * 1.5;
+    } else if (effectiveROIC >= 10) {
+      levelScorePoints = 5.0 + ((effectiveROIC - 10) / 5) * 2.0;
+    } else if (effectiveROIC >= 5) {
+      levelScorePoints = 3.0 + ((effectiveROIC - 5) / 5) * 2.0;
+    } else if (effectiveROIC >= 0) {
+      levelScorePoints = 0.5 + (effectiveROIC / 5) * 2.5;
+    } else {
+      levelScorePoints = 0;
+    }
+  }
+
+  // 2. ROIC Trend Classification & Score (0 to 5.0 points)
+  let trend: ROICTrendDirection = "N/A";
+  let trendScorePoints = 2.5;
+
+  if (roic3Y !== null && roic5Y !== null && roic10Y !== null) {
+    if (roic3Y >= roic5Y + 0.75 && roic5Y >= roic10Y + 0.75) {
+      trend = "Improving";
+    } else if (roic3Y >= roic10Y + 2.0 && roic3Y >= roic5Y) {
+      trend = "Improving";
+    } else if (roic3Y <= roic5Y - 0.75 && roic5Y <= roic10Y - 0.75) {
+      trend = "Declining";
+    } else if (roic3Y <= roic10Y - 2.0 && roic3Y <= roic5Y) {
+      trend = "Declining";
+    } else if (Math.abs(roic3Y - roic10Y) <= 2.0 && Math.abs(roic5Y - roic10Y) <= 2.0) {
+      trend = "Stable";
+    } else {
+      trend = "Mixed";
+    }
+  } else if (roic3Y !== null && roic5Y !== null) {
+    if (roic3Y >= roic5Y + 1.0) {
+      trend = "Improving";
+    } else if (roic3Y <= roic5Y - 1.0) {
+      trend = "Declining";
+    } else {
+      trend = "Stable";
+    }
+  } else if (series.length >= 2) {
+    const oldest = series[series.length - 1].roic;
+    const newest = series[0].roic;
+    if (newest >= oldest + 1.5) trend = "Improving";
+    else if (newest <= oldest - 1.5) trend = "Declining";
+    else trend = "Stable";
+  }
+
+  if (trend === "Improving") {
+    trendScorePoints = 4.5 + (roic3Y && roic3Y >= 15 ? 0.5 : 0.3);
+  } else if (trend === "Stable") {
+    trendScorePoints = 3.8;
+  } else if (trend === "Mixed") {
+    trendScorePoints = 2.5;
+  } else if (trend === "Declining") {
+    trendScorePoints = 0.8;
+  }
+
+  // 3. ROIC Consistency Classification & Score (0 to 5.0 points)
+  let consistency: ROICConsistencyLevel = "N/A";
+  let consistencyScorePoints = 2.5;
+  let stdDev: number | null = null;
+
+  if (series.length >= 2) {
+    const meanRoic = series.reduce((acc, curr) => acc + curr.roic, 0) / series.length;
+    const variance = series.reduce((acc, curr) => acc + Math.pow(curr.roic - meanRoic, 2), 0) / (series.length - 1);
+    stdDev = Math.sqrt(variance);
+
+    const positiveCount = series.filter(s => s.roic > 0).length;
+    const posRatio = positiveCount / series.length;
+
+    if (stdDev <= 3.0 && posRatio === 1.0) {
+      consistency = "Highly Consistent";
+      consistencyScorePoints = 4.8 + Math.min(0.2, (3.0 - stdDev) / 3.0 * 0.2);
+    } else if (stdDev <= 6.0 && posRatio >= 0.8) {
+      consistency = "Consistent";
+      consistencyScorePoints = 3.6 + ((6.0 - stdDev) / 3.0) * 0.8;
+    } else if (stdDev <= 10.0 && posRatio >= 0.6) {
+      consistency = "Moderate";
+      consistencyScorePoints = 2.5 + ((10.0 - stdDev) / 4.0) * 0.9;
+    } else {
+      consistency = "Inconsistent";
+      consistencyScorePoints = Math.max(0, 2.0 - ((stdDev - 10.0) / 10.0) * 1.5);
+    }
+  }
+
+  // Round points
+  levelScorePoints = Math.min(10.0, Math.max(0, Number(levelScorePoints.toFixed(1))));
+  trendScorePoints = Math.min(5.0, Math.max(0, Number(trendScorePoints.toFixed(1))));
+  consistencyScorePoints = Math.min(5.0, Math.max(0, Number(consistencyScorePoints.toFixed(1))));
+
+  const totalROICPoints = Math.min(20.0, Math.max(0, Number((levelScorePoints + trendScorePoints + consistencyScorePoints).toFixed(1))));
+  const totalROICScore100 = Math.min(100, Math.max(0, Math.round((totalROICPoints / 20.0) * 100)));
+
+  return {
+    roic10Y,
+    roic5Y,
+    roic3Y,
+    latestROIC,
+    levelScorePoints,
+    trend,
+    trendScorePoints,
+    consistency,
+    consistencyScorePoints,
+    stdDev,
+    totalROICPoints,
+    totalROICScore100,
+    annualHistory: [...series].reverse(), // chronologically ordered (oldest to newest)
+  };
+}
+
+/**
  * Calculate average ROIC from latest financial statements
  */
 export function calculateAverageROIC(
   incomeStatements: FinancialStatement[],
   balanceSheets: FinancialStatement[],
 ): number | null {
-  if (
-    !incomeStatements ||
-    !balanceSheets ||
-    incomeStatements.length === 0 ||
-    balanceSheets.length === 0
-  ) {
-    return null;
-  }
-
-  const sortedIncome = [...incomeStatements].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-  );
-
-  const latestIncome = sortedIncome[0];
-  const latestYear = latestIncome.date
-    ? new Date(latestIncome.date).getFullYear()
-    : null;
-
-  // Pair latest income statement with matching balance sheet year
-  const latestBalance =
-    balanceSheets.find(
-      (b) => b.date && new Date(b.date).getFullYear() === latestYear,
-    ) || balanceSheets[0];
-
-  if (
-    !latestIncome.operatingIncome ||
-    !latestBalance ||
-    !latestBalance.totalEquity ||
-    !latestBalance.totalDebt
-  ) {
-    return null;
-  }
-
-  const investedCapital = latestBalance.totalEquity + latestBalance.totalDebt;
-
-  return calculateROIC(
-    latestIncome.operatingIncome,
-    latestIncome.netIncome,
-    investedCapital,
-  );
+  const series = calculateROICSeries(incomeStatements, balanceSheets);
+  return series.length > 0 ? series[0].roic : null;
 }
 
 /**
@@ -1444,6 +1624,8 @@ export function calculateAllMetrics(
   );
   const epsTrendData = calculateEPSTrend(incomeStatements);
   const fcfTrendData = calculateFCFTrend(cashFlowStatements);
+  const roicDetail = calculateROICAnalysis(incomeStatements, balanceSheets);
+
   return {
     revenueCAGR: calculateRevenueCAGR(incomeStatements),
     epsGrowth: calculateEPSGrowth(incomeStatements),
@@ -1461,6 +1643,17 @@ export function calculateAllMetrics(
     netDebtToFCF: calculateNetDebtToFCF(balanceSheets, cashFlowStatements),
     shareDilution: calculateShareDilution(incomeStatements, balanceSheets),
     roic: calculateAverageROIC(incomeStatements, balanceSheets),
+    roic10Y: roicDetail.roic10Y,
+    roic5Y: roicDetail.roic5Y,
+    roic3Y: roicDetail.roic3Y,
+    roicTrend: roicDetail.trend,
+    roicTrendScorePoints: roicDetail.trendScorePoints,
+    roicConsistency: roicDetail.consistency,
+    roicConsistencyScorePoints: roicDetail.consistencyScorePoints,
+    roicStdDev: roicDetail.stdDev,
+    roicLevelScorePoints: roicDetail.levelScorePoints,
+    roicTotalPoints: roicDetail.totalROICPoints,
+    roicDetail,
     debtToEquity: calculateDebtToEquity(
       sortedBalance[0]?.totalDebt,
       sortedBalance[0]?.totalEquity,

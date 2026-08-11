@@ -1,5 +1,5 @@
 import { FinancialMetrics, MetricScores, FinancialStatement, ScoringConfig } from "../types";
-import { calculateEPSTrend, calculateFCFTrend } from "./financialCalculations";
+import { calculateEPSTrend, calculateFCFTrend, calculateROICAnalysis } from "./financialCalculations";
 
 export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
   universalScoreMetrics: {
@@ -171,8 +171,17 @@ export function scoreFCFGrowth(
  * Average: 6% - 10% (Score 50-69)
  * Poor: < 6%       (Score 0-49)
  */
-export function scoreROIC(roic: number | null): number | null {
+export function scoreROIC(
+  roic: number | null,
+  incomeStatements?: FinancialStatement[],
+  balanceSheets?: FinancialStatement[],
+): number | null {
   if (roic === null) return null;
+
+  if (incomeStatements && balanceSheets && incomeStatements.length > 0 && balanceSheets.length > 0) {
+    const analysis = calculateROICAnalysis(incomeStatements, balanceSheets);
+    return analysis.totalROICScore100;
+  }
 
   return interpolateScore(roic, [
     { minVal: -5, maxVal: 0, minScore: 0, maxScore: 19 },
@@ -359,6 +368,7 @@ export function calculateMetricScores(
   metrics: FinancialMetrics,
   cashFlowStatements?: FinancialStatement[],
   incomeStatements?: FinancialStatement[],
+  balanceSheets?: FinancialStatement[],
 ): MetricScores {
   let epsScore: number | null = null;
   if (metrics.epsGrowth !== null && metrics.epsGrowth !== undefined) {
@@ -392,7 +402,7 @@ export function calculateMetricScores(
     marginStability: scoreMarginStability(metrics.marginStability),
     netDebtToFCF: scoreNetDebtToFCF(metrics.netDebtToFCF),
     shareDilution: scoreShareDilution(metrics.shareDilution),
-    roic: scoreROIC(metrics.roic),
+    roic: scoreROIC(metrics.roic, incomeStatements, balanceSheets),
     debt: scoreDebtToEquity(metrics.debtToEquity),
     profitability: scoreProfitability(
       metrics.netMargin,

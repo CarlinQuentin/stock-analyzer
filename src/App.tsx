@@ -148,7 +148,7 @@ function App() {
         slicedCashFlow,
         dividendMetrics,
       );
-      const scores = calculateMetricScores(metrics, slicedCashFlow);
+      const scores = calculateMetricScores(metrics, slicedCashFlow, slicedIncome, slicedBalance);
       const overallScore = calculateOverallScore(scores);
       const dataConfidenceScore = calculateDataConfidenceScore(scores);
       const unavailableMetrics = getUnavailableMetrics(scores);
@@ -1009,8 +1009,19 @@ function App() {
                     value={result.metrics.roic}
                     unit="%"
                     score={result.scores.roic}
-                    description="Return on Invested Capital"
-                    tooltip="Measures the return a company earns on the capital invested in its business. Companies with consistently high ROIC often have strong competitive advantages and effective management."
+                    description={(() => {
+                      const detail = result.metrics.roicDetail || result.roicDetail;
+                      const r10Y = result.metrics.roic10Y ?? detail?.roic10Y;
+                      const r5Y = result.metrics.roic5Y ?? detail?.roic5Y;
+                      const r3Y = result.metrics.roic3Y ?? detail?.roic3Y;
+                      const parts = [];
+                      if (r10Y !== null && r10Y !== undefined) parts.push(`10Y: ${r10Y.toFixed(1)}%`);
+                      if (r5Y !== null && r5Y !== undefined) parts.push(`5Y: ${r5Y.toFixed(1)}%`);
+                      if (r3Y !== null && r3Y !== undefined) parts.push(`3Y: ${r3Y.toFixed(1)}%`);
+                      return parts.length > 0 ? parts.join(" · ") : "Return on Invested Capital";
+                    })()}
+                    statusText={result.metrics.roicTrend ? `${result.metrics.roicTrend === "Improving" ? "🟢" : result.metrics.roicTrend === "Declining" ? "🔴" : "🟡"} ${result.metrics.roicTrend}` : undefined}
+                    tooltip="Measures multi-year Return on Invested Capital quality (Level 10pts, Trend 5pts, Consistency 5pts = 20pts max). Click for detailed breakdown."
                     icon="🎯"
                     chartData={result.roicHistory}
                     chartValueType="percent"
