@@ -1032,7 +1032,6 @@ function App() {
                     isExpanded={showAllCharts}
                     onClick={() => setSelectedMetric("roicConsistency")}
                     directionStrategy="higherIsBetter"
-                    isInformational={true}
                   />
                   <MetricCard
                     title="FCF Margin"
