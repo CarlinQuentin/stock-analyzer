@@ -329,7 +329,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           unit: "%",
           chartData: result.roicHistory || [],
           chartValueType: "percent" as const,
-          description: "Measures a company's efficiency in allocating capital to profitable investments.",
+          description: "Measures a company's efficiency in allocating capital to profitable investments over the selected historical period.",
           formula: "ROIC = Net Operating Profit After Tax (NOPAT) / Invested Capital",
           mathExplanation: getROICMathExplanation(result.metrics.roic, result.roicHistory || []),
           whyItMatters: "ROIC is one of the most reliable indicators of a company's competitive advantage (moat) and quality of management. High ROIC companies create value by earning returns far above their cost of capital, compounding shareholder value over time.",
@@ -340,6 +340,33 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
             { label: "Poor", range: "< 6%", color: "text-red-500" },
           ],
           getInsights: () => analyzeEfficiencyHistory(result.roicHistory || [], "ROIC", 15),
+        };
+      case "roicConsistency":
+        return {
+          ...defaultData,
+          title: "ROIC Consistency",
+          icon: "🎯",
+          score: result.metrics.roicConsistency,
+          value: result.metrics.roicConsistency,
+          unit: "%",
+          chartData: result.roicHistory || [],
+          chartValueType: "percent" as const,
+          chartType: "bar" as const,
+          description: "Measures the reliability and stability of Return on Invested Capital generation over the selected historical period.",
+          formula: "ROIC Consistency = Weighted (Positive ROIC Years % + Count + Low Volatility)",
+          mathExplanation: [
+            `1. ROIC Consistency Score: ${result.metrics.roicConsistency !== null && result.metrics.roicConsistency !== undefined ? `${result.metrics.roicConsistency}%` : "N/A"}`,
+            `2. Evaluated over selected historical period: ${result.selectedPeriod || "10Y"}.`,
+            `3. Measured independently from Average ROIC level—evaluates positive year ratio, historical coverage count, and annual volatility (CV).`,
+          ],
+          whyItMatters: "Consistent Return on Invested Capital indicates a durable competitive advantage (moat) and effective management allocation that withstands business cycles.",
+          tiers: [
+            { label: "Excellent", range: "85 - 100%", color: "text-green-500" },
+            { label: "Good", range: "70 - 84%", color: "text-blue-500" },
+            { label: "Average", range: "50 - 69%", color: "text-amber-500" },
+            { label: "Poor", range: "< 50%", color: "text-red-500" },
+          ],
+          getInsights: () => ["Reliable ROIC generation demonstrates strong operational control and competitive stability."],
         };
       case "debt":
         return {
@@ -668,14 +695,13 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     const period = result.selectedPeriod || detail?.period || "10Y";
     const periodLabel = detail?.periodLabel || `${period === "10Y" ? "10-Year" : period === "5Y" ? "5-Year" : "3-Year"} Average`;
     const avgROIC = detail?.averageROIC ?? result.metrics.roic;
-    const consistencyPct = result.metrics.roicConsistency ?? detail?.consistencyPct;
-    const totalPts = result.metrics.roicTotalPoints ?? detail?.totalROICPoints ?? (result.scores.roic !== null ? (result.scores.roic * 0.20) : null);
 
     return [
       `1. Average ROIC (${periodLabel}): ${avgROIC !== null && avgROIC !== undefined ? `${avgROIC.toFixed(1)}%` : "N/A"}`,
-      `2. Average ROIC Level Score: ${detail?.levelScorePoints !== undefined ? detail.levelScorePoints.toFixed(1) : "N/A"} / 14.0 Points (Primary measure of absolute quality).`,
-      `3. ROIC Consistency Score: ${consistencyPct !== null && consistencyPct !== undefined ? `${consistencyPct}%` : "N/A"} (${detail?.consistencyScorePoints !== undefined ? detail.consistencyScorePoints.toFixed(1) : "N/A"} / 6.0 Points).`,
-      `4. Total ROIC Contribution: ${totalPts !== null && totalPts !== undefined ? `${totalPts.toFixed(1)} / 20.0 Points` : "N/A"} (Universal Score Weight: 20 points).`,
+      `2. Formula: ROIC = Net Operating Profit After Tax (NOPAT) / Invested Capital`,
+      `3. NOPAT = Operating Income × (1 - Tax Rate)`,
+      `4. Invested Capital = Total Shareholders' Equity + Total Debt`,
+      `5. Evaluates capital allocation efficiency over the selected ${period} historical period.`,
     ];
   }
 
@@ -1351,7 +1377,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                   Metric Value
                 </span>
                 <div className="text-3xl font-extrabold text-slate-900 dark:text-white">
-                  {config.value !== null ? (
+                  {config.value !== null && config.value !== undefined ? (
                     <>
                       {config.unit === "%"
                         ? formatPercentageMetric(
@@ -1456,61 +1482,70 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
               );
             })()}
 
-            {/* ROIC Breakdown Section */}
+            {/* Average ROIC Breakdown Section */}
             {metricKey === "roic" && (() => {
               const detail = result.metrics.roicDetail || result.roicDetail;
               const period = result.selectedPeriod || detail?.period || "10Y";
               const periodLabel = detail?.periodLabel || `${period === "10Y" ? "10-Year" : period === "5Y" ? "5-Year" : "3-Year"} Average`;
               const avgROIC = detail?.averageROIC ?? result.metrics.roic;
-              const consistencyPct = result.metrics.roicConsistency ?? detail?.consistencyPct;
-              const totalPts = result.metrics.roicTotalPoints ?? detail?.totalROICPoints ?? (result.scores.roic !== null ? Number((result.scores.roic * 0.20).toFixed(1)) : 0);
 
               return (
-                <div className="mb-6 bg-slate-50 dark:bg-slate-800/80 p-4 border border-slate-200/80 dark:border-slate-700/60 rounded-xl space-y-4">
+                <div className="mb-6 bg-slate-50 dark:bg-slate-800/80 p-4 border border-slate-200/80 dark:border-slate-700/60 rounded-xl space-y-3">
                   <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
                     <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-widest">
-                      ROIC 20-Point Quality Breakdown ({period})
+                      Average ROIC Summary ({period})
                     </h4>
                     <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400 font-mono">
-                      ROIC Score: {totalPts.toFixed(1)} / 20.0 pts
+                      Level Score: {detail?.levelScorePoints ?? 0} / 14.0 pts
                     </span>
                   </div>
 
-                  {/* Selected Period Average ROIC */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    <div className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-200/70 dark:border-slate-700/50 flex justify-between items-center">
-                      <div>
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold block">
-                          Average ROIC ({period})
-                        </span>
-                        <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                          {periodLabel} ({detail?.levelScorePoints ?? 0} / 14.0 pts)
-                        </span>
-                      </div>
-                      <span className="text-lg font-extrabold text-slate-900 dark:text-white font-mono">
-                        {avgROIC !== null && avgROIC !== undefined ? `${avgROIC.toFixed(1)}%` : "N/A"}
+                  <div className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-200/70 dark:border-slate-700/50 flex justify-between items-center">
+                    <div>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold block">
+                        {periodLabel}
+                      </span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        Primary ROIC level over selected {period} historical period
                       </span>
                     </div>
+                    <span className="text-xl font-extrabold text-slate-900 dark:text-white font-mono">
+                      {avgROIC !== null && avgROIC !== undefined ? `${avgROIC.toFixed(1)}%` : "N/A"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
-                    <div className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-200/70 dark:border-slate-700/50 flex justify-between items-center">
-                      <div>
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold block">
-                          ROIC Consistency ({period})
-                        </span>
-                        <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                          Reliability score ({detail?.consistencyScorePoints ?? 0} / 6.0 pts)
-                        </span>
-                      </div>
-                      <span className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
-                        {consistencyPct !== null && consistencyPct !== undefined ? `${consistencyPct}%` : "N/A"}
-                      </span>
-                    </div>
+            {/* ROIC Consistency Breakdown Section */}
+            {metricKey === "roicConsistency" && (() => {
+              const detail = result.metrics.roicDetail || result.roicDetail;
+              const period = result.selectedPeriod || detail?.period || "10Y";
+              const consistencyPct = result.metrics.roicConsistency ?? detail?.consistencyPct;
+
+              return (
+                <div className="mb-6 bg-slate-50 dark:bg-slate-800/80 p-4 border border-slate-200/80 dark:border-slate-700/60 rounded-xl space-y-3">
+                  <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
+                    <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-widest">
+                      ROIC Consistency Summary ({period})
+                    </h4>
+                    <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
+                      Consistency Score: {detail?.consistencyScorePoints ?? 0} / 6.0 pts
+                    </span>
                   </div>
 
-                  {/* Score Breakdown Tiers */}
-                  <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-[11px] flex justify-between text-slate-600 dark:text-slate-300 font-medium">
-                    <span>Average ROIC Level: <strong>{detail?.levelScorePoints ?? 0} / 14.0</strong></span>
-                    <span>ROIC Consistency: <strong>{detail?.consistencyScorePoints ?? 0} / 6.0</strong></span>
+                  <div className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-200/70 dark:border-slate-700/50 flex justify-between items-center">
+                    <div>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold block">
+                        ROIC Consistency ({period})
+                      </span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        Reliability of positive annual ROIC over {period} historical period
+                      </span>
+                    </div>
+                    <span className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
+                      {consistencyPct !== null && consistencyPct !== undefined ? `${consistencyPct}%` : "N/A"}
+                    </span>
                   </div>
                 </div>
               );

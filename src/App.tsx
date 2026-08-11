@@ -1024,13 +1024,13 @@ function App() {
                     value={result.metrics.roicConsistency ?? null}
                     unit="%"
                     score={result.metrics.roicConsistency ?? null}
-                    description={`Reliability of ROIC over selected ${(result.selectedPeriod || selectedPeriod)} period`}
+                    description={`${(result.selectedPeriod || selectedPeriod) === "10Y" ? "10-Year" : (result.selectedPeriod || selectedPeriod) === "5Y" ? "5-Year" : "3-Year"} Consistency`}
                     tooltip="Measures how consistently a company generates ROIC throughout the selected historical period. Higher percentages indicate stable, reliable capital returns."
                     icon="🎯"
                     chartData={result.roicHistory}
                     chartValueType="percent"
                     isExpanded={showAllCharts}
-                    onClick={() => setSelectedMetric("roic")}
+                    onClick={() => setSelectedMetric("roicConsistency")}
                     directionStrategy="higherIsBetter"
                     isInformational={true}
                   />
