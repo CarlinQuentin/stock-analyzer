@@ -738,8 +738,54 @@ export function calculateROICAverageForPeriod(
 }
 
 /**
+ * Shared consistency calculation algorithm used by both FCF Consistency and ROIC Consistency.
+ * Weighted: 50% Positive Years Ratio + 25% Historical Count Coverage + 25% Low Volatility (CV)
+ */
+export function calculateSeriesConsistency(values: number[]): number | null {
+  if (!values || !Array.isArray(values) || values.length === 0) {
+    return null;
+  }
+
+  const totalYears = values.length;
+  const positiveYears = values.filter((val) => val > 0).length;
+  const positivePct = positiveYears / totalYears;
+
+  const ratioScore = positivePct * 100;
+  const countScore = Math.min(100, (positiveYears / Math.min(5, Math.max(totalYears, 1))) * 100);
+
+  let volatilityScore = 50;
+  const mean = values.reduce((sum, val) => sum + val, 0) / totalYears;
+
+  if (mean > 0 && totalYears >= 2) {
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / totalYears;
+    const stdDev = Math.sqrt(variance);
+    const cv = stdDev / mean;
+
+    if (cv <= 0.3) {
+      volatilityScore = 100;
+    } else if (cv <= 0.8) {
+      volatilityScore = Math.round(100 - ((cv - 0.3) / 0.5) * 30);
+    } else if (cv <= 1.5) {
+      volatilityScore = Math.round(70 - ((cv - 0.8) / 0.7) * 40);
+    } else {
+      volatilityScore = Math.max(0, Math.round(30 - (cv - 1.5) * 15));
+    }
+  } else if (positiveYears === totalYears) {
+    volatilityScore = 85;
+  } else if (positiveYears === 0) {
+    volatilityScore = 0;
+  }
+
+  const finalConsistency = Math.round(
+    0.50 * ratioScore + 0.25 * countScore + 0.25 * volatilityScore,
+  );
+
+  return Math.min(100, Math.max(0, finalConsistency));
+}
+
+/**
  * Calculate ROIC Consistency percentage (0-100%) for a given set of statements/slice
- * Matches FCF Consistency methodology (ratio of positive years + count + volatility / std dev)
+ * Matches FCF Consistency methodology (ratio of positive years + count + volatility / CV)
  */
 export function calculateROICConsistency(
   incomeStatements: FinancialStatement[] | null | undefined,
@@ -769,40 +815,7 @@ export function calculateROICConsistency(
   }
 
   const roicValues = series.map((s) => s.roic);
-  const totalYears = roicValues.length;
-  const positiveYears = roicValues.filter((v) => v > 0).length;
-  const positivePct = positiveYears / totalYears;
-
-  const ratioScore = positivePct * 100;
-  const countScore = Math.min(100, (positiveYears / Math.min(5, Math.max(totalYears, 1))) * 100);
-
-  let volatilityScore = 50;
-  const mean = roicValues.reduce((sum, val) => sum + val, 0) / totalYears;
-
-  if (totalYears >= 2) {
-    const variance = roicValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / totalYears;
-    const stdDev = Math.sqrt(variance);
-
-    if (stdDev <= 2.0) {
-      volatilityScore = 100;
-    } else if (stdDev <= 5.0) {
-      volatilityScore = Math.round(100 - ((stdDev - 2.0) / 3.0) * 30);
-    } else if (stdDev <= 10.0) {
-      volatilityScore = Math.round(70 - ((stdDev - 5.0) / 5.0) * 40);
-    } else {
-      volatilityScore = Math.max(0, Math.round(30 - (stdDev - 10.0) * 3));
-    }
-  } else if (positiveYears === totalYears) {
-    volatilityScore = 85;
-  } else {
-    volatilityScore = 0;
-  }
-
-  const finalConsistency = Math.round(
-    0.50 * ratioScore + 0.25 * countScore + 0.25 * volatilityScore
-  );
-
-  return Math.min(100, Math.max(0, finalConsistency));
+  return calculateSeriesConsistency(roicValues);
 }
 
 /**
@@ -1119,42 +1132,7 @@ export function calculateFCFConsistency(
     return null;
   }
 
-  const totalYears = fcfValues.length;
-  const positiveYears = fcfValues.filter((val) => val > 0).length;
-  const positivePct = positiveYears / totalYears;
-
-  const ratioScore = positivePct * 100;
-  const countScore = Math.min(100, (positiveYears / Math.min(5, Math.max(totalYears, 1))) * 100);
-
-  let volatilityScore = 50;
-  const mean = fcfValues.reduce((sum, val) => sum + val, 0) / totalYears;
-
-  if (mean > 0 && totalYears >= 2) {
-    const variance =
-      fcfValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / totalYears;
-    const stdDev = Math.sqrt(variance);
-    const cv = stdDev / mean;
-
-    if (cv <= 0.3) {
-      volatilityScore = 100;
-    } else if (cv <= 0.8) {
-      volatilityScore = Math.round(100 - ((cv - 0.3) / 0.5) * 30);
-    } else if (cv <= 1.5) {
-      volatilityScore = Math.round(70 - ((cv - 0.8) / 0.7) * 40);
-    } else {
-      volatilityScore = Math.max(0, Math.round(30 - (cv - 1.5) * 15));
-    }
-  } else if (positiveYears === totalYears) {
-    volatilityScore = 85;
-  } else if (positiveYears === 0) {
-    volatilityScore = 0;
-  }
-
-  const finalConsistency = Math.round(
-    0.5 * ratioScore + 0.25 * countScore + 0.25 * volatilityScore,
-  );
-
-  return Math.min(100, Math.max(0, finalConsistency));
+  return calculateSeriesConsistency(fcfValues);
 }
 
 /**
