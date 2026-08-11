@@ -232,6 +232,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           getInsights: () => ["High long-term FCF conversion indicates high-quality earnings backed by real cash flow over full business cycles."],
         };
       case "marginStability":
+        const msDetail = result.metrics?.marginStabilityDetail;
         const avgMargin = result.marginStabilityHistory && result.marginStabilityHistory.length > 0
           ? result.marginStabilityHistory.reduce((a, b) => a + b.value, 0) / result.marginStabilityHistory.length
           : undefined;
@@ -246,11 +247,16 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           chartValueType: "percent" as const,
           referenceLineValue: avgMargin,
           referenceLineLabel: avgMargin !== undefined ? `Avg Margin: ${avgMargin.toFixed(1)}%` : undefined,
-          description: "Measures whether operating profitability is improving, stable, or deteriorating over time.",
-          formula: "Margin Stability = Standard Deviation of Operating Margins + Trend Adjustment",
-          mathExplanation: [
+          description: "Margin stability measures how consistently a company's operating margins have performed over time. The score rewards low margin volatility and sustained improvement, while penalizing significant volatility and persistent margin deterioration.",
+          formula: "Margin Stability = Volatility Base Score (from σ) + Trend Adjustment (from Linear Regression Slope)",
+          mathExplanation: msDetail ? [
+            `1. Operating Margin Std Dev (σ): ${msDetail.marginStandardDeviation}% → Volatility Base Score: ${msDetail.volatilityBaseScore} pts`,
+            `2. Linear Regression Slope: ${msDetail.trendSlope > 0 ? "+" : ""}${msDetail.trendSlope} pp/year → Trend Adjustment: ${msDetail.trendAdjustment > 0 ? "+" : ""}${msDetail.trendAdjustment} pts`,
+            `3. Multi-Year Average Margin: ${msDetail.averageOperatingMargin}% ${msDetail.averageOperatingMargin < 0 ? "(Capped at 40 max due to negative average margin)" : ""}`,
+            `4. Final Clamped Score: ${msDetail.finalScore} / 100`,
+          ] : [
             `1. Margin Stability Score: ${result.metrics.marginStability !== null ? formatPercentageMetric(result.metrics.marginStability, true) : "N/A"}`,
-            `2. Measures low variation and positive direction in operating profit margins over time.`,
+            `2. Evaluates full multi-year operating margin volatility (σ) and full-series linear regression slope.`,
           ],
           whyItMatters: "Stable or expanding operating margins demonstrate pricing power, cost control discipline, and a strong competitive moat against inflation.",
           tiers: [

@@ -108,6 +108,16 @@ export interface ChartDataPoint {
 
 export type HistoricalPeriod = "10Y" | "5Y" | "3Y";
 
+export interface MarginStabilityDetail {
+  operatingMargins: number[];
+  marginStandardDeviation: number;
+  volatilityBaseScore: number;
+  trendSlope: number;
+  trendAdjustment: number;
+  averageOperatingMargin: number;
+  finalScore: number;
+}
+
 export interface ROICAnalysisDetail {
   period: HistoricalPeriod;
   periodLabel: string; // e.g. "10-Year Average", "5-Year Average", "3-Year Average"
@@ -195,6 +205,7 @@ export interface FinancialMetrics {
   fcfConversion: number | null;
   /** Stored as whole percentage (0-100), e.g. 80 for 80% */
   marginStability: number | null;
+  marginStabilityDetail?: MarginStabilityDetail;
   /** Stored as leverage ratio, e.g. 1.5 for 1.5x, -0.8 for net cash position */
   netDebtToFCF: number | null;
   /** Stored as percentage change in shares outstanding over measurement period, e.g. -5.2 for -5.2% buyback */

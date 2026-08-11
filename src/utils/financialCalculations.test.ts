@@ -14,6 +14,7 @@ import {
   calculateFCFConversion,
   calculateFCFConversionHistory,
   calculateMarginStability,
+  calculateMarginStabilityDetail,
   calculateMarginStabilityHistory,
   calculateNetDebtToFCF,
   calculateNetDebtToFCFHistory,
@@ -1365,21 +1366,137 @@ describe("calculateFCFConversion", () => {
   });
 });
 
-describe("calculateMarginStability", () => {
-  it("should calculate margin stability score for operating margins", () => {
+describe("calculateMarginStability & calculateMarginStabilityDetail", () => {
+  it("1. Perfectly flat margins produce zero std dev, zero slope, and score 100", () => {
     const income: FinancialStatement[] = [
-      { date: "2020-12-31", revenue: 1000, operatingIncome: 150 },
-      { date: "2021-12-31", revenue: 1100, operatingIncome: 165 },
-      { date: "2022-12-31", revenue: 1200, operatingIncome: 180 },
+      { date: "2020-12-31", revenue: 1000, operatingIncome: 120 }, // 12%
+      { date: "2021-12-31", revenue: 1000, operatingIncome: 120 }, // 12%
+      { date: "2022-12-31", revenue: 1000, operatingIncome: 120 }, // 12%
+      { date: "2023-12-31", revenue: 1000, operatingIncome: 120 }, // 12%
+      { date: "2024-12-31", revenue: 1000, operatingIncome: 120 }, // 12%
     ];
-    const stability = calculateMarginStability(income);
-    expect(stability).not.toBeNull();
-    expect(stability!).toBeGreaterThanOrEqual(85);
+    const detail = calculateMarginStabilityDetail(income);
+    expect(detail).not.toBeNull();
+    expect(detail!.marginStandardDeviation).toBe(0);
+    expect(detail!.volatilityBaseScore).toBe(100);
+    expect(detail!.trendSlope).toBe(0);
+    expect(detail!.trendAdjustment).toBe(0);
+    expect(detail!.finalScore).toBe(100);
+    expect(calculateMarginStability(income)).toBe(100);
   });
 
-  it("should return null if fewer than 2 valid income statements exist", () => {
+  it("2. Consistently increasing margins produce positive slope and positive trend adjustment", () => {
+    const income: FinancialStatement[] = [
+      { date: "2020-12-31", revenue: 1000, operatingIncome: 100 }, // 10%
+      { date: "2021-12-31", revenue: 1000, operatingIncome: 110 }, // 11%
+      { date: "2022-12-31", revenue: 1000, operatingIncome: 120 }, // 12%
+      { date: "2023-12-31", revenue: 1000, operatingIncome: 130 }, // 13%
+      { date: "2024-12-31", revenue: 1000, operatingIncome: 140 }, // 14%
+    ];
+    const detail = calculateMarginStabilityDetail(income);
+    expect(detail!.trendSlope).toBe(1.0); // +1.0 pp/year
+    expect(detail!.trendAdjustment).toBe(10); // max +10 bonus
+    expect(detail!.finalScore).toBe(100); // 100 base + 10 clamped to 100
+  });
+
+  it("3. Consistently decreasing margins produce negative slope and negative trend adjustment", () => {
+    const income: FinancialStatement[] = [
+      { date: "2020-12-31", revenue: 1000, operatingIncome: 160 }, // 16%
+      { date: "2021-12-31", revenue: 1000, operatingIncome: 150 }, // 15%
+      { date: "2022-12-31", revenue: 1000, operatingIncome: 140 }, // 14%
+      { date: "2023-12-31", revenue: 1000, operatingIncome: 130 }, // 13%
+      { date: "2024-12-31", revenue: 1000, operatingIncome: 120 }, // 12%
+    ];
+    const detail = calculateMarginStabilityDetail(income);
+    expect(detail!.trendSlope).toBe(-1.0); // -1.0 pp/year
+    expect(detail!.trendAdjustment).toBe(-10); // max -10 penalty
+  });
+
+  it("4. Highly volatile but flat-endpoint margins produce near-zero slope", () => {
+    const income: FinancialStatement[] = [
+      { date: "2020-12-31", revenue: 1000, operatingIncome: 100 }, // 10%
+      { date: "2021-12-31", revenue: 1000, operatingIncome: 200 }, // 20%
+      { date: "2022-12-31", revenue: 1000, operatingIncome: 50 },  // 5%
+      { date: "2023-12-31", revenue: 1000, operatingIncome: 200 }, // 20%
+      { date: "2024-12-31", revenue: 1000, operatingIncome: 100 }, // 10%
+    ];
+    const detail = calculateMarginStabilityDetail(income);
+    expect(Math.abs(detail!.trendSlope)).toBe(0);
+    expect(detail!.marginStandardDeviation).toBeGreaterThanOrEqual(6.0);
+    expect(detail!.volatilityBaseScore).toBeLessThan(70);
+  });
+
+  it("5. Increasing trend with a weak final year produces a positive trend slope", () => {
+    const income: FinancialStatement[] = [
+      { date: "2020-12-31", revenue: 1000, operatingIncome: 100 }, // 10%
+      { date: "2021-12-31", revenue: 1000, operatingIncome: 120 }, // 12%
+      { date: "2022-12-31", revenue: 1000, operatingIncome: 140 }, // 14%
+      { date: "2023-12-31", revenue: 1000, operatingIncome: 160 }, // 16%
+      { date: "2024-12-31", revenue: 1000, operatingIncome: 130 }, // 13% (weak final year)
+    ];
+    const detail = calculateMarginStabilityDetail(income);
+    expect(detail!.trendSlope).toBeGreaterThan(0); // +1.00 pp/year slope
+    expect(detail!.trendAdjustment).toBe(10);
+  });
+
+  it("6. Decreasing trend with a strong final year produces a negative trend slope", () => {
+    const income: FinancialStatement[] = [
+      { date: "2020-12-31", revenue: 1000, operatingIncome: 200 }, // 20%
+      { date: "2021-12-31", revenue: 1000, operatingIncome: 180 }, // 18%
+      { date: "2022-12-31", revenue: 1000, operatingIncome: 160 }, // 16%
+      { date: "2023-12-31", revenue: 1000, operatingIncome: 140 }, // 14%
+      { date: "2024-12-31", revenue: 1000, operatingIncome: 170 }, // 17% (rebound final year)
+    ];
+    const detail = calculateMarginStabilityDetail(income);
+    expect(detail!.trendSlope).toBeLessThan(0); // -1.00 pp/year slope
+    expect(detail!.trendAdjustment).toBe(-10);
+  });
+
+  it("7. Negative average operating margin is hard-capped at max score of 40", () => {
+    const income: FinancialStatement[] = [
+      { date: "2020-12-31", revenue: 1000, operatingIncome: -100 }, // -10%
+      { date: "2021-12-31", revenue: 1000, operatingIncome: -100 }, // -10%
+      { date: "2022-12-31", revenue: 1000, operatingIncome: -100 }, // -10%
+    ];
+    const detail = calculateMarginStabilityDetail(income);
+    expect(detail!.averageOperatingMargin).toBeLessThan(0);
+    expect(detail!.finalScore).toBeLessThanOrEqual(40);
+  });
+
+  it("8. Preserves chronological ordering when missing sequence years exist", () => {
+    const income: FinancialStatement[] = [
+      { date: "2024-12-31", revenue: 1000, operatingIncome: 140 }, // 14%
+      { date: "2020-12-31", revenue: 1000, operatingIncome: 100 }, // 10% (out of order input)
+      { date: "2022-12-31", revenue: 1000, operatingIncome: 120 }, // 12%
+    ];
+    const detail = calculateMarginStabilityDetail(income);
+    expect(detail!.operatingMargins).toEqual([10, 12, 14]);
+    expect(detail!.trendSlope).toBeGreaterThan(0);
+  });
+
+  it("9. Returns null when fewer than 2 valid observations exist", () => {
     expect(calculateMarginStability([])).toBeNull();
     expect(calculateMarginStability([{ date: "2024-12-31", revenue: 1000, operatingIncome: 100 }])).toBeNull();
+  });
+
+  it("10. Trend slopes above +0.50 pp/year hit maximum +10 adjustment", () => {
+    const income: FinancialStatement[] = [
+      { date: "2023-12-31", revenue: 1000, operatingIncome: 100 }, // 10%
+      { date: "2024-12-31", revenue: 1000, operatingIncome: 120 }, // 12% (+2.0 slope)
+    ];
+    const detail = calculateMarginStabilityDetail(income);
+    expect(detail!.trendSlope).toBeGreaterThan(0.50);
+    expect(detail!.trendAdjustment).toBe(10);
+  });
+
+  it("11. Trend slopes below -0.50 pp/year hit maximum -10 adjustment", () => {
+    const income: FinancialStatement[] = [
+      { date: "2023-12-31", revenue: 1000, operatingIncome: 120 }, // 12%
+      { date: "2024-12-31", revenue: 1000, operatingIncome: 100 }, // 10% (-2.0 slope)
+    ];
+    const detail = calculateMarginStabilityDetail(income);
+    expect(detail!.trendSlope).toBeLessThan(-0.50);
+    expect(detail!.trendAdjustment).toBe(-10);
   });
 });
 

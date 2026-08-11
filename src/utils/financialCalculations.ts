@@ -5,6 +5,7 @@ import {
   FCFTrendResult,
   HistoricalPeriod,
   ROICAnalysisDetail,
+  MarginStabilityDetail,
 } from "../types";
 
 /**
@@ -1251,11 +1252,11 @@ export function calculateFCFConversionHistory(
 }
 
 /**
- * Calculate Margin Stability score (0-100) measuring whether operating profitability is improving, stable, or deteriorating over time.
+ * Detailed Margin Stability audit breakdown
  */
-export function calculateMarginStability(
+export function calculateMarginStabilityDetail(
   incomeStatements: FinancialStatement[] | null | undefined,
-): number | null {
+): MarginStabilityDetail | null {
   if (!incomeStatements || !Array.isArray(incomeStatements) || incomeStatements.length < 2) {
     return null;
   }
@@ -1298,13 +1299,23 @@ export function calculateMarginStability(
     baseStability = Math.max(10, Math.round(50 - (stdDev - 10.0) * 3));
   }
 
-  const netChange = opMargins[opMargins.length - 1] - opMargins[0];
-  let trendAdjustment = 0;
-  if (netChange > 1.0) {
-    trendAdjustment = 10;
-  } else if (netChange < -3.0) {
-    trendAdjustment = -15;
+  // Calculate linear regression slope across chronological indices X_i = 0 ... N-1
+  const xMean = (total - 1) / 2;
+  let num = 0;
+  let den = 0;
+
+  for (let i = 0; i < total; i++) {
+    const xDiff = i - xMean;
+    const yDiff = opMargins[i] - mean;
+    num += xDiff * yDiff;
+    den += xDiff * xDiff;
   }
+
+  const trendSlope = den !== 0 ? num / den : 0;
+
+  // Continuous trend adjustment: clamp(slope / 0.50 * 10, -10, +10)
+  const rawTrendAdj = (trendSlope / 0.50) * 10;
+  const trendAdjustment = Math.min(10, Math.max(-10, Number(rawTrendAdj.toFixed(2))));
 
   let score = baseStability + trendAdjustment;
 
@@ -1312,7 +1323,28 @@ export function calculateMarginStability(
     score = Math.min(40, score);
   }
 
-  return Math.min(100, Math.max(0, score));
+  const finalScore = Math.min(100, Math.max(0, Math.round(score)));
+
+  return {
+    operatingMargins: opMargins.map((m) => Number(m.toFixed(2))),
+    marginStandardDeviation: Number(stdDev.toFixed(2)),
+    volatilityBaseScore: baseStability,
+    trendSlope: Number(trendSlope.toFixed(3)),
+    trendAdjustment: Number(trendAdjustment.toFixed(2)),
+    averageOperatingMargin: Number(mean.toFixed(2)),
+    finalScore,
+  };
+}
+
+/**
+ * Calculate Margin Stability score (0-100) measuring whether operating profitability is improving, stable, or deteriorating over time.
+ * Uses full-series linear regression slope for trend assessment.
+ */
+export function calculateMarginStability(
+  incomeStatements: FinancialStatement[] | null | undefined,
+): number | null {
+  const detail = calculateMarginStabilityDetail(incomeStatements);
+  return detail ? detail.finalScore : null;
 }
 
 /**
@@ -1622,6 +1654,7 @@ export function calculateAllMetrics(
   const epsTrendData = calculateEPSTrend(incomeStatements);
   const fcfTrendData = calculateFCFTrend(cashFlowStatements);
   const roicDetail = calculateROICAnalysis(incomeStatements, balanceSheets, selectedPeriod);
+  const marginStabilityDetail = calculateMarginStabilityDetail(incomeStatements);
 
   return {
     revenueCAGR: calculateRevenueCAGR(incomeStatements),
@@ -1636,7 +1669,8 @@ export function calculateAllMetrics(
     fcfMargin: calculateFCFMargin(incomeStatements, cashFlowStatements),
     fcfConsistency: calculateFCFConsistency(cashFlowStatements),
     fcfConversion: calculateFCFConversion(incomeStatements, cashFlowStatements),
-    marginStability: calculateMarginStability(incomeStatements),
+    marginStability: marginStabilityDetail ? marginStabilityDetail.finalScore : null,
+    marginStabilityDetail: marginStabilityDetail || undefined,
     netDebtToFCF: calculateNetDebtToFCF(balanceSheets, cashFlowStatements),
     shareDilution: calculateShareDilution(incomeStatements, balanceSheets),
     roic: roicDetail.averageROIC ?? calculateAverageROIC(incomeStatements, balanceSheets),
