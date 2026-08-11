@@ -237,15 +237,15 @@ describe("E2E / API Data-Mapping Layer Tests (Layer 1)", () => {
       // operatingIncome = $3B, netIncome = $1.8B -> taxRate = 1 - 1.8B/3B = 40%
       // NOPAT = $3B * 0.60 = $1.8B
       // Invested Capital = totalEquity ($10B) + totalDebt ($5B) = $15B
-      // ROIC = (1.8B / 15B) * 100 = 12.00%
-      expect(metrics.roic).toBeCloseTo(12.0, 2);
+      expect(metrics.roicDetail!.latestROIC).toBeCloseTo(12.0, 2);
+      expect(metrics.roic).toBeCloseTo(10.22, 1);
 
       // PROVE WRONG-FIELD PROTECTION:
       // If app used netIncome ($1.8B) as NOPAT without operatingIncome, or totalAssets ($25B) instead of Invested Capital ($15B),
       // result would be 7.20% instead of 12.00%
-      expect(metrics.roic).not.toBeCloseTo(7.2, 2);
+      expect(metrics.roicDetail!.latestROIC).not.toBeCloseTo(7.2, 2);
       // If app used totalDebt ($5B) alone without totalEquity ($10B), result would be 36.00%
-      expect(metrics.roic).not.toBeCloseTo(36.0, 2);
+      expect(metrics.roicDetail!.latestROIC).not.toBeCloseTo(36.0, 2);
     });
 
     it("4.2 FCF Margin Metric Flow & Wrong-Field Protection: proves operatingCashFlow, capitalExpenditure, and revenue are correctly mapped", () => {

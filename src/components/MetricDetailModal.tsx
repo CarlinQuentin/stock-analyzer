@@ -1461,9 +1461,9 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
             {/* ROIC Multi-Year Breakdown Section */}
             {metricKey === "roic" && (() => {
               const detail = result.metrics.roicDetail || result.roicDetail;
-              const r10Y = result.metrics.roic10Y ?? detail?.roic10Y;
-              const r5Y = result.metrics.roic5Y ?? detail?.roic5Y;
-              const r3Y = result.metrics.roic3Y ?? detail?.roic3Y;
+              const period = result.selectedPeriod || detail?.period || "10Y";
+              const periodLabel = detail?.periodLabel || `${period === "10Y" ? "10-Year" : period === "5Y" ? "5-Year" : "3-Year"} Average`;
+              const avgROIC = detail?.averageROIC ?? result.metrics.roic;
               const trend = result.metrics.roicTrend ?? detail?.trend ?? "N/A";
               const consistency = result.metrics.roicConsistency ?? detail?.consistency ?? "N/A";
               const totalPts = result.metrics.roicTotalPoints ?? detail?.totalROICPoints ?? (result.scores.roic !== null ? Number((result.scores.roic * 0.20).toFixed(1)) : 0);
@@ -1476,8 +1476,8 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
               };
 
               const getConsistencyBadge = (cs: string) => {
-                if (cs === "Highly Consistent" || cs === "Consistent") return "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300";
-                if (cs === "Moderate") return "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300";
+                if (cs.includes("Consistent")) return "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300";
+                if (cs === "Moderate" || cs === "Moderately Consistent") return "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300";
                 if (cs === "Inconsistent") return "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300";
                 return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300";
               };
@@ -1486,38 +1486,26 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                 <div className="mb-6 bg-slate-50 dark:bg-slate-800/80 p-4 border border-slate-200/80 dark:border-slate-700/60 rounded-xl space-y-4">
                   <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
                     <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-widest">
-                      ROIC 20-Point Quality Breakdown
+                      ROIC 20-Point Quality Breakdown ({period})
                     </h4>
                     <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400 font-mono">
                       ROIC Score: {totalPts.toFixed(1)} / 20.0 pts
                     </span>
                   </div>
 
-                  {/* Historical Averages Table */}
-                  <div>
-                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block mb-2">
-                      1. Multi-Year Historical Averages
-                    </span>
-                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                      <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200/70 dark:border-slate-700/50">
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 block uppercase font-bold">10 Year Avg</span>
-                        <span className="font-extrabold text-slate-900 dark:text-white text-sm">
-                          {r10Y !== null && r10Y !== undefined ? `${r10Y.toFixed(1)}%` : "N/A"}
-                        </span>
-                      </div>
-                      <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200/70 dark:border-slate-700/50">
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 block uppercase font-bold">5 Year Avg</span>
-                        <span className="font-extrabold text-slate-900 dark:text-white text-sm">
-                          {r5Y !== null && r5Y !== undefined ? `${r5Y.toFixed(1)}%` : "N/A"}
-                        </span>
-                      </div>
-                      <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200/70 dark:border-slate-700/50">
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 block uppercase font-bold">3 Year Avg</span>
-                        <span className="font-extrabold text-slate-900 dark:text-white text-sm">
-                          {r3Y !== null && r3Y !== undefined ? `${r3Y.toFixed(1)}%` : "N/A"}
-                        </span>
-                      </div>
+                  {/* Selected Period Average ROIC */}
+                  <div className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-200/70 dark:border-slate-700/50 flex justify-between items-center">
+                    <div>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold block">
+                        {periodLabel}
+                      </span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        Primary ROIC metric for {period} historical period
+                      </span>
                     </div>
+                    <span className="text-xl font-extrabold text-slate-900 dark:text-white font-mono">
+                      {avgROIC !== null && avgROIC !== undefined ? `${avgROIC.toFixed(1)}%` : "N/A"}
+                    </span>
                   </div>
 
                   {/* Trend & Consistency Cards */}
@@ -1531,7 +1519,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Measures capital efficiency direction ({detail?.trendScorePoints ?? 2.5} / 5.0 pts).
+                        Capital efficiency direction over {period} ({detail?.trendScorePoints ?? 2.0} / 4.0 pts).
                       </p>
                     </div>
 
@@ -1540,20 +1528,20 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                       <div className="flex justify-between items-center mb-1">
                         <span className="font-bold text-slate-700 dark:text-slate-300">ROIC Consistency</span>
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getConsistencyBadge(consistency)}`}>
-                          {consistency === "Highly Consistent" || consistency === "Consistent" ? "🟢 " + consistency : consistency === "Moderate" ? "🟡 Moderate" : "🔴 " + consistency}
+                          {consistency.includes("Consistent") ? "🟢 " + consistency : consistency.includes("Moderate") ? "🟡 " + consistency : "🔴 " + consistency}
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Measures year-to-year reliability ({detail?.consistencyScorePoints ?? 2.5} / 5.0 pts).
+                        ROIC stability over {period} ({detail?.consistencyScorePoints ?? 2.0} / 4.0 pts).
                       </p>
                     </div>
                   </div>
 
                   {/* Score Breakdown Tiers */}
                   <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-[11px] flex justify-between text-slate-600 dark:text-slate-300 font-medium">
-                    <span>Level: <strong>{detail?.levelScorePoints ?? 0} / 10.0</strong></span>
-                    <span>Trend: <strong>{detail?.trendScorePoints ?? 0} / 5.0</strong></span>
-                    <span>Consistency: <strong>{detail?.consistencyScorePoints ?? 0} / 5.0</strong></span>
+                    <span>Average ROIC Level: <strong>{detail?.levelScorePoints ?? 0} / 12.0</strong></span>
+                    <span>Trend: <strong>{detail?.trendScorePoints ?? 0} / 4.0</strong></span>
+                    <span>Consistency: <strong>{detail?.consistencyScorePoints ?? 0} / 4.0</strong></span>
                   </div>
                 </div>
               );

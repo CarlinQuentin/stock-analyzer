@@ -147,6 +147,7 @@ function App() {
         slicedBalance,
         slicedCashFlow,
         dividendMetrics,
+        period,
       );
       const scores = calculateMetricScores(metrics, slicedCashFlow, slicedIncome, slicedBalance);
       const overallScore = calculateOverallScore(scores);
@@ -1005,29 +1006,44 @@ function App() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <MetricCard
-                    title="ROIC"
+                    title="Average ROIC"
                     value={result.metrics.roic}
                     unit="%"
                     score={result.scores.roic}
-                    description={(() => {
-                      const detail = result.metrics.roicDetail || result.roicDetail;
-                      const r10Y = result.metrics.roic10Y ?? detail?.roic10Y;
-                      const r5Y = result.metrics.roic5Y ?? detail?.roic5Y;
-                      const r3Y = result.metrics.roic3Y ?? detail?.roic3Y;
-                      const parts = [];
-                      if (r10Y !== null && r10Y !== undefined) parts.push(`10Y: ${r10Y.toFixed(1)}%`);
-                      if (r5Y !== null && r5Y !== undefined) parts.push(`5Y: ${r5Y.toFixed(1)}%`);
-                      if (r3Y !== null && r3Y !== undefined) parts.push(`3Y: ${r3Y.toFixed(1)}%`);
-                      return parts.length > 0 ? parts.join(" · ") : "Return on Invested Capital";
-                    })()}
-                    statusText={result.metrics.roicTrend ? `${result.metrics.roicTrend === "Improving" ? "🟢" : result.metrics.roicTrend === "Declining" ? "🔴" : "🟡"} ${result.metrics.roicTrend}` : undefined}
-                    tooltip="Measures multi-year Return on Invested Capital quality (Level 10pts, Trend 5pts, Consistency 5pts = 20pts max). Click for detailed breakdown."
+                    description={`${(result.selectedPeriod || selectedPeriod) === "10Y" ? "10-Year" : (result.selectedPeriod || selectedPeriod) === "5Y" ? "5-Year" : "3-Year"} Average`}
+                    tooltip="Measures average Return on Invested Capital over the selected period. Evaluates capital efficiency and competitive moat."
                     icon="🎯"
                     chartData={result.roicHistory}
                     chartValueType="percent"
                     isExpanded={showAllCharts}
                     onClick={() => setSelectedMetric("roic")}
                     directionStrategy="higherIsBetter"
+                  />
+                  <MetricCard
+                    title="ROIC Consistency & Trend"
+                    value={null}
+                    statusText={(() => {
+                      const detail = result.metrics.roicDetail || result.roicDetail;
+                      const consistency = result.metrics.roicConsistency ?? detail?.consistency ?? "N/A";
+                      const trend = result.metrics.roicTrend ?? detail?.trend ?? "N/A";
+                      const cIcon = consistency.includes("Consistent") ? "🟢" : consistency === "Moderately Consistent" ? "🟡" : "🔴";
+                      const tIcon = trend === "Improving" ? "🟢" : trend === "Declining" ? "🔴" : "🟡";
+                      return `${cIcon} ${consistency} · ${tIcon} ${trend}`;
+                    })()}
+                    score={(() => {
+                      const detail = result.metrics.roicDetail || result.roicDetail;
+                      const pts = (detail?.consistencyScorePoints ?? 2.0) + (detail?.trendScorePoints ?? 2.0);
+                      return Math.round((pts / 8.0) * 100);
+                    })()}
+                    description={`ROIC stability & trend over selected ${(result.selectedPeriod || selectedPeriod)} period`}
+                    tooltip="Evaluates how reliably ROIC has been maintained and whether capital efficiency is improving or declining over the selected historical period."
+                    icon="🛡️"
+                    chartData={result.roicHistory}
+                    chartValueType="percent"
+                    isExpanded={showAllCharts}
+                    onClick={() => setSelectedMetric("roic")}
+                    directionStrategy="higherIsBetter"
+                    isInformational={true}
                   />
                   <MetricCard
                     title="FCF Margin"

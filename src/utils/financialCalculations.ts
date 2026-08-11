@@ -740,101 +740,102 @@ export function calculateROICAverageForPeriod(
 }
 
 /**
- * Full Multi-Period ROIC Analysis: Level (10 pts) + Trend (5 pts) + Consistency (5 pts) = 20 pts max
+ * Full Multi-Period ROIC Analysis: Level (12 pts) + Trend (4 pts) + Consistency (4 pts) = 20 pts max
  */
 export function calculateROICAnalysis(
   incomeStatements: FinancialStatement[],
   balanceSheets: FinancialStatement[],
-  _selectedPeriod: HistoricalPeriod = "10Y"
+  selectedPeriod: HistoricalPeriod = "10Y"
 ): ROICAnalysisDetail {
-  const series = calculateROICSeries(incomeStatements, balanceSheets);
-  const latestROIC = series.length > 0 ? series[0].roic : null;
+  const fullSeries = calculateROICSeries(incomeStatements, balanceSheets);
+  const latestROIC = fullSeries.length > 0 ? fullSeries[0].roic : null;
 
+  // Independent period averages from full history
   const roic3Y = calculateROICAverageForPeriod(incomeStatements, balanceSheets, "3Y");
   const roic5Y = calculateROICAverageForPeriod(incomeStatements, balanceSheets, "5Y");
   const roic10Y = calculateROICAverageForPeriod(incomeStatements, balanceSheets, "10Y");
 
-  // Determine effective ROIC Level
-  let effectiveROIC: number | null = null;
-  if (roic3Y !== null && roic5Y !== null && roic10Y !== null) {
-    effectiveROIC = 0.50 * roic3Y + 0.30 * roic5Y + 0.20 * roic10Y;
-  } else if (roic3Y !== null && roic5Y !== null) {
-    effectiveROIC = 0.60 * roic3Y + 0.40 * roic5Y;
+  // Determine series slice for the selectedPeriod
+  let limit = 10;
+  if (selectedPeriod === "3Y") limit = 3;
+  else if (selectedPeriod === "5Y") limit = 5;
+
+  const series = fullSeries.slice(0, limit);
+
+  // Average ROIC for the currently selected period
+  let averageROIC: number | null = null;
+  if (series.length > 0) {
+    const sum = series.reduce((acc, curr) => acc + curr.roic, 0);
+    averageROIC = sum / series.length;
   } else {
-    effectiveROIC = roic3Y ?? roic5Y ?? roic10Y ?? latestROIC;
+    averageROIC = selectedPeriod === "3Y" ? roic3Y : selectedPeriod === "5Y" ? roic5Y : roic10Y;
   }
 
-  // 1. ROIC Level Score (0 to 10.0 points)
+  const periodLabel = `${selectedPeriod === "10Y" ? "10-Year" : selectedPeriod === "5Y" ? "5-Year" : "3-Year"} Average`;
+
+  // 1. ROIC Level Score (0 to 12.0 points)
   let levelScorePoints = 0;
-  if (effectiveROIC !== null) {
-    if (effectiveROIC >= 25) {
-      levelScorePoints = 10.0;
-    } else if (effectiveROIC >= 20) {
-      levelScorePoints = 8.5 + ((effectiveROIC - 20) / 5) * 1.5;
-    } else if (effectiveROIC >= 15) {
-      levelScorePoints = 7.0 + ((effectiveROIC - 15) / 5) * 1.5;
-    } else if (effectiveROIC >= 10) {
-      levelScorePoints = 5.0 + ((effectiveROIC - 10) / 5) * 2.0;
-    } else if (effectiveROIC >= 5) {
-      levelScorePoints = 3.0 + ((effectiveROIC - 5) / 5) * 2.0;
-    } else if (effectiveROIC >= 0) {
-      levelScorePoints = 0.5 + (effectiveROIC / 5) * 2.5;
+  if (averageROIC !== null) {
+    if (averageROIC >= 25) {
+      levelScorePoints = 12.0;
+    } else if (averageROIC >= 20) {
+      levelScorePoints = 10.5 + ((averageROIC - 20) / 5) * 1.5;
+    } else if (averageROIC >= 15) {
+      levelScorePoints = 8.5 + ((averageROIC - 15) / 5) * 2.0;
+    } else if (averageROIC >= 10) {
+      levelScorePoints = 6.0 + ((averageROIC - 10) / 5) * 2.5;
+    } else if (averageROIC >= 5) {
+      levelScorePoints = 3.5 + ((averageROIC - 5) / 5) * 2.5;
+    } else if (averageROIC >= 0) {
+      levelScorePoints = 0.5 + (averageROIC / 5) * 3.0;
     } else {
       levelScorePoints = 0;
     }
   }
 
-  // 2. ROIC Trend Classification & Score (0 to 5.0 points)
+  // 2. ROIC Trend Classification & Score (0 to 4.0 points)
   let trend: ROICTrendDirection = "N/A";
-  let trendScorePoints = 2.5;
+  let trendScorePoints = 2.0;
 
-  if (roic3Y !== null && roic5Y !== null && roic10Y !== null) {
-    if (roic3Y >= roic5Y + 0.75 && roic5Y >= roic10Y + 0.75) {
-      trend = "Improving";
-    } else if (roic3Y >= roic10Y + 2.0 && roic3Y >= roic5Y) {
-      trend = "Improving";
-    } else if (roic3Y <= roic5Y - 0.75 && roic5Y <= roic10Y - 0.75) {
-      trend = "Declining";
-    } else if (roic3Y <= roic10Y - 2.0 && roic3Y <= roic5Y) {
-      trend = "Declining";
-    } else if (Math.abs(roic3Y - roic10Y) <= 2.0 && Math.abs(roic5Y - roic10Y) <= 2.0) {
-      trend = "Stable";
-    } else {
-      trend = "Mixed";
-    }
-  } else if (roic3Y !== null && roic5Y !== null) {
-    if (roic3Y >= roic5Y + 1.0) {
-      trend = "Improving";
-    } else if (roic3Y <= roic5Y - 1.0) {
-      trend = "Declining";
-    } else {
-      trend = "Stable";
-    }
-  } else if (series.length >= 2) {
-    const oldest = series[series.length - 1].roic;
+  if (series.length >= 3) {
     const newest = series[0].roic;
-    if (newest >= oldest + 1.5) trend = "Improving";
-    else if (newest <= oldest - 1.5) trend = "Declining";
-    else trend = "Stable";
+    const oldest = series[series.length - 1].roic;
+    const diff = newest - oldest;
+
+    if (diff >= 1.5) {
+      trend = "Improving";
+      trendScorePoints = 3.6 + Math.min(0.4, (diff - 1.5) / 5 * 0.4);
+    } else if (diff <= -1.5) {
+      trend = "Declining";
+      trendScorePoints = Math.max(0.5, 1.0 - (Math.abs(diff) - 1.5) / 5 * 0.5);
+    } else {
+      trend = "Stable";
+      trendScorePoints = 3.0;
+    }
+  } else if (series.length === 2) {
+    const newest = series[0].roic;
+    const oldest = series[1].roic;
+    const diff = newest - oldest;
+
+    if (diff >= 1.5) {
+      trend = "Improving";
+      trendScorePoints = 3.5;
+    } else if (diff <= -1.5) {
+      trend = "Declining";
+      trendScorePoints = 1.0;
+    } else {
+      trend = "Stable";
+      trendScorePoints = 3.0;
+    }
   }
 
-  if (trend === "Improving") {
-    trendScorePoints = 4.5 + (roic3Y && roic3Y >= 15 ? 0.5 : 0.3);
-  } else if (trend === "Stable") {
-    trendScorePoints = 3.8;
-  } else if (trend === "Mixed") {
-    trendScorePoints = 2.5;
-  } else if (trend === "Declining") {
-    trendScorePoints = 0.8;
-  }
-
-  // 3. ROIC Consistency Classification & Score (0 to 5.0 points)
+  // 3. ROIC Consistency Classification & Score (0 to 4.0 points)
   let consistency: ROICConsistencyLevel = "N/A";
-  let consistencyScorePoints = 2.5;
+  let consistencyScorePoints = 2.0;
   let stdDev: number | null = null;
 
   if (series.length >= 2) {
-    const meanRoic = series.reduce((acc, curr) => acc + curr.roic, 0) / series.length;
+    const meanRoic = averageROIC ?? (series.reduce((acc, curr) => acc + curr.roic, 0) / series.length);
     const variance = series.reduce((acc, curr) => acc + Math.pow(curr.roic - meanRoic, 2), 0) / (series.length - 1);
     stdDev = Math.sqrt(variance);
 
@@ -843,28 +844,31 @@ export function calculateROICAnalysis(
 
     if (stdDev <= 3.0 && posRatio === 1.0) {
       consistency = "Highly Consistent";
-      consistencyScorePoints = 4.8 + Math.min(0.2, (3.0 - stdDev) / 3.0 * 0.2);
-    } else if (stdDev <= 6.0 && posRatio >= 0.8) {
+      consistencyScorePoints = 3.8 + Math.min(0.2, (3.0 - stdDev) / 3.0 * 0.2);
+    } else if (stdDev <= 6.0 && posRatio >= 0.75) {
+      consistency = "Moderately Consistent";
+      consistencyScorePoints = 3.0 + ((6.0 - stdDev) / 3.0) * 0.7;
+    } else if (stdDev <= 10.0 && posRatio >= 0.5) {
       consistency = "Consistent";
-      consistencyScorePoints = 3.6 + ((6.0 - stdDev) / 3.0) * 0.8;
-    } else if (stdDev <= 10.0 && posRatio >= 0.6) {
-      consistency = "Moderate";
-      consistencyScorePoints = 2.5 + ((10.0 - stdDev) / 4.0) * 0.9;
+      consistencyScorePoints = 2.0 + ((10.0 - stdDev) / 4.0) * 0.9;
     } else {
       consistency = "Inconsistent";
-      consistencyScorePoints = Math.max(0, 2.0 - ((stdDev - 10.0) / 10.0) * 1.5);
+      consistencyScorePoints = Math.max(0, 1.5 - ((stdDev - 10.0) / 10.0) * 1.0);
     }
   }
 
   // Round points
-  levelScorePoints = Math.min(10.0, Math.max(0, Number(levelScorePoints.toFixed(1))));
-  trendScorePoints = Math.min(5.0, Math.max(0, Number(trendScorePoints.toFixed(1))));
-  consistencyScorePoints = Math.min(5.0, Math.max(0, Number(consistencyScorePoints.toFixed(1))));
+  levelScorePoints = Math.min(12.0, Math.max(0, Number(levelScorePoints.toFixed(1))));
+  trendScorePoints = Math.min(4.0, Math.max(0, Number(trendScorePoints.toFixed(1))));
+  consistencyScorePoints = Math.min(4.0, Math.max(0, Number(consistencyScorePoints.toFixed(1))));
 
   const totalROICPoints = Math.min(20.0, Math.max(0, Number((levelScorePoints + trendScorePoints + consistencyScorePoints).toFixed(1))));
   const totalROICScore100 = Math.min(100, Math.max(0, Math.round((totalROICPoints / 20.0) * 100)));
 
   return {
+    period: selectedPeriod,
+    periodLabel,
+    averageROIC,
     roic10Y,
     roic5Y,
     roic3Y,
@@ -1618,13 +1622,14 @@ export function calculateAllMetrics(
   balanceSheets: FinancialStatement[],
   cashFlowStatements: FinancialStatement[],
   dividendMetrics: DividendMetrics,
+  selectedPeriod: HistoricalPeriod = "10Y",
 ): FinancialMetrics {
   const sortedBalance = [...balanceSheets].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
   const epsTrendData = calculateEPSTrend(incomeStatements);
   const fcfTrendData = calculateFCFTrend(cashFlowStatements);
-  const roicDetail = calculateROICAnalysis(incomeStatements, balanceSheets);
+  const roicDetail = calculateROICAnalysis(incomeStatements, balanceSheets, selectedPeriod);
 
   return {
     revenueCAGR: calculateRevenueCAGR(incomeStatements),
@@ -1642,7 +1647,7 @@ export function calculateAllMetrics(
     marginStability: calculateMarginStability(incomeStatements),
     netDebtToFCF: calculateNetDebtToFCF(balanceSheets, cashFlowStatements),
     shareDilution: calculateShareDilution(incomeStatements, balanceSheets),
-    roic: calculateAverageROIC(incomeStatements, balanceSheets),
+    roic: roicDetail.averageROIC ?? calculateAverageROIC(incomeStatements, balanceSheets),
     roic10Y: roicDetail.roic10Y,
     roic5Y: roicDetail.roic5Y,
     roic3Y: roicDetail.roic3Y,
