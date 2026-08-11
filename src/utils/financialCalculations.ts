@@ -5,8 +5,6 @@ import {
   FCFTrendResult,
   HistoricalPeriod,
   ROICAnalysisDetail,
-  ROICTrendDirection,
-  ROICConsistencyLevel,
 } from "../types";
 
 /**
@@ -740,7 +738,75 @@ export function calculateROICAverageForPeriod(
 }
 
 /**
- * Full Multi-Period ROIC Analysis: Level (12 pts) + Trend (4 pts) + Consistency (4 pts) = 20 pts max
+ * Calculate ROIC Consistency percentage (0-100%) for a given set of statements/slice
+ * Matches FCF Consistency methodology (ratio of positive years + count + volatility / std dev)
+ */
+export function calculateROICConsistency(
+  incomeStatements: FinancialStatement[] | null | undefined,
+  balanceSheets: FinancialStatement[] | null | undefined,
+  period: HistoricalPeriod = "10Y"
+): number | null {
+  if (!incomeStatements || !balanceSheets || incomeStatements.length === 0 || balanceSheets.length === 0) {
+    return null;
+  }
+
+  const fullSeries = calculateROICSeries(incomeStatements, balanceSheets);
+  if (fullSeries.length === 0) return null;
+
+  let limit = 10;
+  let minRequired = 4;
+  if (period === "3Y") {
+    limit = 3;
+    minRequired = 2;
+  } else if (period === "5Y") {
+    limit = 5;
+    minRequired = 3;
+  }
+
+  const series = fullSeries.slice(0, limit);
+  if (series.length < minRequired) {
+    return null;
+  }
+
+  const roicValues = series.map((s) => s.roic);
+  const totalYears = roicValues.length;
+  const positiveYears = roicValues.filter((v) => v > 0).length;
+  const positivePct = positiveYears / totalYears;
+
+  const ratioScore = positivePct * 100;
+  const countScore = Math.min(100, (positiveYears / Math.min(5, Math.max(totalYears, 1))) * 100);
+
+  let volatilityScore = 50;
+  const mean = roicValues.reduce((sum, val) => sum + val, 0) / totalYears;
+
+  if (totalYears >= 2) {
+    const variance = roicValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / totalYears;
+    const stdDev = Math.sqrt(variance);
+
+    if (stdDev <= 2.0) {
+      volatilityScore = 100;
+    } else if (stdDev <= 5.0) {
+      volatilityScore = Math.round(100 - ((stdDev - 2.0) / 3.0) * 30);
+    } else if (stdDev <= 10.0) {
+      volatilityScore = Math.round(70 - ((stdDev - 5.0) / 5.0) * 40);
+    } else {
+      volatilityScore = Math.max(0, Math.round(30 - (stdDev - 10.0) * 3));
+    }
+  } else if (positiveYears === totalYears) {
+    volatilityScore = 85;
+  } else {
+    volatilityScore = 0;
+  }
+
+  const finalConsistency = Math.round(
+    0.50 * ratioScore + 0.25 * countScore + 0.25 * volatilityScore
+  );
+
+  return Math.min(100, Math.max(0, finalConsistency));
+}
+
+/**
+ * Full ROIC Analysis: Average ROIC Level (14 pts) + ROIC Consistency (6 pts) = 20 pts max
  */
 export function calculateROICAnalysis(
   incomeStatements: FinancialStatement[],
@@ -773,110 +839,58 @@ export function calculateROICAnalysis(
 
   const periodLabel = `${selectedPeriod === "10Y" ? "10-Year" : selectedPeriod === "5Y" ? "5-Year" : "3-Year"} Average`;
 
-  // 1. ROIC Level Score (0 to 12.0 points)
+  // 1. ROIC Level Score (0 to 14.0 points)
   let levelScorePoints = 0;
   if (averageROIC !== null) {
     if (averageROIC >= 25) {
-      levelScorePoints = 12.0;
+      levelScorePoints = 14.0;
     } else if (averageROIC >= 20) {
-      levelScorePoints = 10.5 + ((averageROIC - 20) / 5) * 1.5;
+      levelScorePoints = 12.0 + ((averageROIC - 20) / 5) * 1.9;
     } else if (averageROIC >= 15) {
-      levelScorePoints = 8.5 + ((averageROIC - 15) / 5) * 2.0;
+      levelScorePoints = 10.0 + ((averageROIC - 15) / 5) * 1.9;
     } else if (averageROIC >= 10) {
-      levelScorePoints = 6.0 + ((averageROIC - 10) / 5) * 2.5;
+      levelScorePoints = 7.0 + ((averageROIC - 10) / 5) * 2.9;
     } else if (averageROIC >= 5) {
-      levelScorePoints = 3.5 + ((averageROIC - 5) / 5) * 2.5;
+      levelScorePoints = 4.0 + ((averageROIC - 5) / 5) * 2.9;
     } else if (averageROIC >= 0) {
-      levelScorePoints = 0.5 + (averageROIC / 5) * 3.0;
+      levelScorePoints = 0.5 + (averageROIC / 5) * 3.4;
     } else {
       levelScorePoints = 0;
     }
   }
 
-  // 2. ROIC Trend Classification & Score (0 to 4.0 points)
-  let trend: ROICTrendDirection = "N/A";
-  let trendScorePoints = 2.0;
-
-  if (series.length >= 3) {
-    const newest = series[0].roic;
-    const oldest = series[series.length - 1].roic;
-    const diff = newest - oldest;
-
-    if (diff >= 1.5) {
-      trend = "Improving";
-      trendScorePoints = 3.6 + Math.min(0.4, (diff - 1.5) / 5 * 0.4);
-    } else if (diff <= -1.5) {
-      trend = "Declining";
-      trendScorePoints = Math.max(0.5, 1.0 - (Math.abs(diff) - 1.5) / 5 * 0.5);
-    } else {
-      trend = "Stable";
-      trendScorePoints = 3.0;
-    }
-  } else if (series.length === 2) {
-    const newest = series[0].roic;
-    const oldest = series[1].roic;
-    const diff = newest - oldest;
-
-    if (diff >= 1.5) {
-      trend = "Improving";
-      trendScorePoints = 3.5;
-    } else if (diff <= -1.5) {
-      trend = "Declining";
-      trendScorePoints = 1.0;
-    } else {
-      trend = "Stable";
-      trendScorePoints = 3.0;
-    }
-  }
-
-  // 3. ROIC Consistency Classification & Score (0 to 4.0 points)
-  let consistency: ROICConsistencyLevel = "N/A";
-  let consistencyScorePoints = 2.0;
+  // 2. ROIC Consistency Score (0 to 6.0 points)
+  const consistencyPct = calculateROICConsistency(incomeStatements, balanceSheets, selectedPeriod);
+  let consistencyScorePoints = 3.0;
   let stdDev: number | null = null;
 
   if (series.length >= 2) {
     const meanRoic = averageROIC ?? (series.reduce((acc, curr) => acc + curr.roic, 0) / series.length);
     const variance = series.reduce((acc, curr) => acc + Math.pow(curr.roic - meanRoic, 2), 0) / (series.length - 1);
     stdDev = Math.sqrt(variance);
+  }
 
-    const positiveCount = series.filter(s => s.roic > 0).length;
-    const posRatio = positiveCount / series.length;
-
-    if (stdDev <= 3.0 && posRatio === 1.0) {
-      consistency = "Highly Consistent";
-      consistencyScorePoints = 3.8 + Math.min(0.2, (3.0 - stdDev) / 3.0 * 0.2);
-    } else if (stdDev <= 6.0 && posRatio >= 0.75) {
-      consistency = "Moderately Consistent";
-      consistencyScorePoints = 3.0 + ((6.0 - stdDev) / 3.0) * 0.7;
-    } else if (stdDev <= 10.0 && posRatio >= 0.5) {
-      consistency = "Consistent";
-      consistencyScorePoints = 2.0 + ((10.0 - stdDev) / 4.0) * 0.9;
-    } else {
-      consistency = "Inconsistent";
-      consistencyScorePoints = Math.max(0, 1.5 - ((stdDev - 10.0) / 10.0) * 1.0);
-    }
+  if (consistencyPct !== null) {
+    consistencyScorePoints = (consistencyPct / 100) * 6.0;
   }
 
   // Round points
-  levelScorePoints = Math.min(12.0, Math.max(0, Number(levelScorePoints.toFixed(1))));
-  trendScorePoints = Math.min(4.0, Math.max(0, Number(trendScorePoints.toFixed(1))));
-  consistencyScorePoints = Math.min(4.0, Math.max(0, Number(consistencyScorePoints.toFixed(1))));
+  levelScorePoints = Math.min(14.0, Math.max(0, Number(levelScorePoints.toFixed(1))));
+  consistencyScorePoints = Math.min(6.0, Math.max(0, Number(consistencyScorePoints.toFixed(1))));
 
-  const totalROICPoints = Math.min(20.0, Math.max(0, Number((levelScorePoints + trendScorePoints + consistencyScorePoints).toFixed(1))));
+  const totalROICPoints = Math.min(20.0, Math.max(0, Number((levelScorePoints + consistencyScorePoints).toFixed(1))));
   const totalROICScore100 = Math.min(100, Math.max(0, Math.round((totalROICPoints / 20.0) * 100)));
 
   return {
     period: selectedPeriod,
     periodLabel,
     averageROIC,
+    consistencyPct,
     roic10Y,
     roic5Y,
     roic3Y,
     latestROIC,
     levelScorePoints,
-    trend,
-    trendScorePoints,
-    consistency,
     consistencyScorePoints,
     stdDev,
     totalROICPoints,
@@ -1648,12 +1662,10 @@ export function calculateAllMetrics(
     netDebtToFCF: calculateNetDebtToFCF(balanceSheets, cashFlowStatements),
     shareDilution: calculateShareDilution(incomeStatements, balanceSheets),
     roic: roicDetail.averageROIC ?? calculateAverageROIC(incomeStatements, balanceSheets),
+    roicConsistency: roicDetail.consistencyPct,
     roic10Y: roicDetail.roic10Y,
     roic5Y: roicDetail.roic5Y,
     roic3Y: roicDetail.roic3Y,
-    roicTrend: roicDetail.trend,
-    roicTrendScorePoints: roicDetail.trendScorePoints,
-    roicConsistency: roicDetail.consistency,
     roicConsistencyScorePoints: roicDetail.consistencyScorePoints,
     roicStdDev: roicDetail.stdDev,
     roicLevelScorePoints: roicDetail.levelScorePoints,

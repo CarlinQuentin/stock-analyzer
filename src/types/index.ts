@@ -106,23 +106,19 @@ export interface ChartDataPoint {
 }
 
 export type HistoricalPeriod = "10Y" | "5Y" | "3Y";
-export type ROICTrendDirection = "Improving" | "Stable" | "Declining" | "Mixed" | "N/A";
-export type ROICConsistencyLevel = "Highly Consistent" | "Moderately Consistent" | "Consistent" | "Inconsistent" | "N/A";
 
 export interface ROICAnalysisDetail {
   period: HistoricalPeriod;
   periodLabel: string; // e.g. "10-Year Average", "5-Year Average", "3-Year Average"
   averageROIC: number | null;
+  consistencyPct: number | null; // ROIC Consistency percentage (0 to 100%)
   roic10Y: number | null;
   roic5Y: number | null;
   roic3Y: number | null;
   latestROIC: number | null;
-  levelScorePoints: number; // 0 to 12.0 pts
-  trend: ROICTrendDirection;
-  trendScorePoints: number; // 0 to 4.0 pts
-  consistency: ROICConsistencyLevel;
-  consistencyScorePoints: number; // 0 to 4.0 pts
-  stdDev: number | null; // Standard deviation of annual ROIC values for selected period
+  levelScorePoints: number; // 0 to 14.0 pts
+  consistencyScorePoints: number; // 0 to 6.0 pts
+  stdDev: number | null;
   totalROICPoints: number; // 0 to 20.0 pts max
   totalROICScore100: number; // 0 to 100
   annualHistory: { year: string; roic: number }[];
@@ -203,12 +199,10 @@ export interface FinancialMetrics {
   /** Stored as percentage change in shares outstanding over measurement period, e.g. -5.2 for -5.2% buyback */
   shareDilution: number | null;
   roic: number | null;
+  roicConsistency?: number | null;
   roic10Y?: number | null;
   roic5Y?: number | null;
   roic3Y?: number | null;
-  roicTrend?: ROICTrendDirection;
-  roicTrendScorePoints?: number;
-  roicConsistency?: ROICConsistencyLevel;
   roicConsistencyScorePoints?: number;
   roicStdDev?: number | null;
   roicLevelScorePoints?: number;

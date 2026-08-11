@@ -1,4 +1,4 @@
-import { FinancialMetrics, MetricScores, FinancialStatement, ScoringConfig } from "../types";
+import { FinancialMetrics, MetricScores, FinancialStatement, ScoringConfig, HistoricalPeriod } from "../types";
 import { calculateEPSTrend, calculateFCFTrend, calculateROICAnalysis } from "./financialCalculations";
 
 export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
@@ -175,11 +175,12 @@ export function scoreROIC(
   roic: number | null,
   incomeStatements?: FinancialStatement[],
   balanceSheets?: FinancialStatement[],
+  selectedPeriod: HistoricalPeriod = "10Y",
 ): number | null {
   if (roic === null) return null;
 
   if (incomeStatements && balanceSheets && incomeStatements.length > 0 && balanceSheets.length > 0) {
-    const analysis = calculateROICAnalysis(incomeStatements, balanceSheets);
+    const analysis = calculateROICAnalysis(incomeStatements, balanceSheets, selectedPeriod);
     return analysis.totalROICScore100;
   }
 
@@ -369,6 +370,7 @@ export function calculateMetricScores(
   cashFlowStatements?: FinancialStatement[],
   incomeStatements?: FinancialStatement[],
   balanceSheets?: FinancialStatement[],
+  selectedPeriod: HistoricalPeriod = "10Y",
 ): MetricScores {
   let epsScore: number | null = null;
   if (metrics.epsGrowth !== null && metrics.epsGrowth !== undefined) {
@@ -402,7 +404,7 @@ export function calculateMetricScores(
     marginStability: scoreMarginStability(metrics.marginStability),
     netDebtToFCF: scoreNetDebtToFCF(metrics.netDebtToFCF),
     shareDilution: scoreShareDilution(metrics.shareDilution),
-    roic: scoreROIC(metrics.roic, incomeStatements, balanceSheets),
+    roic: scoreROIC(metrics.roic, incomeStatements, balanceSheets, selectedPeriod),
     debt: scoreDebtToEquity(metrics.debtToEquity),
     profitability: scoreProfitability(
       metrics.netMargin,

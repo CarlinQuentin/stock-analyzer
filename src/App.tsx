@@ -149,7 +149,7 @@ function App() {
         dividendMetrics,
         period,
       );
-      const scores = calculateMetricScores(metrics, slicedCashFlow, slicedIncome, slicedBalance);
+      const scores = calculateMetricScores(metrics, slicedCashFlow, slicedIncome, slicedBalance, period);
       const overallScore = calculateOverallScore(scores);
       const dataConfidenceScore = calculateDataConfidenceScore(scores);
       const unavailableMetrics = getUnavailableMetrics(scores);
@@ -1020,24 +1020,13 @@ function App() {
                     directionStrategy="higherIsBetter"
                   />
                   <MetricCard
-                    title="ROIC Consistency & Trend"
-                    value={null}
-                    statusText={(() => {
-                      const detail = result.metrics.roicDetail || result.roicDetail;
-                      const consistency = result.metrics.roicConsistency ?? detail?.consistency ?? "N/A";
-                      const trend = result.metrics.roicTrend ?? detail?.trend ?? "N/A";
-                      const cIcon = consistency.includes("Consistent") ? "🟢" : consistency === "Moderately Consistent" ? "🟡" : "🔴";
-                      const tIcon = trend === "Improving" ? "🟢" : trend === "Declining" ? "🔴" : "🟡";
-                      return `${cIcon} ${consistency} · ${tIcon} ${trend}`;
-                    })()}
-                    score={(() => {
-                      const detail = result.metrics.roicDetail || result.roicDetail;
-                      const pts = (detail?.consistencyScorePoints ?? 2.0) + (detail?.trendScorePoints ?? 2.0);
-                      return Math.round((pts / 8.0) * 100);
-                    })()}
-                    description={`ROIC stability & trend over selected ${(result.selectedPeriod || selectedPeriod)} period`}
-                    tooltip="Evaluates how reliably ROIC has been maintained and whether capital efficiency is improving or declining over the selected historical period."
-                    icon="🛡️"
+                    title="ROIC Consistency"
+                    value={result.metrics.roicConsistency ?? null}
+                    unit="%"
+                    score={result.metrics.roicConsistency ?? null}
+                    description={`Reliability of ROIC over selected ${(result.selectedPeriod || selectedPeriod)} period`}
+                    tooltip="Measures how consistently a company generates ROIC throughout the selected historical period. Higher percentages indicate stable, reliable capital returns."
+                    icon="🎯"
                     chartData={result.roicHistory}
                     chartValueType="percent"
                     isExpanded={showAllCharts}
