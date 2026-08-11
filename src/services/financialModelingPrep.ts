@@ -248,43 +248,67 @@ class FinancialModelingPrepService {
 
   async getHistoricalPrices(ticker: string): Promise<HistoricalPricePoint[]> {
     try {
-      let response = await this.client.get("/historical-price-eod/full", {
-        params: { ...this.getParams(), symbol: ticker.toUpperCase() },
-      });
+      const symbol = ticker.toUpperCase();
+      const [priceResponse, divResponse] = await Promise.all([
+        this.client.get("/historical-price-eod/full", {
+          params: { ...this.getParams(), symbol },
+        }).catch(() => null),
+        this.client.get("/dividends", {
+          params: { ...this.getParams(), symbol, limit: 100 },
+        }).catch(() => ({ data: [] })),
+      ]);
 
-      let data = response.data;
+      let data = priceResponse?.data;
       if (!data || !Array.isArray(data) || data.length === 0) {
-        response = await this.client.get("/historical-price-eod/light", {
-          params: { ...this.getParams(), symbol: ticker.toUpperCase() },
+        const lightResponse = await this.client.get("/historical-price-eod/light", {
+          params: { ...this.getParams(), symbol },
         });
-        data = response.data;
+        data = lightResponse.data;
       }
 
       if (!data || !Array.isArray(data)) {
         return [];
       }
 
-      return data
-        .map((item: any) => ({
+      const rawDividends = divResponse && Array.isArray(divResponse.data) ? divResponse.data : [];
+      const divMap = new Map<string, number>();
+      rawDividends.forEach((d: any) => {
+        if (d.date && (typeof d.adjDividend === "number" || typeof d.dividend === "number")) {
+          const val = typeof d.adjDividend === "number" ? d.adjDividend : d.dividend;
+          if (val > 0) divMap.set(d.date, val);
+        }
+      });
+
+      const sortedRaw = data
+        .filter((item: any) => item.date && (typeof item.close === "number" || typeof item.price === "number"))
+        .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      let currentMultiplier = 1.0;
+      const pointsWithAdj: HistoricalPricePoint[] = new Array(sortedRaw.length);
+
+      for (let i = sortedRaw.length - 1; i >= 0; i--) {
+        const item = sortedRaw[i];
+        const closePrice = typeof item.close === "number" ? item.close : item.price || 0;
+        const divAmt = divMap.get(item.date);
+
+        if (divAmt && divAmt > 0 && closePrice > 0) {
+          currentMultiplier *= (1 + divAmt / closePrice);
+        }
+
+        pointsWithAdj[i] = {
           date: item.date,
-          open: typeof item.open === "number" ? item.open : item.price,
-          high: typeof item.high === "number" ? item.high : item.price,
-          low: typeof item.low === "number" ? item.low : item.price,
-          close: typeof item.close === "number" ? item.close : item.price,
-          adjClose: typeof item.adjClose === "number"
-            ? item.adjClose
-            : typeof item.adjClose === "string" && !isNaN(parseFloat(item.adjClose))
-            ? parseFloat(item.adjClose)
-            : undefined,
+          open: typeof item.open === "number" ? item.open : closePrice,
+          high: typeof item.high === "number" ? item.high : closePrice,
+          low: typeof item.low === "number" ? item.low : closePrice,
+          close: closePrice,
+          adjClose: closePrice > 0 ? Number((closePrice / currentMultiplier).toFixed(4)) : closePrice,
           volume: typeof item.volume === "number" ? item.volume : 0,
           change: typeof item.change === "number" ? item.change : 0,
           changePercent: typeof item.changePercent === "number" ? item.changePercent : 0,
-        }))
-        .filter((item: HistoricalPricePoint) => item.date && typeof item.close === "number" && !isNaN(item.close))
-        .sort(
-          (a: HistoricalPricePoint, b: HistoricalPricePoint) =>
-            new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
+        };
+      }
+
+      return pointsWithAdj;
     } catch (error) {
       console.warn("Failed to fetch historical prices:", error);
       return [];
