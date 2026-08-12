@@ -3,7 +3,6 @@ import {
   formatRawCurrency,
   formatRawEPS,
 } from "./RawFinancialsSection";
-import { FinancialStatement } from "../types";
 
 describe("RawFinancialsSection Formatters & Data Mapping", () => {
   describe("formatRawCurrency", () => {
