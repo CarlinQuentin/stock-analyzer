@@ -1,5 +1,5 @@
-import React from "react";
 import { CompanyProfile } from "../types";
+import { formatMarketCap } from "../utils/scoring";
 
 interface CompanyHeaderProps {
   profile: CompanyProfile;
@@ -94,7 +94,7 @@ export const CompanyHeader: React.FC<CompanyHeaderProps> = ({
           <div>
             <p className="text-slate-500 dark:text-slate-400 text-[11px] sm:text-xs">Market Cap</p>
             <p className="font-semibold text-slate-900 dark:text-slate-100">
-              ${(profile.mktCap / 1e9).toFixed(1)}B
+              {formatMarketCap(profile.mktCap)}
             </p>
           </div>
         )}

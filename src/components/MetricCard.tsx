@@ -79,7 +79,10 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     const isNegative = val < 0;
     const absVal = Math.abs(val);
     let text = "";
-    if (absVal >= 1e9) {
+    if (absVal >= 1e12) {
+      const valT = absVal / 1e12;
+      text = `${valT % 1 === 0 ? valT.toFixed(0) : parseFloat(valT.toFixed(2)).toString()}T`;
+    } else if (absVal >= 1e9) {
       text = `${(absVal / 1e9).toFixed(1)}B`;
     } else if (absVal >= 1e6) {
       text = `${(absVal / 1e6).toFixed(1)}M`;
@@ -305,6 +308,10 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       if (v === undefined || isNaN(v)) return "N/A";
       const isNeg = v < 0;
       const abs = Math.abs(v);
+      if (abs >= 1e12) {
+        const valT = abs / 1e12;
+        return (isNeg ? "-" : "") + "$" + (valT % 1 === 0 ? valT.toFixed(0) : parseFloat(valT.toFixed(2)).toString()) + "T";
+      }
       if (abs >= 1e9) return (isNeg ? "-" : "") + "$" + (abs / 1e9).toFixed(2) + "B";
       if (abs >= 1e6) return (isNeg ? "-" : "") + "$" + (abs / 1e6).toFixed(2) + "M";
       return (isNeg ? "-" : "") + "$" + abs.toFixed(2);

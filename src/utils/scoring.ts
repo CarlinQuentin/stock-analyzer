@@ -71,6 +71,39 @@ export function formatPercentageMetric(
 }
 
 /**
+ * Format Market Capitalization with Trillions (T), Billions (B), and Millions (M) support.
+ * - Values >= $1,000,000,000,000 ($1T): formatted in Trillions (e.g. "$1T", "$1.25T", "$2.5T", "$10T")
+ * - Values < $1,000,000,000,000 ($1T): formatted in Billions (e.g. "$950B", "$750B") or Millions (e.g. "$50M")
+ */
+export function formatMarketCap(marketCap?: number | null): string {
+  if (marketCap === null || marketCap === undefined || isNaN(marketCap) || marketCap <= 0) {
+    return "N/A";
+  }
+
+  const absCap = Math.abs(marketCap);
+
+  if (absCap >= 1e12) {
+    const val = marketCap / 1e12;
+    const formatted = val % 1 === 0 ? val.toFixed(0) : parseFloat(val.toFixed(2)).toString();
+    return `$${formatted}T`;
+  }
+
+  if (absCap >= 1e9) {
+    const val = marketCap / 1e9;
+    const formatted = val % 1 === 0 ? val.toFixed(0) : parseFloat(val.toFixed(2)).toString();
+    return `$${formatted}B`;
+  }
+
+  if (absCap >= 1e6) {
+    const val = marketCap / 1e6;
+    const formatted = val % 1 === 0 ? val.toFixed(0) : parseFloat(val.toFixed(2)).toString();
+    return `$${formatted}M`;
+  }
+
+  return `$${marketCap.toLocaleString()}`;
+}
+
+/**
  * Helper to interpolate scores based on threshold tiers
  */
 function interpolateScore(

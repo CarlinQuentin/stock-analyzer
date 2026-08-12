@@ -1,4 +1,5 @@
 import { CompanyProfile } from "../types";
+import { formatMarketCap } from "../utils/scoring";
 
 interface ProfileOnlyPageProps {
   profile: CompanyProfile;
@@ -66,9 +67,7 @@ export function ProfileOnlyPage({
               <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 p-4">
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Market Cap</p>
                 <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">
-                  {profile.mktCap
-                    ? `$${(profile.mktCap / 1e9).toFixed(1)}B`
-                    : "Not available"}
+                  {profile.mktCap ? formatMarketCap(profile.mktCap) : "Not available"}
                 </p>
               </div>
             </div>

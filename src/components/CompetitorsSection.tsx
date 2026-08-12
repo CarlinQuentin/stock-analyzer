@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { CompetitorData, CompetitorProfile } from "../types";
+import { formatMarketCap } from "../utils/scoring";
 
 interface CompetitorsSectionProps {
   competitorData: CompetitorData | null;
@@ -94,14 +95,6 @@ const CompetitorCard: React.FC<CompetitorCardProps> = ({
   onSelectCompany,
 }) => {
   const [imageError, setImageError] = useState(false);
-
-  const formatMarketCap = (marketCap?: number): string => {
-    if (!marketCap || marketCap <= 0) return "N/A";
-    if (marketCap >= 1e12) return `$${(marketCap / 1e12).toFixed(2)}T`;
-    if (marketCap >= 1e9) return `$${(marketCap / 1e9).toFixed(2)}B`;
-    if (marketCap >= 1e6) return `$${(marketCap / 1e6).toFixed(2)}M`;
-    return `$${marketCap.toLocaleString()}`;
-  };
 
   const getBadgeColor = (badge: string): string => {
     switch (badge) {

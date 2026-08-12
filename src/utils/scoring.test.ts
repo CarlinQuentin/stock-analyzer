@@ -3,6 +3,7 @@ import {
   SCORE_WEIGHTS,
   DEFAULT_SCORING_CONFIG,
   formatPercentageMetric,
+  formatMarketCap,
   formatShortenedShareCount,
   scoreRevenueGrowth,
   scoreEPSGrowth,
@@ -92,6 +93,44 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
     it("11. Verifies ROIC Quality Score is preserved for AAL (0.3443% -> 22/100) and Case 2 (45.20% -> 100/100)", () => {
       expect(scoreROIC(0.3443)).toBe(22);
       expect(scoreROIC(45.2)).toBe(100);
+    });
+  });
+
+  describe("formatMarketCap Display Formatting", () => {
+    it("1. Formats 1,000B ($1T) as $1T", () => {
+      expect(formatMarketCap(1000000000000)).toBe("$1T");
+    });
+
+    it("2. Formats 1,250B ($1.25T) as $1.25T", () => {
+      expect(formatMarketCap(1250000000000)).toBe("$1.25T");
+    });
+
+    it("3. Formats 2,500B ($2.5T) as $2.5T", () => {
+      expect(formatMarketCap(2500000000000)).toBe("$2.5T");
+    });
+
+    it("4. Formats 10,000B ($10T) as $10T", () => {
+      expect(formatMarketCap(10000000000000)).toBe("$10T");
+    });
+
+    it("5. Formats 950B as $950B", () => {
+      expect(formatMarketCap(950000000000)).toBe("$950B");
+    });
+
+    it("6. Formats 750B as $750B", () => {
+      expect(formatMarketCap(750000000000)).toBe("$750B");
+    });
+
+    it("7. Handles exact $1T boundary correctly", () => {
+      expect(formatMarketCap(1e12)).toBe("$1T");
+      expect(formatMarketCap(0.9999e12)).toBe("$999.9B");
+    });
+
+    it("8. Handles null, undefined, zero, and negative values gracefully", () => {
+      expect(formatMarketCap(null)).toBe("N/A");
+      expect(formatMarketCap(undefined)).toBe("N/A");
+      expect(formatMarketCap(0)).toBe("N/A");
+      expect(formatMarketCap(-100)).toBe("N/A");
     });
   });
 
