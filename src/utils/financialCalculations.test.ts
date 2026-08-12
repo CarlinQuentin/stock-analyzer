@@ -1264,7 +1264,26 @@ describe("calculateFCFMargin", () => {
     expect(margin).toBe(-15);
   });
 
-  it("5. Missing/invalid revenue or FCF data returns null", () => {
+  it("5. Calculates multi-year arithmetic average FCF margin across timeframe", () => {
+    const income: FinancialStatement[] = [
+      { date: "2021-12-31", revenue: 100 },
+      { date: "2022-12-31", revenue: 100 },
+      { date: "2023-12-31", revenue: 100 },
+      { date: "2024-12-31", revenue: 100 },
+      { date: "2025-12-31", revenue: 100 },
+    ];
+    const cashFlow: FinancialStatement[] = [
+      { date: "2021-12-31", operatingCashFlow: 8.0, capitalExpenditure: 0 },   // 8.0%
+      { date: "2022-12-31", operatingCashFlow: 6.0, capitalExpenditure: 0 },   // 6.0%
+      { date: "2023-12-31", operatingCashFlow: 4.0, capitalExpenditure: 0 },   // 4.0%
+      { date: "2024-12-31", operatingCashFlow: 5.0, capitalExpenditure: 0 },   // 5.0%
+      { date: "2025-12-31", operatingCashFlow: 2.76, capitalExpenditure: 0 },  // 2.76%
+    ];
+    const margin = calculateFCFMargin(income, cashFlow);
+    expect(margin).toBeCloseTo(5.152, 3);
+  });
+
+  it("6. Missing/invalid revenue or FCF data returns null", () => {
     expect(calculateFCFMargin([], [])).toBeNull();
     expect(calculateFCFMargin([{ date: "2024-12-31", revenue: 0 }], [{ date: "2024-12-31", operatingCashFlow: 100, capitalExpenditure: 10 }])).toBeNull();
     expect(calculateFCFMargin(undefined, undefined)).toBeNull();

@@ -256,15 +256,14 @@ describe("E2E / API Data-Mapping Layer Tests (Layer 1)", () => {
         statementData.dividendMetrics,
       );
 
-      // Expected 2025 FCF = operatingCashFlow ($2.6B) - |capitalExpenditure (-$500M)| = $2.1B
-      // FCF Margin = (2.1B / 10B) * 100 = 21.00%
-      expect(metrics.fcfMargin).toBeCloseTo(21.0, 2);
+      // Multi-year Average FCF Margin across 5 years = 21.29%
+      expect(metrics.fcfMargin).toBeCloseTo(21.29, 1);
 
       // PROVE WRONG-FIELD PROTECTION:
-      // If app used netIncome ($1.8B) instead of FCF ($2.1B), FCF Margin would be 18.00%
-      expect(metrics.fcfMargin).not.toBeCloseTo(18.0, 2);
-      // If app used operatingCashFlow ($2.6B) without deducting CapEx ($500M), margin would be 26.00%
-      expect(metrics.fcfMargin).not.toBeCloseTo(26.0, 2);
+      // If app used netIncome instead of FCF, FCF Margin would be ~18.00%
+      expect(metrics.fcfMargin).not.toBeCloseTo(18.0, 1);
+      // If app used operatingCashFlow without deducting CapEx, margin would be ~26.00%
+      expect(metrics.fcfMargin).not.toBeCloseTo(26.0, 1);
     });
 
     it("4.3 Share Dilution CAGR Flow & Wrong-Field Protection: proves weightedAverageShsOutDil is used across multi-year statements", () => {

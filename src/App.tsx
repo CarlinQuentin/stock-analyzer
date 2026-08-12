@@ -1039,8 +1039,8 @@ function App() {
                     value={result.metrics.fcfMargin}
                     unit="%"
                     score={result.scores.fcfMargin}
-                    description="Free Cash Flow Margin"
-                    tooltip="Measures how efficiently a company converts top-line revenue into bottom-line free cash flow. Higher margins indicate superior cash conversion."
+                    description={`${(result.selectedPeriod || selectedPeriod) === "10Y" ? "10-Year" : (result.selectedPeriod || selectedPeriod) === "5Y" ? "5-Year" : "3-Year"} Avg FCF Margin`}
+                    tooltip="Measures the multi-year average percentage of revenue converted into free cash flow over the selected historical period."
                     icon="💵"
                     chartData={result.fcfMarginHistory}
                     chartValueType="percent"

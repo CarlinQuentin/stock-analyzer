@@ -155,6 +155,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
         };
       }
       case "fcfMargin":
+        const fcfPeriod = result.selectedPeriod || "10Y";
         return {
           ...defaultData,
           title: "FCF Margin",
@@ -164,8 +165,8 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           unit: "%",
           chartData: result.fcfMarginHistory || [],
           chartValueType: "percent" as const,
-          description: "Measures the percentage of revenue that a company converts into free cash flow after operating expenses and capital expenditures.",
-          formula: "FCF Margin = (Free Cash Flow / Revenue) * 100",
+          description: `Measures the multi-year average percentage of revenue that a company converts into free cash flow over the selected ${fcfPeriod} analysis timeframe.`,
+          formula: "Average FCF Margin = Average of Annual (Free Cash Flow / Revenue) × 100",
           mathExplanation: getFCFMarginMathExplanation(result.metrics.fcfMargin, result.fcfMarginHistory || []),
           whyItMatters: "FCF Margin measures how efficiently a company converts top-line revenue into bottom-line cash. Higher FCF Margins indicate strong cash generation capability, capital efficiency, and financial resilience.",
           tiers: [
@@ -688,10 +689,13 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
 
   function getFCFMarginMathExplanation(val: number | null, data: { label: string; value: number }[]): string[] {
     if (val === null || data.length === 0) return ["No FCF Margin data available."];
-    const latest = data[data.length - 1];
+    const period = result.selectedPeriod || "10Y";
+    const periodLabel = `${period === "10Y" ? "10-Year" : period === "5Y" ? "5-Year" : "3-Year"} Average`;
+    const count = data.length;
+    const yearsRange = count === 1 ? data[0].label : `${data[0].label}–${data[count - 1].label}`;
     return [
-      `1. Latest Fiscal Year (${latest.label}) FCF Margin: ${latest.value.toFixed(2)}%`,
-      `2. Formula Used: FCF Margin = (Free Cash Flow / Revenue) * 100`,
+      `1. ${periodLabel} FCF Margin (${yearsRange}): ${val.toFixed(2)}%`,
+      `2. Formula Used: Arithmetic Average of Annual (Free Cash Flow / Revenue) × 100 across ${count} valid annual observations.`,
       `3. Quality Assessment: Evaluated against benchmark tiers (20%+ Excellent, 10%-20% Strong, 5%-10% Average, 0%-5% Weak, <0% Poor).`,
     ];
   }

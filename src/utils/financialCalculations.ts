@@ -1009,9 +1009,9 @@ export function calculateAverageMargins(statements: FinancialStatement[]): {
 }
 
 /**
- * Calculate FCF Margin from the most recent fiscal year statements.
- * Formula: (Free Cash Flow / Revenue) * 100
- * Returns null if Revenue or FCF is unavailable, invalid, or Revenue is 0.
+ * Calculate Average FCF Margin across all valid fiscal years in the analysis timeframe.
+ * Formula: Arithmetic Average of Annual (Free Cash Flow / Revenue) * 100
+ * Returns null if no valid years with Revenue > 0 and valid FCF exist.
  */
 export function calculateFCFMargin(
   incomeStatements?: FinancialStatement[] | null,
@@ -1021,40 +1021,15 @@ export function calculateFCFMargin(
     return null;
   }
 
-  const sortedIncome = [...incomeStatements]
-    .filter((s) => s && s.date && typeof s.revenue === "number" && !isNaN(s.revenue) && isFinite(s.revenue))
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-  const sortedCashFlow = [...cashFlowStatements]
-    .filter((s) => s && s.date && s.operatingCashFlow !== undefined && s.capitalExpenditure !== undefined)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-  if (sortedIncome.length === 0 || sortedCashFlow.length === 0) {
+  const history = calculateFCFMarginHistory(incomeStatements, cashFlowStatements);
+  if (history.length === 0) {
     return null;
   }
 
-  const latestIncome = sortedIncome[0];
-  const latestYear = new Date(latestIncome.date).getFullYear();
+  const totalMarginSum = history.reduce((sum, item) => sum + item.value, 0);
+  const avgMargin = totalMarginSum / history.length;
 
-  let matchingCashFlow = sortedCashFlow.find(
-    (c) => new Date(c.date).getFullYear() === latestYear,
-  );
-
-  if (!matchingCashFlow) {
-    matchingCashFlow = sortedCashFlow[0];
-  }
-
-  const revenue = latestIncome.revenue;
-  if (!revenue || revenue === 0) {
-    return null;
-  }
-
-  const fcf = calculateFCF(matchingCashFlow.operatingCashFlow, matchingCashFlow.capitalExpenditure);
-  if (fcf === null) {
-    return null;
-  }
-
-  return (fcf / revenue) * 100;
+  return isNaN(avgMargin) || !isFinite(avgMargin) ? null : avgMargin;
 }
 
 /**
