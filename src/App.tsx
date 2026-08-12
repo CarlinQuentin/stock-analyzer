@@ -17,6 +17,7 @@ import { SavedStocksPage } from "./components/SavedStocksPage";
 import { LeadershipSection } from "./components/LeadershipSection";
 import { CompetitorsSection } from "./components/CompetitorsSection";
 import { FutureOutlookSection } from "./components/FutureOutlookSection";
+import { RawFinancialsSection } from "./components/RawFinancialsSection";
 import { PeriodSelector } from "./components/PeriodSelector";
 import { authService, UserProfile } from "./services/authService";
 import { fmpService } from "./services/financialModelingPrep";
@@ -79,7 +80,7 @@ function App() {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"fundamentals" | "valuation" | "leadership" | "futureOutlook">(
+  const [activeTab, setActiveTab] = useState<"fundamentals" | "valuation" | "leadership" | "futureOutlook" | "rawFinancials">(
     "fundamentals",
   );
   const [selectedPeriod, setSelectedPeriod] = useState<HistoricalPeriod>("10Y");
@@ -896,9 +897,9 @@ function App() {
           />
         </div>
 
-        {/* Navigation Tabs & Period Selector Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700 mb-6 pb-2 sm:pb-0">
-          <div className="flex flex-wrap border-b-0 overflow-x-auto scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden text-xs sm:text-sm">
+        {/* Navigation Tabs Header */}
+        <div className="border-b border-slate-200 dark:border-slate-700 mb-6">
+          <div className="flex border-b-0 overflow-x-auto scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden text-xs sm:text-sm">
             <button
               onClick={() => setActiveTab("fundamentals")}
               className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
@@ -922,6 +923,17 @@ function App() {
               <span>Stock Valuation (Price)</span>
             </button>
             <button
+              onClick={() => setActiveTab("rawFinancials")}
+              className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
+                activeTab === "rawFinancials"
+                  ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
+                  : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+              }`}
+            >
+              <span>📋</span>
+              <span>Raw Financials</span>
+            </button>
+            <button
               onClick={() => setActiveTab("futureOutlook")}
               className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
                 activeTab === "futureOutlook"
@@ -943,13 +955,6 @@ function App() {
               <span>👔</span>
               <span>Senior Leadership</span>
             </button>
-          </div>
-
-          <div className="pb-2 md:pb-3 flex justify-end">
-            <PeriodSelector
-              selectedPeriod={selectedPeriod}
-              onPeriodChange={handlePeriodChange}
-            />
           </div>
         </div>
 
@@ -977,11 +982,16 @@ function App() {
                       rating.
                     </p>
                   </div>
-                  {result.fcfHistory && result.fcfHistory.length > 0 && (
-                    <button
-                      onClick={() => setShowAllCharts(!showAllCharts)}
-                      className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-white hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-blue-200 dark:border-blue-800/50 rounded-lg shadow-sm transition-all duration-200"
-                    >
+                  <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+                    <PeriodSelector
+                      selectedPeriod={selectedPeriod}
+                      onPeriodChange={handlePeriodChange}
+                    />
+                    {result.fcfHistory && result.fcfHistory.length > 0 && (
+                      <button
+                        onClick={() => setShowAllCharts(!showAllCharts)}
+                        className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-white hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-blue-200 dark:border-blue-800/50 rounded-lg shadow-sm transition-all duration-200 whitespace-nowrap"
+                      >
                       <span>
                         {showAllCharts
                           ? "Hide All Trend Charts"
@@ -1004,6 +1014,7 @@ function App() {
                     </button>
                   )}
                 </div>
+              </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <MetricCard
@@ -1502,6 +1513,17 @@ function App() {
               </div>
             </div>
           </>
+        )}
+
+        {/* Raw Financials Tab Content */}
+        {activeTab === "rawFinancials" && rawStatementData && (
+          <RawFinancialsSection
+            incomeStatements={rawStatementData.statementData.incomeStatements}
+            balanceSheets={rawStatementData.statementData.balanceSheets}
+            cashFlowStatements={rawStatementData.statementData.cashFlowStatements}
+            symbol={result.companyProfile.symbol || result.ticker}
+            companyName={result.companyProfile.companyName}
+          />
         )}
 
         {/* Future Outlook Tab Content */}

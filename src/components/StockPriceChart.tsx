@@ -350,31 +350,8 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
                     : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300"
                 }`}
               >
-                Price CAGR: {stats.priceCAGR > 0 ? "+" : ""}
+                Annualized Return: {stats.priceCAGR > 0 ? "+" : ""}
                 {stats.priceCAGR.toFixed(2)}% / yr
-              </span>
-            )}
-
-            {stats.totalReturnCAGR !== null ? (
-              <span
-                title="Includes dividends with reinvestment using adjusted closing prices"
-                className={`text-xs sm:text-sm font-extrabold font-mono px-2.5 py-1 rounded-full border ${
-                  stats.totalReturnCAGR > 0
-                    ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-300 dark:border-blue-800"
-                    : stats.totalReturnCAGR < 0
-                    ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border-rose-300 dark:border-rose-800"
-                    : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300"
-                }`}
-              >
-                Total Return CAGR: {stats.totalReturnCAGR > 0 ? "+" : ""}
-                {stats.totalReturnCAGR.toFixed(2)}% / yr
-              </span>
-            ) : (
-              <span
-                title="Adjusted price data unavailable for total return calculation"
-                className="text-xs sm:text-sm font-bold font-mono px-2.5 py-1 rounded-full border bg-slate-100 text-slate-400 dark:bg-slate-800/60 dark:text-slate-500 border-slate-200 dark:border-slate-700"
-              >
-                Total Return CAGR: N/A
               </span>
             )}
           </div>
@@ -404,8 +381,11 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
       {/* Range Quick Metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 py-4 my-2 border-b border-slate-100 dark:border-slate-700/60 text-xs">
         <div>
-          <span className="text-slate-500 dark:text-slate-400 block mb-0.5 font-medium">
-            Price CAGR ({timeframe})
+          <span
+            title="Stock price appreciation only (excluding dividends)"
+            className="text-slate-500 dark:text-slate-400 block mb-0.5 font-medium cursor-help"
+          >
+            Annualized Return ({timeframe})
           </span>
           <span
             className={`font-extrabold text-sm font-mono ${
@@ -422,13 +402,16 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
               ? `${stats.priceCAGR > 0 ? "+" : ""}${stats.priceCAGR.toFixed(2)}% / yr`
               : "N/A"}
           </span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
+            Price Only
+          </span>
         </div>
         <div>
           <span
             title="Includes dividends with reinvestment using adjusted closing prices"
             className="text-slate-500 dark:text-slate-400 block mb-0.5 font-medium cursor-help flex items-center gap-1"
           >
-            <span>Total Return CAGR</span>
+            <span>Total Return</span>
             <span className="text-[10px] text-blue-500 font-bold">ℹ</span>
           </span>
           <span
