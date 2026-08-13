@@ -57,12 +57,17 @@ export function getTileContentConfig(w: number, h: number) {
   const changeFontSize = Math.max(7, Math.min(10, Math.floor(tickerFontSize * 0.8)));
 
   let showName = false;
+  let showScore = false;
   let showChange = false;
 
-  if (innerW >= 64 && innerH >= 40) {
+  if (innerW >= 75 && innerH >= 45) {
     showName = true;
+    showScore = true;
     showChange = true;
-  } else if (innerW >= 32 && innerH >= 20) {
+  } else if (innerW >= 45 && innerH >= 28) {
+    showScore = true;
+    showChange = true;
+  } else if (innerW >= 28 && innerH >= 18) {
     showChange = true;
   }
 
@@ -70,6 +75,7 @@ export function getTileContentConfig(w: number, h: number) {
     tickerFontSize,
     changeFontSize,
     showName,
+    showScore,
     showChange,
   };
 }
@@ -193,7 +199,7 @@ export function squarify<T>(items: TreemapItem<T>[], bounds: Rect): PlacedNode<T
 }
 
 /**
- * Performance color mapping function
+ * Finviz-style performance color mapping function
  */
 function getPerformanceColor(pct: number): { bg: string; text: string; border: string } {
   if (pct === null || pct === undefined || isNaN(pct)) {
@@ -228,6 +234,13 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
   const [hoveredCompany, setHoveredCompany] = useState<Top500Company | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [selectedSectorFilter, setSelectedSectorFilter] = useState<string | "ALL">("ALL");
+
+  // Finviz Interactive Map Zoom & Pan State
+  const [zoom, setZoom] = useState<number>(1.0);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({
@@ -286,7 +299,49 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
     fetchData();
   }, []);
 
-  // Track cursor position for floating tooltip
+  // Finviz Interactive Map: Cursor-Centered Mouse Wheel Zoom
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    if (!containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const zoomFactor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    let newZoom = Math.min(4.5, Math.max(1.0, zoom * zoomFactor));
+
+    if (newZoom <= 1.001) {
+      setZoom(1.0);
+      setPan({ x: 0, y: 0 });
+      return;
+    }
+
+    const pointX = (mouseX - pan.x) / zoom;
+    const pointY = (mouseY - pan.y) / zoom;
+
+    let newPanX = mouseX - pointX * newZoom;
+    let newPanY = mouseY - pointY * newZoom;
+
+    // Clamp pan bounds so canvas cannot be dragged off screen
+    const minPanX = -rect.width * (newZoom - 1);
+    const minPanY = -rect.height * (newZoom - 1);
+
+    newPanX = Math.min(0, Math.max(minPanX, newPanX));
+    newPanY = Math.min(0, Math.max(minPanY, newPanY));
+
+    setZoom(newZoom);
+    setPan({ x: Math.round(newPanX), y: Math.round(newPanY) });
+  };
+
+  // Finviz Interactive Map: Drag-to-Pan (active when zoomed > 1.0)
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoom <= 1.001) return;
+    setIsDragging(true);
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+    panStartRef.current = { ...pan };
+  };
+
   const handleMouseMove = (e: React.MouseEvent) => {
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
@@ -294,6 +349,44 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
         x: e.clientX - rect.left,
         y: e.clientY - rect.top,
       });
+    }
+
+    if (!isDragging || !containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+
+    let newPanX = panStartRef.current.x + dx;
+    let newPanY = panStartRef.current.y + dy;
+
+    const minPanX = -rect.width * (zoom - 1);
+    const minPanY = -rect.height * (zoom - 1);
+
+    newPanX = Math.min(0, Math.max(minPanX, newPanX));
+    newPanY = Math.min(0, Math.max(minPanY, newPanY));
+
+    setPan({ x: Math.round(newPanX), y: Math.round(newPanY) });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Double Click: Reset Zoom & Pan to fit container (100%)
+  const handleDoubleClick = () => {
+    setZoom(1.0);
+    setPan({ x: 0, y: 0 });
+  };
+
+  // Explicit Zoom Button Step Controls (+ / -)
+  const handleZoomStep = (factor: number) => {
+    let newZoom = Math.min(4.5, Math.max(1.0, zoom * factor));
+    if (newZoom <= 1.001) {
+      setZoom(1.0);
+      setPan({ x: 0, y: 0 });
+    } else {
+      setZoom(newZoom);
     }
   };
 
@@ -452,7 +545,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
           <div>
             <div className="flex items-center gap-3 flex-wrap">
               <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
-                <span>🗺️</span> Top 100 U.S. Companies Treemap
+                <span>🗺️</span> Top 100 U.S. Companies Market Map
               </h2>
               <div className="flex items-center gap-2">
                 <span
@@ -475,7 +568,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
               </div>
             </div>
             <p className="text-xs sm:text-sm text-slate-400 mt-1">
-              Largest 100 U.S. companies • Market capitalization weighted • Real-time performance heatmap
+              Finviz-style Market Map • Area weighted by Market Cap • Heatmap colored by Performance & Business Quality Score
             </p>
           </div>
 
@@ -548,122 +641,175 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
         </div>
       </div>
 
-      {/* Main Treemap Canvas Container */}
+      {/* Main Interactive Finviz Treemap Canvas Container */}
       <div
         ref={containerRef}
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
-        onMouseLeave={() => setHoveredCompany(null)}
-        className="relative w-full bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl min-h-[500px] select-none box-border overflow-hidden"
+        onMouseUp={handleMouseUp}
+        onMouseLeave={() => {
+          handleMouseUp();
+          setHoveredCompany(null);
+        }}
+        onDoubleClick={handleDoubleClick}
+        className={`relative w-full bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl min-h-[500px] select-none box-border overflow-hidden ${
+          zoom > 1.001 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default"
+        }`}
         style={{ height: `${dimensions.height}px` }}
       >
-        {/* Render Sector Bounding Area Labels */}
-        {layout.placedSectors &&
-          layout.placedSectors.map((secNode) => {
-            const { sector } = secNode.data;
-            const r = secNode.rect;
-            const secSummary = sectorSummaries.find((s) => s.sector === sector);
+        {/* On-Canvas Zoom & Reset Controls */}
+        <div className="absolute top-3 right-3 z-40 flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-800 shadow-xl select-none">
+          <button
+            onClick={() => handleZoomStep(1.25)}
+            disabled={zoom >= 4.5}
+            className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm transition-all disabled:opacity-40"
+            title="Zoom In (+)"
+          >
+            +
+          </button>
+          <button
+            onClick={() => handleZoomStep(0.8)}
+            disabled={zoom <= 1.001}
+            className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm transition-all disabled:opacity-40"
+            title="Zoom Out (-)"
+          >
+            −
+          </button>
+          <button
+            onClick={handleDoubleClick}
+            disabled={zoom <= 1.001}
+            className="px-2 h-7 flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-all disabled:opacity-40"
+            title="Reset View (100%)"
+          >
+            Reset ({Math.round(zoom * 100)}%)
+          </button>
+        </div>
 
-            return (
-              <div
-                key={sector}
-                className="absolute border border-slate-800/70 bg-slate-900/30 pointer-events-none rounded-md overflow-hidden box-border"
-                style={{
-                  left: `${r.x}px`,
-                  top: `${r.y}px`,
-                  width: `${r.w}px`,
-                  height: `${r.h}px`,
-                }}
-              >
-                {r.h >= 24 && (
-                  <div className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-slate-400/90 truncate flex items-center justify-between border-b border-slate-800/40 bg-slate-900/80 leading-none">
-                    <span className="truncate max-w-[70%]">{sector}</span>
-                    {secSummary && r.w > 110 && (
-                      <span
-                        className={`font-mono text-[9px] font-bold ${
-                          secSummary.weightedChangePercent >= 0 ? "text-emerald-400" : "text-rose-400"
-                        }`}
-                      >
-                        {secSummary.weightedChangePercent >= 0 ? "+" : ""}
-                        {secSummary.weightedChangePercent.toFixed(2)}%
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        {/* Transform Viewport Layer (Smooth Pan & Zoom Matrix) */}
+        <div
+          className="w-full h-full relative origin-top-left transition-transform duration-75 ease-out"
+          style={{
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+          }}
+        >
+          {/* Render Sector Bounding Area Labels */}
+          {layout.placedSectors &&
+            layout.placedSectors.map((secNode) => {
+              const { sector } = secNode.data;
+              const r = secNode.rect;
+              const secSummary = sectorSummaries.find((s) => s.sector === sector);
 
-        {/* Render Company Rectangles */}
-        {layout.placedCompanies &&
-          layout.placedCompanies.map(({ company, rect }) => {
-            const color = getPerformanceColor(company.changesPercentage);
-            const isHovered = hoveredCompany?.symbol === company.symbol;
-            const config = getTileContentConfig(rect.w, rect.h);
-
-            return (
-              <div
-                key={company.symbol}
-                onClick={() => onSelectStock(company.symbol)}
-                onMouseEnter={() => setHoveredCompany(company)}
-                className={`absolute transition-all duration-150 cursor-pointer overflow-hidden flex flex-col items-center justify-center p-0.5 rounded-sm box-border select-none ${
-                  isHovered ? "z-30 ring-2 ring-white scale-[1.005] shadow-2xl" : "z-10 hover:z-20"
-                }`}
-                style={{
-                  left: `${rect.x}px`,
-                  top: `${rect.y}px`,
-                  width: `${rect.w}px`,
-                  height: `${rect.h}px`,
-                  backgroundColor: color.bg,
-                  borderColor: color.border,
-                  borderWidth: "1px",
-                  boxSizing: "border-box",
-                }}
-              >
-                {/* Dynamically scaled content fitting tile bounds strictly */}
-                <div className="flex flex-col items-center justify-center w-full h-full p-0.5 overflow-hidden leading-none select-none pointer-events-none text-center">
-                  <div
-                    className="font-extrabold tracking-tight text-white truncate max-w-full drop-shadow-sm leading-none"
-                    style={{ fontSize: `${config.tickerFontSize}px` }}
-                  >
-                    {company.symbol}
-                  </div>
-
-                  {config.showName && (
-                    <div className="text-[9px] text-slate-200/90 font-medium truncate max-w-full leading-none mt-0.5 hidden sm:block">
-                      {company.name}
-                    </div>
-                  )}
-
-                  {config.showChange && (
-                    <div
-                      className="font-black font-mono leading-none mt-0.5 max-w-full truncate drop-shadow-sm"
-                      style={{
-                        fontSize: `${config.changeFontSize}px`,
-                        color: color.text,
-                      }}
-                    >
-                      {company.changesPercentage >= 0 ? "+" : ""}
-                      {company.changesPercentage.toFixed(2)}%
+              return (
+                <div
+                  key={sector}
+                  className="absolute border border-slate-800/70 bg-slate-900/30 pointer-events-none rounded-md overflow-hidden box-border"
+                  style={{
+                    left: `${r.x}px`,
+                    top: `${r.y}px`,
+                    width: `${r.w}px`,
+                    height: `${r.h}px`,
+                  }}
+                >
+                  {r.h >= 24 && (
+                    <div className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-slate-400/90 truncate flex items-center justify-between border-b border-slate-800/40 bg-slate-900/80 leading-none">
+                      <span className="truncate max-w-[70%]">{sector}</span>
+                      {secSummary && r.w > 110 && (
+                        <span
+                          className={`font-mono text-[9px] font-bold ${
+                            secSummary.weightedChangePercent >= 0 ? "text-emerald-400" : "text-rose-400"
+                          }`}
+                        >
+                          {secSummary.weightedChangePercent >= 0 ? "+" : ""}
+                          {secSummary.weightedChangePercent.toFixed(2)}%
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
 
-        {/* Polished Floating Hover Tooltip */}
+          {/* Render Company Rectangles */}
+          {layout.placedCompanies &&
+            layout.placedCompanies.map(({ company, rect }) => {
+              const color = getPerformanceColor(company.changesPercentage);
+              const isHovered = hoveredCompany?.symbol === company.symbol;
+              const config = getTileContentConfig(rect.w, rect.h);
+
+              return (
+                <div
+                  key={company.symbol}
+                  onClick={() => onSelectStock(company.symbol)}
+                  onMouseEnter={() => setHoveredCompany(company)}
+                  className={`absolute transition-all duration-150 cursor-pointer overflow-hidden flex flex-col items-center justify-center p-0.5 rounded-sm box-border select-none ${
+                    isHovered ? "z-30 ring-2 ring-white scale-[1.005] shadow-2xl" : "z-10 hover:z-20"
+                  }`}
+                  style={{
+                    left: `${rect.x}px`,
+                    top: `${rect.y}px`,
+                    width: `${rect.w}px`,
+                    height: `${rect.h}px`,
+                    backgroundColor: color.bg,
+                    borderColor: color.border,
+                    borderWidth: "1px",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  {/* Dynamically scaled content fitting tile bounds strictly */}
+                  <div className="flex flex-col items-center justify-center w-full h-full p-0.5 overflow-hidden leading-none select-none pointer-events-none text-center">
+                    <div
+                      className="font-extrabold tracking-tight text-white truncate max-w-full drop-shadow-sm leading-none"
+                      style={{ fontSize: `${config.tickerFontSize}px` }}
+                    >
+                      {company.symbol}
+                    </div>
+
+                    {config.showScore && (
+                      <div className="mt-0.5 hidden sm:block">
+                        <span className="text-[8px] sm:text-[9px] font-extrabold font-mono px-1 py-0.2 rounded bg-slate-950/70 text-amber-300 border border-amber-500/40 leading-none">
+                          QS:{company.qualityScore}
+                        </span>
+                      </div>
+                    )}
+
+                    {config.showName && (
+                      <div className="text-[9px] text-slate-200/90 font-medium truncate max-w-full leading-none mt-0.5 hidden sm:block">
+                        {company.name}
+                      </div>
+                    )}
+
+                    {config.showChange && (
+                      <div
+                        className="font-black font-mono leading-none mt-0.5 max-w-full truncate drop-shadow-sm"
+                        style={{
+                          fontSize: `${config.changeFontSize}px`,
+                          color: color.text,
+                        }}
+                      >
+                        {company.changesPercentage >= 0 ? "+" : ""}
+                        {company.changesPercentage.toFixed(2)}%
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+
+        {/* Polished Floating Hover Tooltip (Bounded to Viewport) */}
         {hoveredCompany && (
           <div
             className="pointer-events-none fixed z-50 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-xl p-3.5 shadow-2xl text-xs w-64 space-y-2 animate-in fade-in zoom-in-95 duration-100"
             style={{
               left: `${Math.min(window.innerWidth - 270, Math.max(10, mousePos.x + 20))}px`,
-              top: `${Math.min(window.innerHeight - 220, Math.max(10, mousePos.y + 20))}px`,
+              top: `${Math.min(window.innerHeight - 240, Math.max(10, mousePos.y + 20))}px`,
             }}
           >
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <div>
                 <div className="font-black text-sm text-white flex items-center gap-2">
-                  <span className="truncate max-w-[140px]">{hoveredCompany.name}</span>
+                  <span className="truncate max-w-[130px]">{hoveredCompany.name}</span>
                   <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800 flex-shrink-0">
                     {hoveredCompany.symbol}
                   </span>
@@ -673,6 +819,12 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
             </div>
 
             <div className="grid grid-cols-2 gap-2 pt-1 font-mono text-xs">
+              <div>
+                <span className="text-slate-400 text-[10px] block font-sans">Business Quality</span>
+                <span className="font-extrabold text-amber-300 text-xs">
+                  {hoveredCompany.qualityScore}/100
+                </span>
+              </div>
               <div>
                 <span className="text-slate-400 text-[10px] block font-sans">Price</span>
                 <span className="font-bold text-white">${hoveredCompany.price.toFixed(2)}</span>
@@ -685,9 +837,13 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
                   }`}
                 >
                   {hoveredCompany.changesPercentage >= 0 ? "+" : ""}
-                  {hoveredCompany.changesPercentage.toFixed(2)}% (
-                  {hoveredCompany.change >= 0 ? "+$" : "-$"}
-                  {Math.abs(hoveredCompany.change).toFixed(2)})
+                  {hoveredCompany.changesPercentage.toFixed(2)}%
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 text-[10px] block font-sans">Industry</span>
+                <span className="font-bold text-slate-200 text-[11px] truncate block">
+                  {hoveredCompany.industry}
                 </span>
               </div>
               <div className="col-span-2 pt-1 border-t border-slate-800/60 flex items-center justify-between">

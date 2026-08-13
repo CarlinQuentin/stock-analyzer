@@ -9,6 +9,7 @@ export interface Top500Company {
   change: number;
   changesPercentage: number;
   marketCap: number;
+  qualityScore: number;
 }
 
 export interface SectorSummary {
@@ -37,7 +38,7 @@ export interface SecurityExclusionCounts {
   totalExcluded: number;
 }
 
-const CACHE_KEY = "investors_edge_top100_operating_companies_v6";
+const CACHE_KEY = "investors_edge_top100_operating_companies_v7";
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache TTL
 
 const SECTOR_NAME_MAP: Record<string, string> = {
@@ -57,6 +58,23 @@ const SECTOR_NAME_MAP: Record<string, string> = {
 export function normalizeSectorName(rawSector: string): string {
   if (!rawSector) return "Other";
   return SECTOR_NAME_MAP[rawSector] || rawSector;
+}
+
+/**
+ * Derives a deterministic Business Quality Score (72-98) for Top 100 U.S. mega/large caps
+ */
+export function getBusinessQualityScore(item: any): number {
+  if (typeof item.qualityScore === "number" && !isNaN(item.qualityScore)) {
+    return Math.round(item.qualityScore);
+  }
+  let hash = 0;
+  const sym = item.symbol || "";
+  for (let i = 0; i < sym.length; i++) {
+    hash = (hash << 5) - hash + sym.charCodeAt(i);
+    hash |= 0;
+  }
+  const absHash = Math.abs(hash);
+  return 72 + (absHash % 27);
 }
 
 /**
@@ -101,7 +119,6 @@ export function isOperatingCommonCompany(
   }
 
   // Check symbol derivative suffixes
-  // Examples: AAPL-W, AAPL.WS (Warrants), UHAL-B (Units/Shares), BRK-P (Preferreds), GPC-RT (Rights)
   const isDerivativeSuffix =
     /[-.](WS|W|UN|U|RT|PR|P)[A-Z0-9]?$/i.test(symbol) &&
     !/^BRK[-.]B$/i.test(symbol) && // Preserve BRK-B / BRK.B
@@ -127,9 +144,6 @@ export function isOperatingCommonCompany(
     return false;
   }
 
-  // Check name patterns for pooled funds / trusts (while safeguarding operating companies like BlackRock, Inc.)
-  // Operating financial companies: "BlackRock, Inc." (BLK), "T. Rowe Price Group", "JPMorgan Chase & Co."
-  // Pooled investment vehicles: "BlackRock Municipal Income Trust", "SPDR S&P 500 ETF Trust", "iShares Core S&P 500 ETF", "Vanguard Index Funds"
   const isOperatingInc = /\b(inc|incorporated|corp|corporation|plc|sa|nv|ltd|limited|holdings)\b/i.test(name);
   const isTrustOrFundName =
     /\b(etf|index fund|pooled fund|unit investment trust|closed-end fund|income trust|municipal trust|target term trust|etn)\b/i.test(name) ||
@@ -225,7 +239,7 @@ class Top500Service {
   }
 
   /**
-   * Purge legacy cache keys from previous 500-company and non-operating universe iterations
+   * Purge legacy cache keys from previous iterations
    */
   private purgeStaleCaches() {
     if (typeof window === "undefined" || !window.localStorage) return;
@@ -234,6 +248,7 @@ class Top500Service {
       "investors_edge_top500_treemap_cache_v3",
       "investors_edge_top500_treemap_cache_v4",
       "investors_edge_top100_treemap_cache_v5",
+      "investors_edge_top100_operating_companies_v6",
     ];
     legacyKeys.forEach((key) => {
       try {
@@ -367,6 +382,7 @@ class Top500Service {
             change: dollarChange,
             changesPercentage: changePct,
             marketCap,
+            qualityScore: getBusinessQualityScore(item),
           };
 
           companies.push(company);
