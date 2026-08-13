@@ -24,9 +24,9 @@ interface PlacedNode<T> {
 }
 
 /**
- * Safe container inner padding margin (in pixels) matching 14px padding
+ * Safe container inner padding margin (in pixels) ensuring generous 20px breathing room on all sides
  */
-export const CANVAS_MARGIN = 14;
+export const CANVAS_MARGIN = 20;
 
 /**
  * Strict rectangle bounds clamping to prevent any pixel from overflowing parent container
@@ -248,6 +248,12 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
     height: 680,
   });
 
+  // Keep ref values in sync for native wheel listener
+  const zoomRef = useRef(zoom);
+  const panRef = useRef(pan);
+  zoomRef.current = zoom;
+  panRef.current = pan;
+
   // Measure container dimensions with ResizeObserver and calculate responsive height curve
   useEffect(() => {
     if (!containerRef.current) return;
@@ -282,6 +288,54 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
     };
   }, []);
 
+  // Native non-passive wheel event listener to lock broader page scrolling while mouse is over the chart
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onNativeWheel = (e: WheelEvent) => {
+      // Prevent broader page from scrolling when mouse is over the chart container
+      e.preventDefault();
+      e.stopPropagation();
+
+      const rect = el.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const currentZoom = zoomRef.current;
+      const currentPan = panRef.current;
+
+      const zoomFactor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      let newZoom = Math.min(4.5, Math.max(1.0, currentZoom * zoomFactor));
+
+      if (newZoom <= 1.001) {
+        setZoom(1.0);
+        setPan({ x: 0, y: 0 });
+        return;
+      }
+
+      const pointX = (mouseX - currentPan.x) / currentZoom;
+      const pointY = (mouseY - currentPan.y) / currentZoom;
+
+      let newPanX = mouseX - pointX * newZoom;
+      let newPanY = mouseY - pointY * newZoom;
+
+      const minPanX = -rect.width * (newZoom - 1);
+      const minPanY = -rect.height * (newZoom - 1);
+
+      newPanX = Math.min(0, Math.max(minPanX, newPanX));
+      newPanY = Math.min(0, Math.max(minPanY, newPanY));
+
+      setZoom(newZoom);
+      setPan({ x: Math.round(newPanX), y: Math.round(newPanY) });
+    };
+
+    el.addEventListener("wheel", onNativeWheel, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", onNativeWheel);
+    };
+  }, []);
+
   const fetchData = async (forceRefresh: boolean = false) => {
     setLoading(true);
     setError(null);
@@ -298,41 +352,6 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
   useEffect(() => {
     fetchData();
   }, []);
-
-  // Finviz Interactive Map: Cursor-Centered Mouse Wheel Zoom
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    if (!containerRef.current) return;
-
-    const rect = containerRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    const zoomFactor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-    let newZoom = Math.min(4.5, Math.max(1.0, zoom * zoomFactor));
-
-    if (newZoom <= 1.001) {
-      setZoom(1.0);
-      setPan({ x: 0, y: 0 });
-      return;
-    }
-
-    const pointX = (mouseX - pan.x) / zoom;
-    const pointY = (mouseY - pan.y) / zoom;
-
-    let newPanX = mouseX - pointX * newZoom;
-    let newPanY = mouseY - pointY * newZoom;
-
-    // Clamp pan bounds so canvas cannot be dragged off screen
-    const minPanX = -rect.width * (newZoom - 1);
-    const minPanY = -rect.height * (newZoom - 1);
-
-    newPanX = Math.min(0, Math.max(minPanX, newPanX));
-    newPanY = Math.min(0, Math.max(minPanY, newPanY));
-
-    setZoom(newZoom);
-    setPan({ x: Math.round(newPanX), y: Math.round(newPanY) });
-  };
 
   // Finviz Interactive Map: Drag-to-Pan (active when zoomed > 1.0)
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -405,7 +424,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
 
     const { width, height } = dimensions;
 
-    // Safe inset layout bounds matching 14px container inner margin
+    // Safe inset layout bounds matching 20px container inner margin to guarantee right-side data fits comfortably
     const canvasBounds: Rect = {
       x: CANVAS_MARGIN,
       y: CANVAS_MARGIN,
@@ -538,7 +557,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
     };
 
   return (
-    <div className="w-full max-w-[1400px] mx-auto space-y-4">
+    <div className="w-full max-w-[1400px] mx-auto space-y-4 overflow-hidden">
       {/* Treemap Header & Controls */}
       <div className="bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800 p-4 sm:p-5 shadow-xl transition-all">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -644,7 +663,6 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
       {/* Main Interactive Finviz Treemap Canvas Container */}
       <div
         ref={containerRef}
-        onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -653,7 +671,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
           setHoveredCompany(null);
         }}
         onDoubleClick={handleDoubleClick}
-        className={`relative w-full bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl min-h-[500px] select-none box-border overflow-hidden ${
+        className={`relative w-full max-w-full bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl min-h-[500px] select-none box-border overflow-hidden ${
           zoom > 1.001 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default"
         }`}
         style={{ height: `${dimensions.height}px` }}
