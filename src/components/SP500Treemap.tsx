@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { sp500Service, SP500Company, SP500MarketData } from "../services/sp500Service";
+import { top500Service, Top500Company, Top500MarketData } from "../services/top500Service";
 import { formatMarketCap } from "../utils/scoring";
 
-interface SP500TreemapProps {
+interface Top500TreemapProps {
   onSelectStock: (ticker: string) => void;
 }
 
@@ -24,12 +24,26 @@ interface PlacedNode<T> {
 }
 
 /**
- * Standard Squarified Treemap Layout Engine (Bruls, Huizing, van Wijk)
+ * Strict rectangle bounds clamping to prevent any pixel from overflowing parent container
  */
-function squarify<T>(
-  items: TreemapItem<T>[],
-  bounds: Rect
-): PlacedNode<T>[] {
+function clampRect(rect: Rect, outer: Rect): Rect {
+  const minX = Math.max(outer.x, Math.min(rect.x, outer.x + outer.w));
+  const minY = Math.max(outer.y, Math.min(rect.y, outer.y + outer.h));
+  const maxX = Math.min(outer.x + outer.w, Math.max(minX, rect.x + rect.w));
+  const maxY = Math.min(outer.y + outer.h, Math.max(minY, rect.y + rect.h));
+
+  return {
+    x: Math.floor(minX * 10) / 10,
+    y: Math.floor(minY * 10) / 10,
+    w: Math.max(0, Math.floor((maxX - minX) * 10) / 10),
+    h: Math.max(0, Math.floor((maxY - minY) * 10) / 10),
+  };
+}
+
+/**
+ * Standard Squarified Treemap Layout Engine (Bruls, Huizing, van Wijk) with strict bounds clamping
+ */
+function squarify<T>(items: TreemapItem<T>[], bounds: Rect): PlacedNode<T>[] {
   if (!items || items.length === 0 || bounds.w <= 0 || bounds.h <= 0) {
     return [];
   }
@@ -41,39 +55,41 @@ function squarify<T>(
 
   function layoutRow(row: TreemapItem<T>[], _rowArea: number, box: Rect, isHorizontal: boolean): Rect {
     const rowLength = row.reduce((sum, item) => sum + item.value, 0);
-    const rowThickness = rowLength / (isHorizontal ? box.h : box.w);
+    const rowThickness = Math.min(rowLength / (isHorizontal ? box.h : box.w), isHorizontal ? box.w : box.h);
 
     let offset = 0;
-    row.forEach((item) => {
+    row.forEach((item, idx) => {
       const itemFraction = item.value / rowLength;
       let rect: Rect;
 
       if (isHorizontal) {
+        const itemH = idx === row.length - 1 ? box.h - offset : box.h * itemFraction;
         rect = {
           x: box.x,
           y: box.y + offset,
           w: rowThickness,
-          h: box.h * itemFraction,
+          h: itemH,
         };
-        offset += rect.h;
+        offset += itemH;
       } else {
+        const itemW = idx === row.length - 1 ? box.w - offset : box.w * itemFraction;
         rect = {
           x: box.x + offset,
           y: box.y,
-          w: box.w * itemFraction,
+          w: itemW,
           h: rowThickness,
         };
-        offset += rect.w;
+        offset += itemW;
       }
 
-      results.push({ data: item.data, rect });
+      results.push({ data: item.data, rect: clampRect(rect, box) });
     });
 
     if (isHorizontal) {
       return {
         x: box.x + rowThickness,
         y: box.y,
-        w: box.w - rowThickness,
+        w: Math.max(0, box.w - rowThickness),
         h: box.h,
       };
     } else {
@@ -81,7 +97,7 @@ function squarify<T>(
         x: box.x,
         y: box.y + rowThickness,
         w: box.w,
-        h: box.h - rowThickness,
+        h: Math.max(0, box.h - rowThickness),
       };
     }
   }
@@ -113,6 +129,8 @@ function squarify<T>(
 
   while (remainingItems.length > 0) {
     const sideLength = Math.min(currentBounds.w, currentBounds.h);
+    if (sideLength <= 0) break;
+
     const isHorizontal = currentBounds.w >= currentBounds.h;
 
     let currentRow: typeof remainingItems = [remainingItems[0]];
@@ -169,18 +187,18 @@ function getPerformanceColor(pct: number): { bg: string; text: string; border: s
   }
 }
 
-export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => {
-  const [data, setData] = useState<SP500MarketData | null>(null);
+export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) => {
+  const [data, setData] = useState<Top500MarketData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [hoveredCompany, setHoveredCompany] = useState<SP500Company | null>(null);
+  const [hoveredCompany, setHoveredCompany] = useState<Top500Company | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [selectedSectorFilter, setSelectedSectorFilter] = useState<string | "ALL">("ALL");
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({
     width: 1200,
-    height: 700,
+    height: 680,
   });
 
   // Measure container dimensions with ResizeObserver
@@ -188,11 +206,12 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
     if (!containerRef.current) return;
     const observer = new ResizeObserver((entries) => {
       if (entries.length > 0) {
-        const { width, height } = entries[0].contentRect;
-        if (width > 0 && height > 0) {
+        const { width } = entries[0].contentRect;
+        if (width > 0) {
+          const calcHeight = Math.max(500, Math.min(780, width * 0.56));
           setDimensions({
-            width,
-            height: Math.max(height, Math.min(width * 0.58, 850)),
+            width: Math.floor(width),
+            height: Math.floor(calcHeight),
           });
         }
       }
@@ -205,7 +224,7 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
     setLoading(true);
     setError(null);
     try {
-      const marketData = await sp500Service.getSP500MarketData(forceRefresh);
+      const marketData = await top500Service.getTop500MarketData(forceRefresh);
       setData(marketData);
     } catch (err: any) {
       setError(err?.message || "Failed to load Top 500 market data.");
@@ -243,10 +262,11 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
     }
 
     const { width, height } = dimensions;
-    const padding = 3;
+    const canvasBounds: Rect = { x: 0, y: 0, w: width, h: height };
+    const padding = 2;
 
     // Group companies into sectors
-    const sectorMap = new Map<string, SP500Company[]>();
+    const sectorMap = new Map<string, Top500Company[]>();
     filteredCompanies.forEach((c) => {
       const sec = c.sector || "Other";
       if (!sectorMap.has(sec)) sectorMap.set(sec, []);
@@ -262,28 +282,29 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
       .filter((s) => s.value > 0)
       .sort((a, b) => b.value - a.value);
 
-    // Lay out sector bounding boxes
-    const placedSectors = squarify(sectorItems, {
-      x: 0,
-      y: 0,
-      w: width,
-      h: height,
-    });
+    // Lay out sector bounding boxes strictly clamped to canvas bounds
+    const placedSectors = squarify(sectorItems, canvasBounds).map((sNode) => ({
+      ...sNode,
+      rect: clampRect(sNode.rect, canvasBounds),
+    }));
 
-    const placedCompanies: { company: SP500Company; rect: Rect; sector: string }[] = [];
+    const placedCompanies: { company: Top500Company; rect: Rect; sector: string }[] = [];
 
-    // Within each sector box, lay out company rectangles
+    // Within each sector box, lay out company rectangles strictly clamped to innerRect
     placedSectors.forEach((secNode) => {
       const { sector, comps } = secNode.data;
       const sRect = secNode.rect;
 
-      const headerHeight = Math.min(24, Math.max(16, sRect.h * 0.08));
-      const innerRect: Rect = {
-        x: sRect.x + padding,
-        y: sRect.y + headerHeight + padding,
-        w: Math.max(0, sRect.w - padding * 2),
-        h: Math.max(0, sRect.h - headerHeight - padding * 2),
-      };
+      const headerHeight = sRect.h < 28 ? 0 : Math.min(22, Math.max(12, Math.floor(sRect.h * 0.12)));
+      const innerRect: Rect = clampRect(
+        {
+          x: sRect.x + padding,
+          y: sRect.y + headerHeight + padding,
+          w: Math.max(0, sRect.w - padding * 2),
+          h: Math.max(0, sRect.h - headerHeight - padding * 2),
+        },
+        sRect
+      );
 
       if (innerRect.w <= 0 || innerRect.h <= 0) return;
 
@@ -297,7 +318,7 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
       placedComps.forEach((cNode) => {
         placedCompanies.push({
           company: cNode.data,
-          rect: cNode.rect,
+          rect: clampRect(cNode.rect, innerRect),
           sector,
         });
       });
@@ -465,7 +486,7 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
         ref={containerRef}
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setHoveredCompany(null)}
-        className="relative w-full bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl min-h-[600px] select-none"
+        className="relative w-full bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl min-h-[500px] select-none box-border"
         style={{ height: `${dimensions.height}px` }}
       >
         {/* Render Sector Bounding Area Labels */}
@@ -478,7 +499,7 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
             return (
               <div
                 key={sector}
-                className="absolute border border-slate-800/70 bg-slate-900/30 pointer-events-none rounded-md"
+                className="absolute border border-slate-800/70 bg-slate-900/30 pointer-events-none rounded-md overflow-hidden box-border"
                 style={{
                   left: `${r.x}px`,
                   top: `${r.y}px`,
@@ -486,19 +507,21 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
                   height: `${r.h}px`,
                 }}
               >
-                <div className="px-2 py-0.5 text-[11px] font-black uppercase tracking-wider text-slate-400/90 truncate flex items-center justify-between border-b border-slate-800/40 bg-slate-900/80">
-                  <span className="truncate">{sector}</span>
-                  {secSummary && r.w > 120 && (
-                    <span
-                      className={`font-mono text-[10px] font-bold ${
-                        secSummary.weightedChangePercent >= 0 ? "text-emerald-400" : "text-rose-400"
-                      }`}
-                    >
-                      {secSummary.weightedChangePercent >= 0 ? "+" : ""}
-                      {secSummary.weightedChangePercent.toFixed(2)}%
-                    </span>
-                  )}
-                </div>
+                {r.h >= 24 && (
+                  <div className="px-2 py-0.5 text-[11px] font-black uppercase tracking-wider text-slate-400/90 truncate flex items-center justify-between border-b border-slate-800/40 bg-slate-900/80">
+                    <span className="truncate">{sector}</span>
+                    {secSummary && r.w > 120 && (
+                      <span
+                        className={`font-mono text-[10px] font-bold ${
+                          secSummary.weightedChangePercent >= 0 ? "text-emerald-400" : "text-rose-400"
+                        }`}
+                      >
+                        {secSummary.weightedChangePercent >= 0 ? "+" : ""}
+                        {secSummary.weightedChangePercent.toFixed(2)}%
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -509,16 +532,16 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
             const color = getPerformanceColor(company.changesPercentage);
             const isHovered = hoveredCompany?.symbol === company.symbol;
 
-            const isLarge = rect.w >= 75 && rect.h >= 50;
-            const isMedium = rect.w >= 48 && rect.h >= 32;
-            const isSmall = rect.w >= 30 && rect.h >= 20;
+            const isLarge = rect.w >= 75 && rect.h >= 45;
+            const isMedium = rect.w >= 45 && rect.h >= 28;
+            const isSmall = rect.w >= 28 && rect.h >= 18;
 
             return (
               <div
                 key={company.symbol}
                 onClick={() => onSelectStock(company.symbol)}
                 onMouseEnter={() => setHoveredCompany(company)}
-                className={`absolute transition-all duration-150 cursor-pointer overflow-hidden flex flex-col items-center justify-center p-1 rounded-sm group ${
+                className={`absolute transition-all duration-150 cursor-pointer overflow-hidden flex flex-col items-center justify-center p-0.5 rounded-sm box-border ${
                   isHovered ? "z-30 ring-2 ring-white scale-[1.01] shadow-2xl" : "z-10 hover:z-20"
                 }`}
                 style={{
@@ -529,11 +552,12 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
                   backgroundColor: color.bg,
                   borderColor: color.border,
                   borderWidth: "1px",
+                  boxSizing: "border-box",
                 }}
               >
                 {/* Labels based on block dimensions */}
                 {isLarge ? (
-                  <div className="text-center min-w-0 max-w-full px-0.5 leading-tight">
+                  <div className="text-center min-w-0 max-w-full px-0.5 leading-tight overflow-hidden">
                     <div className="font-extrabold text-xs sm:text-sm tracking-tight text-white truncate drop-shadow-sm">
                       {company.symbol}
                     </div>
@@ -549,7 +573,7 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
                     </div>
                   </div>
                 ) : isMedium ? (
-                  <div className="text-center min-w-0 max-w-full px-0.5 leading-tight">
+                  <div className="text-center min-w-0 max-w-full px-0.5 leading-tight overflow-hidden">
                     <div className="font-extrabold text-xs text-white truncate drop-shadow-sm">
                       {company.symbol}
                     </div>
@@ -562,7 +586,7 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
                     </div>
                   </div>
                 ) : isSmall ? (
-                  <div className="font-black text-[10px] text-white truncate drop-shadow-sm px-0.5">
+                  <div className="font-black text-[10px] text-white truncate drop-shadow-sm px-0.5 overflow-hidden">
                     {company.symbol}
                   </div>
                 ) : null}
@@ -582,8 +606,8 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <div>
                 <div className="font-black text-sm text-white flex items-center gap-2">
-                  <span>{hoveredCompany.name}</span>
-                  <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">
+                  <span className="truncate max-w-[140px]">{hoveredCompany.name}</span>
+                  <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800 flex-shrink-0">
                     {hoveredCompany.symbol}
                   </span>
                 </div>
@@ -624,3 +648,5 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
     </div>
   );
 };
+
+export const SP500Treemap = Top500Treemap;

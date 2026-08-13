@@ -72,4 +72,26 @@ describe("Top500Service Unit Tests", () => {
     expect(cachedData.companies[0].symbol).toBe("NVDA");
     expect(mockScreener).toHaveBeenCalledTimes(1); // Still 1 API call!
   });
+
+  it("3. Deduplicates multiple share classes for the same company (e.g. GOOG / GOOGL)", async () => {
+    const mockMultiShareCandidates = [
+      { symbol: "AAPL", companyName: "Apple Inc.", sector: "Technology", price: 220, marketCap: 3300000000000 },
+      { symbol: "GOOGL", companyName: "Alphabet Inc. Class A", sector: "Technology", price: 175, marketCap: 2200000000000 },
+      { symbol: "GOOG", companyName: "Alphabet Inc. Class C", sector: "Technology", price: 174, marketCap: 2190000000000 },
+      { symbol: "BRK-A", companyName: "Berkshire Hathaway Inc. Class A", sector: "Financials", price: 600000, marketCap: 900000000000 },
+      { symbol: "BRK-B", companyName: "Berkshire Hathaway Inc. Class B", sector: "Financials", price: 400, marketCap: 890000000000 },
+    ];
+
+    vi.spyOn(fmpService, "getCompanyScreenerPool").mockResolvedValue(mockMultiShareCandidates);
+
+    const data = await top500Service.getTop500MarketData(true);
+
+    expect(data.companies.length).toBe(3); // AAPL, GOOGL, BRK-A
+    const symbols = data.companies.map((c) => c.symbol);
+
+    expect(symbols).toContain("AAPL");
+    expect(symbols.includes("GOOGL") || symbols.includes("GOOG")).toBe(true);
+    expect(symbols.includes("GOOGL") && symbols.includes("GOOG")).toBe(false); // NO DUPLICATE!
+    expect(symbols.includes("BRK-A") && symbols.includes("BRK-B")).toBe(false); // NO DUPLICATE!
+  });
 });

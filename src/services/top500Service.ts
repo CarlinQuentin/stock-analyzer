@@ -28,7 +28,7 @@ export interface Top500MarketData {
   lastUpdated: string;
 }
 
-const CACHE_KEY = "investors_edge_top500_treemap_cache_v3";
+const CACHE_KEY = "investors_edge_top500_treemap_cache_v4";
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache TTL
 
 const SECTOR_NAME_MAP: Record<string, string> = {
@@ -48,6 +48,52 @@ const SECTOR_NAME_MAP: Record<string, string> = {
 export function normalizeSectorName(rawSector: string): string {
   if (!rawSector) return "Other";
   return SECTOR_NAME_MAP[rawSector] || rawSector;
+}
+
+/**
+ * Create a normalized company key for generic share class deduplication.
+ * E.g., "Alphabet Inc. - Class A" & "Alphabet Inc. - Class C" -> "alphabet_google"
+ * "Berkshire Hathaway Inc. Class A" & "Berkshire Hathaway Inc. Class B" -> "berkshire_hathaway"
+ */
+export function getCompanyDedupKey(companyName: string, symbol: string): string {
+  if (!companyName && !symbol) return "";
+
+  const cleanSym = symbol.toUpperCase().trim();
+
+  // Known multi-class symbol pairs (GOOG/GOOGL, BRK.A/BRK.B, FOX/FOXA, NWS/NWSA, Z/ZG)
+  if (cleanSym === "GOOG" || cleanSym === "GOOGL") return "alphabet_google";
+  if (cleanSym.startsWith("BRK")) return "berkshire_hathaway";
+  if (cleanSym === "FOX" || cleanSym === "FOXA") return "fox_corp";
+  if (cleanSym === "NWS" || cleanSym === "NWSA") return "news_corp";
+  if (cleanSym === "Z" || cleanSym === "ZG") return "zillow_group";
+
+  // Generic symbol base matching (e.g. BRK-A -> BRK, UHAL-B -> UHAL)
+  const baseSymMatch = cleanSym.match(/^([A-Z]{1,4})[-.][A-Z0-9]$/);
+  if (baseSymMatch) return `base_sym_${baseSymMatch[1]}`;
+
+  // Generic company name normalization
+  let normName = (companyName || "").toLowerCase();
+
+  // Strip corporate suffixes
+  normName = normName.replace(
+    /,?\s*(inc|incorporated|corp|corporation|co|company|ltd|limited|plc|nv|sa|holdings|group)\b.*$/g,
+    ""
+  );
+
+  // Strip share class designations
+  normName = normName
+    .replace(
+      /,?\s*(class\s+[a-z0-9]|series\s+[a-z0-9]|cl\s+[a-z0-9]|type\s+[a-z0-9]|common\s+stock|ordinary\s+shares).*$/g,
+      ""
+    )
+    .replace(/[-.\s]+$/g, "")
+    .trim();
+
+  if (normName.length >= 3) {
+    return normName;
+  }
+
+  return cleanSym;
 }
 
 function getDailyChangePct(item: any): { changePct: number; dollarChange: number } {
@@ -107,7 +153,7 @@ class Top500Service {
 
   /**
    * Fetch largest 500 U.S. Companies by Market Capitalization using EXACTLY 1 FMP API call.
-   * Filters invalid market caps, explicitly sorts descending by marketCap, and takes the top 500.
+   * Filters invalid market caps, deduplicates multi-share classes, sorts descending by marketCap, and takes the top 500.
    */
   async getTop500MarketData(forceRefresh: boolean = false): Promise<Top500MarketData> {
     if (!forceRefresh) {
@@ -143,8 +189,20 @@ class Top500Service {
           return mktCapB - mktCapA;
         });
 
-        // 3. Take the first 500 companies after sorting
-        const top500Pool = validCompanies.slice(0, 500);
+        // 3. Deduplicate multiple share classes for the same company (keeping 1 ticker per company)
+        const dedupedCompanies: any[] = [];
+        const seenKeys = new Set<string>();
+
+        validCompanies.forEach((item: any) => {
+          const key = getCompanyDedupKey(item.companyName || item.name || "", item.symbol || "");
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            dedupedCompanies.push(item);
+          }
+        });
+
+        // 4. Take the first 500 unique companies after sorting & deduplication
+        const top500Pool = dedupedCompanies.slice(0, 500);
 
         const companies: Top500Company[] = [];
         let totalMarketCap = 0;
@@ -270,7 +328,6 @@ class Top500Service {
 }
 
 export const top500Service = new Top500Service();
-// Backwards compatibility re-export
 export const sp500Service = top500Service;
 export type SP500Company = Top500Company;
 export type SP500MarketData = Top500MarketData;
