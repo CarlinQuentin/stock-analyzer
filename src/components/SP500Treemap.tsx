@@ -24,7 +24,7 @@ interface PlacedNode<T> {
 }
 
 /**
- * Safe canvas inset margin around the perimeter of the treemap container (in pixels)
+ * Safe container inner padding margin (in pixels) matching 14px padding
  */
 export const CANVAS_MARGIN = 14;
 
@@ -52,17 +52,17 @@ export function getTileContentConfig(w: number, h: number) {
   const innerW = Math.max(0, w - 2);
   const innerH = Math.max(0, h - 2);
 
-  // Dynamic font sizing based on actual tile dimensions
-  const tickerFontSize = Math.max(8, Math.min(13, Math.floor(Math.min(innerW * 0.24, innerH * 0.35))));
-  const changeFontSize = Math.max(7, Math.min(10, Math.floor(tickerFontSize * 0.82)));
+  // Dynamic font sizing based on available tile interior width & height
+  const tickerFontSize = Math.max(8, Math.min(13, Math.floor(Math.min(innerW * 0.22, innerH * 0.34))));
+  const changeFontSize = Math.max(7, Math.min(10, Math.floor(tickerFontSize * 0.8)));
 
   let showName = false;
   let showChange = false;
 
-  if (innerW >= 68 && innerH >= 42) {
+  if (innerW >= 64 && innerH >= 40) {
     showName = true;
     showChange = true;
-  } else if (innerW >= 34 && innerH >= 22) {
+  } else if (innerW >= 32 && innerH >= 20) {
     showChange = true;
   }
 
@@ -235,23 +235,38 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
     height: 680,
   });
 
-  // Measure container dimensions with ResizeObserver
+  // Measure container dimensions with ResizeObserver and calculate responsive height curve
   useEffect(() => {
     if (!containerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      if (entries.length > 0) {
-        const { width } = entries[0].contentRect;
-        if (width > 0) {
-          const calcHeight = Math.max(500, Math.min(780, width * 0.56));
-          setDimensions({
-            width: Math.floor(width),
-            height: Math.floor(calcHeight),
-          });
+
+    const updateSize = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        if (rect.width > 0) {
+          const w = Math.floor(rect.width);
+          let calcHeight = 680;
+          if (w >= 1024) {
+            calcHeight = Math.max(560, Math.min(800, Math.floor(w * 0.54)));
+          } else if (w >= 640) {
+            calcHeight = Math.max(520, Math.floor(w * 0.65));
+          } else {
+            calcHeight = Math.max(550, Math.floor(w * 0.9));
+          }
+
+          setDimensions({ width: w, height: calcHeight });
         }
       }
-    });
+    };
+
+    updateSize();
+
+    const observer = new ResizeObserver(updateSize);
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    window.addEventListener("resize", updateSize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateSize);
+    };
   }, []);
 
   const fetchData = async (forceRefresh: boolean = false) => {
@@ -297,7 +312,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
 
     const { width, height } = dimensions;
 
-    // Safe inset layout bounds: all tiles are placed strictly inside this inset boundary
+    // Safe inset layout bounds matching 14px container inner margin
     const canvasBounds: Rect = {
       x: CANVAS_MARGIN,
       y: CANVAS_MARGIN,
@@ -538,7 +553,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
         ref={containerRef}
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setHoveredCompany(null)}
-        className="relative w-full bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl min-h-[500px] select-none box-border p-3.5"
+        className="relative w-full bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl min-h-[500px] select-none box-border overflow-hidden"
         style={{ height: `${dimensions.height}px` }}
       >
         {/* Render Sector Bounding Area Labels */}
@@ -591,7 +606,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
                 onClick={() => onSelectStock(company.symbol)}
                 onMouseEnter={() => setHoveredCompany(company)}
                 className={`absolute transition-all duration-150 cursor-pointer overflow-hidden flex flex-col items-center justify-center p-0.5 rounded-sm box-border select-none ${
-                  isHovered ? "z-30 ring-2 ring-white scale-[1.01] shadow-2xl" : "z-10 hover:z-20"
+                  isHovered ? "z-30 ring-2 ring-white scale-[1.005] shadow-2xl" : "z-10 hover:z-20"
                 }`}
                 style={{
                   left: `${rect.x}px`,
@@ -605,7 +620,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
                 }}
               >
                 {/* Dynamically scaled content fitting tile bounds strictly */}
-                <div className="flex flex-col items-center justify-center w-full h-full p-0.5 overflow-hidden leading-tight select-none pointer-events-none text-center">
+                <div className="flex flex-col items-center justify-center w-full h-full p-0.5 overflow-hidden leading-none select-none pointer-events-none text-center">
                   <div
                     className="font-extrabold tracking-tight text-white truncate max-w-full drop-shadow-sm leading-none"
                     style={{ fontSize: `${config.tickerFontSize}px` }}
