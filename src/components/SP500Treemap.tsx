@@ -24,9 +24,10 @@ interface PlacedNode<T> {
 }
 
 /**
- * Safe container inner padding margin (in pixels) ensuring generous 20px breathing room on all sides
+ * Safe container inner padding margin (in pixels) ensuring generous 28px breathing room on all sides
+ * so all treemap data fits completely inside the visible container at default view
  */
-export const CANVAS_MARGIN = 20;
+export const CANVAS_MARGIN = 28;
 
 /**
  * Strict rectangle bounds clamping to prevent any pixel from overflowing parent container
@@ -57,17 +58,12 @@ export function getTileContentConfig(w: number, h: number) {
   const changeFontSize = Math.max(7, Math.min(10, Math.floor(tickerFontSize * 0.8)));
 
   let showName = false;
-  let showScore = false;
   let showChange = false;
 
-  if (innerW >= 75 && innerH >= 45) {
+  if (innerW >= 70 && innerH >= 42) {
     showName = true;
-    showScore = true;
     showChange = true;
-  } else if (innerW >= 45 && innerH >= 28) {
-    showScore = true;
-    showChange = true;
-  } else if (innerW >= 28 && innerH >= 18) {
+  } else if (innerW >= 32 && innerH >= 20) {
     showChange = true;
   }
 
@@ -75,7 +71,6 @@ export function getTileContentConfig(w: number, h: number) {
     tickerFontSize,
     changeFontSize,
     showName,
-    showScore,
     showChange,
   };
 }
@@ -424,7 +419,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
 
     const { width, height } = dimensions;
 
-    // Safe inset layout bounds matching 20px container inner margin to guarantee right-side data fits comfortably
+    // Safe inset layout bounds matching 28px container inner margin to guarantee all treemap data fits completely
     const canvasBounds: Rect = {
       x: CANVAS_MARGIN,
       y: CANVAS_MARGIN,
@@ -587,7 +582,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
               </div>
             </div>
             <p className="text-xs sm:text-sm text-slate-400 mt-1">
-              Finviz-style Market Map • Area weighted by Market Cap • Heatmap colored by Performance & Business Quality Score
+              Finviz-style Market Map • Area weighted by Market Cap • Heatmap colored by Performance
             </p>
           </div>
 
@@ -782,14 +777,6 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
                     >
                       {company.symbol}
                     </div>
-
-                    {config.showScore && (
-                      <div className="mt-0.5 hidden sm:block">
-                        <span className="text-[8px] sm:text-[9px] font-extrabold font-mono px-1 py-0.2 rounded bg-slate-950/70 text-amber-300 border border-amber-500/40 leading-none">
-                          QS:{company.qualityScore}
-                        </span>
-                      </div>
-                    )}
 
                     {config.showName && (
                       <div className="text-[9px] text-slate-200/90 font-medium truncate max-w-full leading-none mt-0.5 hidden sm:block">
