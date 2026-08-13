@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { MarketMovers } from "./MarketMovers";
+import { SP500Treemap } from "./SP500Treemap";
 import { fmpService } from "../services/financialModelingPrep";
 import { CompanySearchResult } from "../types";
 
@@ -200,35 +200,8 @@ export const StockSearch: React.FC<StockSearchProps> = ({
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto mb-8">
-          <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-xl shadow-sm p-4 border border-slate-200/60 dark:border-slate-700/50 transition-colors">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
-              <span>🔍</span> Search Ticker or Name
-            </h3>
-            <p className="text-slate-600 dark:text-slate-400 text-xs">
-              Search by company name (e.g., Apple, Steel Dynamics) or ticker symbol.
-            </p>
-          </div>
-          <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-xl shadow-sm p-4 border border-slate-200/60 dark:border-slate-700/50 transition-colors">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
-              <span>🎯</span> Quality & Valuation
-            </h3>
-            <p className="text-slate-600 dark:text-slate-400 text-xs">
-              Weighted 0-100 quality scoring and historical valuation multiple analysis.
-            </p>
-          </div>
-          <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-xl shadow-sm p-4 border border-slate-200/60 dark:border-slate-700/50 transition-colors">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
-              <span>📈</span> Interactive Price Chart
-            </h3>
-            <p className="text-slate-600 dark:text-slate-400 text-xs">
-              5+ years price history, crosshair inspection, and timeframe filters.
-            </p>
-          </div>
-        </div>
-
-        {/* Previous Day Market Movers */}
-        <MarketMovers onSelectStock={onSearch} />
+        {/* Interactive S&P 500 Market Cap Treemap */}
+        <SP500Treemap onSelectStock={onSearch} />
       </div>
     </div>
   );

@@ -359,6 +359,34 @@ class FinancialModelingPrepService {
     }
   }
 
+  async getSP500Constituents(): Promise<any[]> {
+    try {
+      const response = await this.client.get("/sp500_constituent", {
+        params: this.getParams(),
+      });
+      if (!response.data || !Array.isArray(response.data)) return [];
+      return response.data;
+    } catch (error) {
+      console.warn("Failed to fetch S&P 500 constituents:", error);
+      return [];
+    }
+  }
+
+  async getBatchQuotes(symbols: string[]): Promise<any[]> {
+    if (!symbols || symbols.length === 0) return [];
+    try {
+      const symbolString = symbols.join(",");
+      const response = await this.client.get(`/quote/${symbolString}`, {
+        params: this.getParams(),
+      });
+      if (!response.data || !Array.isArray(response.data)) return [];
+      return response.data;
+    } catch (error) {
+      console.warn("Failed to fetch batch quotes:", error);
+      return [];
+    }
+  }
+
   async getDividendMetrics(ticker: string): Promise<DividendMetrics> {
     try {
       const response = await this.client.get("/ratios-ttm", {
