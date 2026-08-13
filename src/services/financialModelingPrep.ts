@@ -359,33 +359,7 @@ class FinancialModelingPrepService {
     }
   }
 
-  async getSP500Constituents(): Promise<any[]> {
-    // 1. Try Stable endpoint /sp500-constituent
-    try {
-      const response = await this.client.get("/sp500-constituent", {
-        params: this.getParams(),
-      });
-      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-        return response.data;
-      }
-    } catch {
-      // Endpoint restricted (402) under plan
-    }
-
-    // 2. Try Legacy endpoint /v3/sp500_constituent
-    try {
-      const legacyClient = axios.create({ baseURL: "https://financialmodelingprep.com/api/v3" });
-      const response = await legacyClient.get("/sp500_constituent", {
-        params: this.getParams(),
-      });
-      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-        return response.data;
-      }
-    } catch {
-      // Legacy endpoint unsupported (403)
-    }
-
-    // 3. Fallback to /company-screener (accessible under standard FMP plan)
+  async getCompanyScreenerPool(): Promise<any[]> {
     try {
       const response = await this.client.get("/company-screener", {
         params: {
@@ -394,23 +368,20 @@ class FinancialModelingPrepService {
           country: "US",
           isEtf: false,
           isActivelyTrading: true,
-          limit: 500,
+          limit: 1000,
         },
       });
       if (response.data && Array.isArray(response.data)) {
-        return response.data.map((item: any) => ({
-          symbol: item.symbol,
-          name: item.companyName || item.symbol,
-          sector: item.sector || "Other",
-          marketCap: item.marketCap || 0,
-          price: item.price || 0,
-        }));
+        return response.data;
       }
     } catch (error) {
-      console.warn("Failed to fetch S&P 500 constituents from all FMP sources:", error);
+      console.warn("Failed to fetch company screener pool:", error);
     }
-
     return [];
+  }
+
+  async getSP500Constituents(): Promise<any[]> {
+    return this.getCompanyScreenerPool();
   }
 
   async getBatchQuotes(symbols: string[]): Promise<any[]> {

@@ -208,7 +208,7 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
       const marketData = await sp500Service.getSP500MarketData(forceRefresh);
       setData(marketData);
     } catch (err: any) {
-      setError(err?.message || "Failed to load S&P 500 market data.");
+      setError(err?.message || "Failed to load Top 500 market data.");
     } finally {
       setLoading(false);
     }
@@ -364,7 +364,7 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
           <div>
             <div className="flex items-center gap-3 flex-wrap">
               <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
-                <span>🗺️</span> S&P 500 Market Cap Treemap
+                <span>🗺️</span> Top 500 U.S. Companies Treemap
               </h2>
               <div className="flex items-center gap-2">
                 <span
@@ -387,7 +387,7 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
               </div>
             </div>
             <p className="text-xs sm:text-sm text-slate-400 mt-1">
-              500 companies • Market capitalization weighted • Real-time performance heatmap
+              Largest 500 U.S. companies • Market capitalization weighted • Real-time performance heatmap
             </p>
           </div>
 
@@ -399,7 +399,7 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
                 <span className="font-extrabold text-white">{formatMarketCap(totalMarketCap)}</span>
               </div>
               <div className="bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700/60">
-                <span className="text-slate-400 block text-[10px] uppercase font-sans">S&P 500 Day</span>
+                <span className="text-slate-400 block text-[10px] uppercase font-sans">Top 500 Day</span>
                 <span
                   className={`font-extrabold ${
                     weightedChangePercent >= 0 ? "text-emerald-400" : "text-rose-400"
@@ -416,7 +416,7 @@ export const SP500Treemap: React.FC<SP500TreemapProps> = ({ onSelectStock }) => 
               onClick={() => fetchData(true)}
               disabled={loading}
               className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl border border-slate-700 text-xs font-semibold transition-all flex items-center gap-1.5 disabled:opacity-50"
-              title="Refresh S&P 500 quotes"
+              title="Refresh Top 500 quotes"
             >
               <span className={loading ? "animate-spin" : ""}>🔄</span>
               <span className="hidden sm:inline">Refresh</span>
