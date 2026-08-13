@@ -28,7 +28,7 @@ export interface Top500MarketData {
   lastUpdated: string;
 }
 
-const CACHE_KEY = "investors_edge_top500_treemap_cache_v4";
+const CACHE_KEY = "investors_edge_top100_treemap_cache_v5";
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache TTL
 
 const SECTOR_NAME_MAP: Record<string, string> = {
@@ -108,7 +108,6 @@ function getDailyChangePct(item: any): { changePct: number; dollarChange: number
   }
 
   // Deterministic daily change calculation derived from stock beta & symbol hash
-  // Guarantees high-density red/green performance heatmap visualization with ZERO extra API requests
   let hash = 0;
   const sym = item.symbol || "";
   for (let i = 0; i < sym.length; i++) {
@@ -127,6 +126,27 @@ function getDailyChangePct(item: any): { changePct: number; dollarChange: number
 
 class Top500Service {
   private pendingRequest: Promise<Top500MarketData> | null = null;
+
+  constructor() {
+    this.purgeStaleCaches();
+  }
+
+  /**
+   * Purge legacy cache keys from previous 500-company iterations
+   */
+  private purgeStaleCaches() {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    const legacyKeys = [
+      "investors_edge_sp500_treemap_cache_v2",
+      "investors_edge_top500_treemap_cache_v3",
+      "investors_edge_top500_treemap_cache_v4",
+    ];
+    legacyKeys.forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch {}
+    });
+  }
 
   /**
    * Determine US Stock Market open status based on current Eastern Time
@@ -152,8 +172,8 @@ class Top500Service {
   }
 
   /**
-   * Fetch largest 500 U.S. Companies by Market Capitalization using EXACTLY 1 FMP API call.
-   * Filters invalid market caps, deduplicates multi-share classes, sorts descending by marketCap, and takes the top 500.
+   * Fetch largest 100 U.S. Companies by Market Capitalization using EXACTLY 1 FMP API call.
+   * Pipeline: Screener candidate pool -> Exclude invalid market caps -> Sort by marketCap DESC -> Deduplicate share classes -> Take top 100.
    */
   async getTop500MarketData(forceRefresh: boolean = false): Promise<Top500MarketData> {
     if (!forceRefresh) {
@@ -172,7 +192,7 @@ class Top500Service {
         // EXACTLY 1 FMP API CALL to fetch U.S. company screener candidate pool
         const screenerData = await fmpService.getCompanyScreenerPool();
         if (!screenerData || !Array.isArray(screenerData) || screenerData.length === 0) {
-          throw new Error("Failed to retrieve Top 500 company market data.");
+          throw new Error("Failed to retrieve Top 100 company market data.");
         }
 
         // 1. Exclude companies with missing, null, zero, or invalid market-cap values
@@ -189,7 +209,7 @@ class Top500Service {
           return mktCapB - mktCapA;
         });
 
-        // 3. Deduplicate multiple share classes for the same company (keeping 1 ticker per company)
+        // 3. Deduplicate multiple share classes for the same company (keeping 1 primary ticker per company)
         const dedupedCompanies: any[] = [];
         const seenKeys = new Set<string>();
 
@@ -201,8 +221,8 @@ class Top500Service {
           }
         });
 
-        // 4. Take the first 100 unique companies after sorting & deduplication
-        const top500Pool = dedupedCompanies.slice(0, 100);
+        // 4. Take EXCLUSIVELY the first 100 unique companies after sorting & deduplication
+        const top100Pool = dedupedCompanies.slice(0, 100);
 
         const companies: Top500Company[] = [];
         let totalMarketCap = 0;
@@ -210,7 +230,7 @@ class Top500Service {
 
         const sectorMap = new Map<string, { marketCap: number; count: number; weightedChangeSum: number }>();
 
-        top500Pool.forEach((item: any) => {
+        top100Pool.forEach((item: any) => {
           const symbol = item.symbol.toUpperCase();
           const name = item.companyName || item.name || symbol;
           const sector = normalizeSectorName(item.sector);
@@ -268,7 +288,7 @@ class Top500Service {
         this.setCache(data);
         return data;
       } catch (error) {
-        console.error("Top500MarketData fetch error:", error);
+        console.error("Top100MarketData fetch error:", error);
         const staleCache = this.getCacheIgnoreTTL();
         if (staleCache) return staleCache;
         throw error;
@@ -291,6 +311,11 @@ class Top500Service {
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       if (Date.now() - parsed.timestamp < CACHE_TTL_MS && parsed.data?.companies?.length > 0) {
+        // Strict assertion: Reject cache if it contains more than 100 companies from an older build
+        if (parsed.data.companies.length > 100) {
+          localStorage.removeItem(CACHE_KEY);
+          return null;
+        }
         return parsed.data;
       }
       return null;
@@ -305,6 +330,9 @@ class Top500Service {
       const raw = localStorage.getItem(CACHE_KEY);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
+      if (parsed.data?.companies?.length > 100) {
+        parsed.data.companies = parsed.data.companies.slice(0, 100);
+      }
       return parsed.data || null;
     } catch {
       return null;
@@ -322,7 +350,7 @@ class Top500Service {
         })
       );
     } catch (e) {
-      console.warn("Failed to set Top 500 cache in localStorage:", e);
+      console.warn("Failed to set Top 100 cache in localStorage:", e);
     }
   }
 }

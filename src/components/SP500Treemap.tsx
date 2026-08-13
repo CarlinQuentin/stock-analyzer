@@ -227,7 +227,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
       const marketData = await top500Service.getTop500MarketData(forceRefresh);
       setData(marketData);
     } catch (err: any) {
-      setError(err?.message || "Failed to load Top 500 market data.");
+      setError(err?.message || "Failed to load Top 100 market data.");
     } finally {
       setLoading(false);
     }
