@@ -415,8 +415,9 @@ class FinancialModelingPrepService {
 
   async getBatchQuotes(symbols: string[]): Promise<any[]> {
     if (!symbols || symbols.length === 0) return [];
+    const safeSymbols = symbols.slice(0, 10);
     try {
-      const promises = symbols.map((sym) =>
+      const promises = safeSymbols.map((sym) =>
         this.client
           .get("/quote", { params: { ...this.getParams(), symbol: sym } })
           .then((res) => (res.data && Array.isArray(res.data) && res.data[0] ? res.data[0] : null))

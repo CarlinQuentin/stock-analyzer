@@ -25,21 +25,16 @@ describe("SP500Service Unit Tests", () => {
     vi.restoreAllMocks();
   });
 
-  it("1. Fetches constituents and batch quotes to compute market caps and sector summaries", async () => {
-    vi.spyOn(fmpService, "getSP500Constituents").mockResolvedValue([
-      { symbol: "AAPL", name: "Apple Inc.", sector: "Information Technology" },
-      { symbol: "MSFT", name: "Microsoft Corp.", sector: "Information Technology" },
-      { symbol: "JPM", name: "JPMorgan Chase & Co.", sector: "Financials" },
-    ]);
-
-    vi.spyOn(fmpService, "getBatchQuotes").mockResolvedValue([
-      { symbol: "AAPL", name: "Apple Inc.", price: 220, change: 2.2, changesPercentage: 1.0, marketCap: 3300000000000 },
-      { symbol: "MSFT", name: "Microsoft Corp.", price: 420, change: -4.2, changesPercentage: -1.0, marketCap: 3100000000000 },
-      { symbol: "JPM", name: "JPMorgan Chase & Co.", price: 210, change: 1.05, changesPercentage: 0.5, marketCap: 600000000000 },
+  it("1. Uses EXACTLY 1 API call to get S&P 500 market data and normalizes sectors", async () => {
+    const spy = vi.spyOn(fmpService, "getSP500Constituents").mockResolvedValue([
+      { symbol: "AAPL", name: "Apple Inc.", sector: "Technology", price: 220, marketCap: 3300000000000 },
+      { symbol: "MSFT", name: "Microsoft Corp.", sector: "Technology", price: 420, marketCap: 3100000000000 },
+      { symbol: "JPM", name: "JPMorgan Chase & Co.", sector: "Financial Services", price: 210, marketCap: 600000000000 },
     ]);
 
     const data = await sp500Service.getSP500MarketData(true);
 
+    expect(spy).toHaveBeenCalledTimes(1);
     expect(data).toBeDefined();
     expect(data.companies.length).toBe(3);
     expect(data.totalMarketCap).toBe(7000000000000);
@@ -51,22 +46,24 @@ describe("SP500Service Unit Tests", () => {
     expect(techSector?.marketCap).toBe(6400000000000);
   });
 
-  it("2. Caches S&P 500 market data in localStorage to prevent unnecessary API calls", async () => {
+  it("2. Deduplicates concurrent in-flight requests and reuses localStorage cache", async () => {
     const mockConstituents = vi.spyOn(fmpService, "getSP500Constituents").mockResolvedValue([
-      { symbol: "NVDA", name: "NVIDIA Corp", sector: "Information Technology" },
-    ]);
-    vi.spyOn(fmpService, "getBatchQuotes").mockResolvedValue([
-      { symbol: "NVDA", name: "NVIDIA Corp", price: 125, change: 2.5, changesPercentage: 2.0, marketCap: 3000000000000 },
+      { symbol: "NVDA", name: "NVIDIA Corp", sector: "Technology", price: 125, marketCap: 3000000000000 },
     ]);
 
-    // First call populates cache
-    const firstCallData = await sp500Service.getSP500MarketData(true);
-    expect(firstCallData.companies[0].symbol).toBe("NVDA");
-    expect(mockConstituents).toHaveBeenCalledTimes(1);
+    // Concurrent calls share the same in-flight Promise
+    const [res1, res2] = await Promise.all([
+      sp500Service.getSP500MarketData(true),
+      sp500Service.getSP500MarketData(true),
+    ]);
 
-    // Second call reuses cache
+    expect(res1.companies[0].symbol).toBe("NVDA");
+    expect(res2.companies[0].symbol).toBe("NVDA");
+    expect(mockConstituents).toHaveBeenCalledTimes(1); // EXACTLY 1 API call made!
+
+    // Subsequent call uses valid cache
     const cachedData = await sp500Service.getSP500MarketData(false);
     expect(cachedData.companies[0].symbol).toBe("NVDA");
-    expect(mockConstituents).toHaveBeenCalledTimes(1); // Not called again
+    expect(mockConstituents).toHaveBeenCalledTimes(1); // Still 1 API call!
   });
 });
