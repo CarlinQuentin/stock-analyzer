@@ -25,7 +25,7 @@ describe("Top500Service Unit Tests", () => {
     vi.restoreAllMocks();
   });
 
-  it("1. Filters invalid/null/zero market caps, sorts descending by marketCap, and caps to top 500", async () => {
+  it("1. Filters invalid/null/zero market caps, sorts descending by marketCap, and caps to top 100", async () => {
     const mockUnsortedCandidates = [
       { symbol: "SMALL", companyName: "Small Corp", sector: "Industrials", price: 10, marketCap: 50000000 },
       { symbol: "INVALID_ZERO", companyName: "Zero Cap", sector: "Technology", price: 5, marketCap: 0 },
@@ -93,5 +93,23 @@ describe("Top500Service Unit Tests", () => {
     expect(symbols.includes("GOOGL") || symbols.includes("GOOG")).toBe(true);
     expect(symbols.includes("GOOGL") && symbols.includes("GOOG")).toBe(false); // NO DUPLICATE!
     expect(symbols.includes("BRK-A") && symbols.includes("BRK-B")).toBe(false); // NO DUPLICATE!
+  });
+
+  it("4. Caps candidate pool to top 100 companies by market cap", async () => {
+    const candidates = Array.from({ length: 150 }, (_, i) => ({
+      symbol: `SYM${i}`,
+      companyName: `Company ${i}`,
+      sector: "Technology",
+      price: 100,
+      marketCap: (150 - i) * 1000000000,
+    }));
+
+    vi.spyOn(fmpService, "getCompanyScreenerPool").mockResolvedValue(candidates);
+
+    const data = await top500Service.getTop500MarketData(true);
+
+    expect(data.companies.length).toBe(100);
+    expect(data.companies[0].symbol).toBe("SYM0"); // Highest market cap
+    expect(data.companies[99].symbol).toBe("SYM99");
   });
 });

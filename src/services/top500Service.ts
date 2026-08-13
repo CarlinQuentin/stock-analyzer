@@ -201,8 +201,8 @@ class Top500Service {
           }
         });
 
-        // 4. Take the first 500 unique companies after sorting & deduplication
-        const top500Pool = dedupedCompanies.slice(0, 500);
+        // 4. Take the first 100 unique companies after sorting & deduplication
+        const top500Pool = dedupedCompanies.slice(0, 100);
 
         const companies: Top500Company[] = [];
         let totalMarketCap = 0;

@@ -200,7 +200,7 @@ export const StockSearch: React.FC<StockSearchProps> = ({
           )}
         </div>
 
-        {/* Interactive Top 500 U.S. Companies Market Cap Treemap */}
+        {/* Interactive Top 100 U.S. Companies Market Cap Treemap */}
         <SP500Treemap onSelectStock={onSearch} />
       </div>
     </div>
