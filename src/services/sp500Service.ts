@@ -114,11 +114,13 @@ class SP500Service {
         const price = typeof q.price === "number" ? q.price : parseFloat(q.price) || 0;
         const change = typeof q.change === "number" ? q.change : parseFloat(q.change) || 0;
         const changesPercentage =
-          typeof q.changesPercentage === "number"
+          typeof q.changePercentage === "number"
+            ? q.changePercentage
+            : typeof q.changesPercentage === "number"
             ? q.changesPercentage
             : typeof q.changePercent === "number"
             ? q.changePercent
-            : parseFloat(q.changesPercentage) || 0;
+            : parseFloat(q.changePercentage || q.changesPercentage) || 0;
         const marketCap = typeof q.marketCap === "number" ? q.marketCap : parseFloat(q.marketCap) || 0;
 
         if (marketCap <= 0) return;

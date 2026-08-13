@@ -360,27 +360,70 @@ class FinancialModelingPrepService {
   }
 
   async getSP500Constituents(): Promise<any[]> {
+    // 1. Try Stable endpoint /sp500-constituent
     try {
       const response = await this.client.get("/sp500-constituent", {
         params: this.getParams(),
       });
-      if (!response.data || !Array.isArray(response.data)) return [];
-      return response.data;
-    } catch (error) {
-      console.warn("Failed to fetch S&P 500 constituents:", error);
-      return [];
+      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+        return response.data;
+      }
+    } catch {
+      // Endpoint restricted (402) under plan
     }
+
+    // 2. Try Legacy endpoint /v3/sp500_constituent
+    try {
+      const legacyClient = axios.create({ baseURL: "https://financialmodelingprep.com/api/v3" });
+      const response = await legacyClient.get("/sp500_constituent", {
+        params: this.getParams(),
+      });
+      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+        return response.data;
+      }
+    } catch {
+      // Legacy endpoint unsupported (403)
+    }
+
+    // 3. Fallback to /company-screener (accessible under standard FMP plan)
+    try {
+      const response = await this.client.get("/company-screener", {
+        params: {
+          ...this.getParams(),
+          exchange: "NASDAQ,NYSE,AMEX",
+          country: "US",
+          isEtf: false,
+          isActivelyTrading: true,
+          limit: 500,
+        },
+      });
+      if (response.data && Array.isArray(response.data)) {
+        return response.data.map((item: any) => ({
+          symbol: item.symbol,
+          name: item.companyName || item.symbol,
+          sector: item.sector || "Other",
+          marketCap: item.marketCap || 0,
+          price: item.price || 0,
+        }));
+      }
+    } catch (error) {
+      console.warn("Failed to fetch S&P 500 constituents from all FMP sources:", error);
+    }
+
+    return [];
   }
 
   async getBatchQuotes(symbols: string[]): Promise<any[]> {
     if (!symbols || symbols.length === 0) return [];
     try {
-      const symbolString = symbols.join(",");
-      const response = await this.client.get(`/quote/${symbolString}`, {
-        params: this.getParams(),
-      });
-      if (!response.data || !Array.isArray(response.data)) return [];
-      return response.data;
+      const promises = symbols.map((sym) =>
+        this.client
+          .get("/quote", { params: { ...this.getParams(), symbol: sym } })
+          .then((res) => (res.data && Array.isArray(res.data) && res.data[0] ? res.data[0] : null))
+          .catch(() => null)
+      );
+      const results = await Promise.all(promises);
+      return results.filter(Boolean);
     } catch (error) {
       console.warn("Failed to fetch batch quotes:", error);
       return [];
