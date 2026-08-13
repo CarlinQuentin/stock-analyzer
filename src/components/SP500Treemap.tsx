@@ -227,7 +227,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [hoveredCompany, setHoveredCompany] = useState<Top500Company | null>(null);
-  const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [mouseClientPos, setMouseClientPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [selectedSectorFilter, setSelectedSectorFilter] = useState<string | "ALL">("ALL");
 
   // Finviz Interactive Map Zoom & Pan State
@@ -357,13 +357,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      setMousePos({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-      });
-    }
+    setMouseClientPos({ x: e.clientX, y: e.clientY });
 
     if (!isDragging || !containerRef.current) return;
 
@@ -391,17 +385,6 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
   const handleDoubleClick = () => {
     setZoom(1.0);
     setPan({ x: 0, y: 0 });
-  };
-
-  // Explicit Zoom Button Step Controls (+ / -)
-  const handleZoomStep = (factor: number) => {
-    let newZoom = Math.min(4.5, Math.max(1.0, zoom * factor));
-    if (newZoom <= 1.001) {
-      setZoom(1.0);
-      setPan({ x: 0, y: 0 });
-    } else {
-      setZoom(newZoom);
-    }
   };
 
   // Filter companies by selected sector
@@ -551,6 +534,21 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
       sectorSummaries: [],
     };
 
+  // Compute side offset position for hover tooltip so tile under mouse cursor remains 100% visible
+  const tooltipWidth = 260;
+  const tooltipHeight = 170;
+  const offsetDist = 45;
+
+  const prefersRight = mouseClientPos.x + offsetDist + tooltipWidth < (typeof window !== "undefined" ? window.innerWidth : 1200) - 20;
+  const tooltipLeft = prefersRight
+    ? mouseClientPos.x + offsetDist
+    : Math.max(10, mouseClientPos.x - offsetDist - tooltipWidth);
+
+  const prefersBelow = mouseClientPos.y + offsetDist + tooltipHeight < (typeof window !== "undefined" ? window.innerHeight : 800) - 20;
+  const tooltipTop = prefersBelow
+    ? mouseClientPos.y + 10
+    : Math.max(10, mouseClientPos.y - tooltipHeight);
+
   return (
     <div className="w-full max-w-[1400px] mx-auto space-y-4 overflow-hidden">
       {/* Treemap Header & Controls */}
@@ -671,34 +669,6 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
         }`}
         style={{ height: `${dimensions.height}px` }}
       >
-        {/* On-Canvas Zoom & Reset Controls */}
-        <div className="absolute top-3 right-3 z-40 flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-800 shadow-xl select-none">
-          <button
-            onClick={() => handleZoomStep(1.25)}
-            disabled={zoom >= 4.5}
-            className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm transition-all disabled:opacity-40"
-            title="Zoom In (+)"
-          >
-            +
-          </button>
-          <button
-            onClick={() => handleZoomStep(0.8)}
-            disabled={zoom <= 1.001}
-            className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm transition-all disabled:opacity-40"
-            title="Zoom Out (-)"
-          >
-            −
-          </button>
-          <button
-            onClick={handleDoubleClick}
-            disabled={zoom <= 1.001}
-            className="px-2 h-7 flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-all disabled:opacity-40"
-            title="Reset View (100%)"
-          >
-            Reset ({Math.round(zoom * 100)}%)
-          </button>
-        </div>
-
         {/* Transform Viewport Layer (Smooth Pan & Zoom Matrix) */}
         <div
           className="w-full h-full relative origin-top-left transition-transform duration-75 ease-out"
@@ -802,13 +772,13 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
             })}
         </div>
 
-        {/* Polished Floating Hover Tooltip (Bounded to Viewport) */}
+        {/* Polished Side-Shifted Floating Hover Tooltip */}
         {hoveredCompany && (
           <div
             className="pointer-events-none fixed z-50 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-xl p-3.5 shadow-2xl text-xs w-64 space-y-2 animate-in fade-in zoom-in-95 duration-100"
             style={{
-              left: `${Math.min(window.innerWidth - 270, Math.max(10, mousePos.x + 20))}px`,
-              top: `${Math.min(window.innerHeight - 240, Math.max(10, mousePos.y + 20))}px`,
+              left: `${tooltipLeft}px`,
+              top: `${tooltipTop}px`,
             }}
           >
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
@@ -825,12 +795,6 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
 
             <div className="grid grid-cols-2 gap-2 pt-1 font-mono text-xs">
               <div>
-                <span className="text-slate-400 text-[10px] block font-sans">Business Quality</span>
-                <span className="font-extrabold text-amber-300 text-xs">
-                  {hoveredCompany.qualityScore}/100
-                </span>
-              </div>
-              <div>
                 <span className="text-slate-400 text-[10px] block font-sans">Price</span>
                 <span className="font-bold text-white">${hoveredCompany.price.toFixed(2)}</span>
               </div>
@@ -845,7 +809,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
                   {hoveredCompany.changesPercentage.toFixed(2)}%
                 </span>
               </div>
-              <div>
+              <div className="col-span-2">
                 <span className="text-slate-400 text-[10px] block font-sans">Industry</span>
                 <span className="font-bold text-slate-200 text-[11px] truncate block">
                   {hoveredCompany.industry}
