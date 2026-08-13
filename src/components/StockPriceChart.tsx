@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { HistoricalPricePoint, CompanyProfile, HistoricalPeriod } from "../types";
 import { calculateStockPriceCAGR, calculateTotalReturnCAGR } from "../utils/financialCalculations";
+import { fmpService } from "../services/financialModelingPrep";
 
 interface StockPriceChartProps {
   priceHistory: HistoricalPricePoint[];
@@ -8,7 +9,7 @@ interface StockPriceChartProps {
   selectedPeriod?: HistoricalPeriod;
 }
 
-type Timeframe = "1M" | "3M" | "6M" | "YTD" | "1Y" | "3Y" | "5Y";
+type Timeframe = "1D" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "3Y" | "5Y";
 
 const mapPeriodToTimeframe = (p?: HistoricalPeriod): Timeframe => {
   if (p === "3Y") return "3Y";
@@ -22,6 +23,8 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
 }) => {
   const [timeframe, setTimeframe] = useState<Timeframe>(mapPeriodToTimeframe(selectedPeriod));
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [intradayData, setIntradayData] = useState<HistoricalPricePoint[]>([]);
+  const [isLoadingIntraday, setIsLoadingIntraday] = useState<boolean>(false);
 
   // Sync timeframe with selectedPeriod when global selector changes
   useEffect(() => {
@@ -31,8 +34,30 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
     }
   }, [selectedPeriod]);
 
-  // Filter historical data based on selected timeframe
+  // Fetch 1D 5-minute intraday prices when 1D timeframe is selected
+  useEffect(() => {
+    if (timeframe === "1D" && profile.symbol) {
+      setIsLoadingIntraday(true);
+      fmpService
+        .getIntradayPrices(profile.symbol)
+        .then((pts) => {
+          setIntradayData(pts);
+        })
+        .catch((err) => {
+          console.warn("Failed to load 1D intraday price data:", err);
+        })
+        .finally(() => {
+          setIsLoadingIntraday(false);
+        });
+    }
+  }, [timeframe, profile.symbol]);
+
+  // Filter historical or intraday data based on selected timeframe
   const filteredData = useMemo(() => {
+    if (timeframe === "1D") {
+      return intradayData;
+    }
+
     if (!priceHistory || priceHistory.length === 0) return [];
 
     const latestDateStr = priceHistory[priceHistory.length - 1].date;
@@ -67,7 +92,7 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
 
     const filtered = priceHistory.filter((pt) => new Date(pt.date) >= cutoffDate);
     return filtered.length > 0 ? filtered : priceHistory;
-  }, [priceHistory, timeframe]);
+  }, [priceHistory, intradayData, timeframe]);
 
   // Statistics for the selected timeframe
   const stats = useMemo(() => {
@@ -219,11 +244,18 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
       let formattedDate = "";
       if (pt && pt.data.date) {
         const d = new Date(pt.data.date);
-        formattedDate = d.toLocaleDateString("en-US", {
-          month: "short",
-          year: timeframe === "1M" || timeframe === "3M" ? undefined : "2-digit",
-          day: timeframe === "1M" || timeframe === "3M" || timeframe === "6M" ? "numeric" : undefined,
-        });
+        if (timeframe === "1D") {
+          formattedDate = d.toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+          });
+        } else {
+          formattedDate = d.toLocaleDateString("en-US", {
+            month: "short",
+            year: timeframe === "1M" || timeframe === "3M" ? undefined : "2-digit",
+            day: timeframe === "1M" || timeframe === "3M" || timeframe === "6M" ? "numeric" : undefined,
+          });
+        }
       }
       return { label: formattedDate, x: pt ? pt.x : 0 };
     });
@@ -299,7 +331,7 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
     return num.toLocaleString();
   };
 
-  const timeframes: Timeframe[] = ["1M", "3M", "6M", "YTD", "1Y", "3Y", "5Y"];
+  const timeframes: Timeframe[] = ["1D", "1M", "3M", "6M", "YTD", "1Y", "3Y", "5Y"];
 
   return (
     <div className="w-full bg-white dark:bg-slate-800/90 backdrop-blur-md rounded-2xl p-4 sm:p-6 shadow-xl border border-slate-200/80 dark:border-slate-700/60 transition-all duration-300 mb-8">
@@ -462,9 +494,14 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
       </div>
 
       {/* SVG Chart */}
-      {priceHistory.length === 0 ? (
+      {isLoadingIntraday ? (
+        <div className="h-64 flex flex-col items-center justify-center gap-2 text-slate-500 dark:text-slate-400">
+          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-xs font-semibold">Loading 1D intraday market data...</span>
+        </div>
+      ) : filteredData.length === 0 ? (
         <div className="h-64 flex items-center justify-center text-slate-500 dark:text-slate-400">
-          Historical price data unavailable for this ticker.
+          Price data unavailable for this timeframe.
         </div>
       ) : (
         <div className="relative w-full overflow-hidden pt-2">
@@ -479,12 +516,20 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
               }}
             >
               <div className="font-semibold text-slate-300 mb-1 border-b border-slate-700/80 pb-1">
-                {new Date(activePoint.date).toLocaleDateString("en-US", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
+                {timeframe === "1D"
+                  ? new Date(activePoint.date).toLocaleString("en-US", {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })
+                  : new Date(activePoint.date).toLocaleDateString("en-US", {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-1">
                 <div>

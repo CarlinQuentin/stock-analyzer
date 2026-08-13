@@ -5,6 +5,7 @@ import {
   getAuthoritativeDailyChange,
   saveSnapshotToDb,
   loadSnapshotFromDb,
+  clearSnapshotDb,
   tryAcquireLocalLease,
   releaseLocalLease,
   CACHE_TTL_MS,
@@ -13,13 +14,16 @@ import {
 } from "./top500Service";
 import { fmpService } from "./financialModelingPrep";
 import { squarify, CANVAS_MARGIN } from "../components/SP500Treemap";
+import { supabase } from "./supabaseClient";
 
 describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () => {
   const store: Record<string, string> = {};
 
   beforeEach(() => {
-    releaseLocalLease();
+    vi.restoreAllMocks();
     Object.keys(store).forEach((k) => delete store[k]);
+    releaseLocalLease();
+    clearSnapshotDb();
     vi.stubGlobal("window", {
       localStorage: {
         getItem: (k: string) => store[k] || null,
@@ -35,7 +39,6 @@ describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () =
       },
     });
     vi.stubGlobal("localStorage", window.localStorage);
-    vi.restoreAllMocks();
   });
 
   it("Scenario A — Fresh cache (<= 5 mins): 10 clients result in 0 FMP refreshes", async () => {
@@ -119,6 +122,20 @@ describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () =
   });
 
   it("Scenario C — Empty cache (initial load): 10 clients result in EXACTLY 1 initial FMP refresh", async () => {
+    Object.keys(store).forEach((k) => delete store[k]);
+    releaseLocalLease();
+    clearSnapshotDb();
+
+    vi.spyOn(supabase, "from").mockReturnValue({
+      select: () => ({
+        eq: () => ({
+          limit: () => Promise.resolve({ data: [], error: null }),
+        }),
+      }),
+      upsert: () => Promise.resolve({ data: [{ id: "top100_latest" }], error: null }),
+      update: () => Promise.resolve({ data: [{ id: "top100_latest" }], error: null }),
+    } as any);
+
     const screenerSpy = vi.spyOn(fmpService, "getCompanyScreenerPool").mockResolvedValue([
       { symbol: "INIT_SYM", companyName: "Initial Corp", sector: "Technology", price: 150, marketCap: 2000000000 },
     ]);

@@ -264,10 +264,22 @@ export function getSnapshotFreshness(snapshot: MarketDataSnapshot | null): {
   return { isFresh, isStale, ageMs };
 }
 
+export function clearSnapshotDb(): void {
+  top500Service.resetService();
+  try {
+    const ls = typeof window !== "undefined" && window.localStorage ? window.localStorage : (typeof globalThis !== "undefined" ? (globalThis as any).localStorage : null);
+    if (ls) {
+      ls.removeItem(SNAPSHOT_DB_KEY);
+      ls.removeItem(LEASE_LOCK_KEY);
+    }
+  } catch {}
+}
+
 export function loadSnapshotFromLocalStorage(): MarketDataSnapshot | null {
   try {
-    if (typeof window === "undefined" || !window.localStorage) return null;
-    const raw = localStorage.getItem(SNAPSHOT_DB_KEY);
+    const ls = typeof window !== "undefined" && window.localStorage ? window.localStorage : (typeof globalThis !== "undefined" ? (globalThis as any).localStorage : null);
+    if (!ls) return null;
+    const raw = ls.getItem(SNAPSHOT_DB_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed && parsed.companies && parsed.companies.length > 0) {
@@ -281,10 +293,12 @@ export function loadSnapshotFromLocalStorage(): MarketDataSnapshot | null {
 
 export function saveSnapshotToLocalStorage(snapshot: MarketDataSnapshot): void {
   try {
-    if (typeof window === "undefined" || !window.localStorage) return;
-    localStorage.setItem(SNAPSHOT_DB_KEY, JSON.stringify(snapshot));
+    const ls = typeof window !== "undefined" && window.localStorage ? window.localStorage : (typeof globalThis !== "undefined" ? (globalThis as any).localStorage : null);
+    if (ls) {
+      ls.setItem(SNAPSHOT_DB_KEY, JSON.stringify(snapshot));
+    }
   } catch (e) {
-    console.warn("[Top100Db] Failed to save snapshot to localStorage:", e);
+    console.warn("Failed to save snapshot to local storage:", e);
   }
 }
 
@@ -439,6 +453,10 @@ export function releaseLocalLease(): void {
 
 class Top500Service {
   private inFlightRefreshPromise: Promise<MarketDataSnapshot> | null = null;
+
+  public resetService(): void {
+    this.inFlightRefreshPromise = null;
+  }
 
   constructor() {
     this.purgeStaleCaches();

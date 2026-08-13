@@ -323,6 +323,41 @@ class FinancialModelingPrepService {
     }
   }
 
+  async getIntradayPrices(ticker: string): Promise<HistoricalPricePoint[]> {
+    try {
+      const symbol = ticker.toUpperCase();
+      const res = await this.client.get("/historical-chart/5min", {
+        params: { ...this.getParams(), symbol },
+      });
+
+      if (!res.data || !Array.isArray(res.data) || res.data.length === 0) {
+        return [];
+      }
+
+      // Find the most recent date present in the 5-min intraday dataset (e.g. "2026-08-13")
+      const latestDateStr = res.data[0].date.split(" ")[0];
+      const todayPoints = res.data
+        .filter((pt: any) => pt.date && pt.date.startsWith(latestDateStr))
+        .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      return todayPoints.map((pt: any) => {
+        const closePrice = typeof pt.close === "number" ? pt.close : parseFloat(pt.close) || 0;
+        return {
+          date: pt.date,
+          open: typeof pt.open === "number" ? pt.open : parseFloat(pt.open) || closePrice,
+          high: typeof pt.high === "number" ? pt.high : parseFloat(pt.high) || closePrice,
+          low: typeof pt.low === "number" ? pt.low : parseFloat(pt.low) || closePrice,
+          close: closePrice,
+          adjClose: closePrice,
+          volume: typeof pt.volume === "number" ? pt.volume : parseFloat(pt.volume) || 0,
+        };
+      });
+    } catch (error) {
+      console.warn("Failed to fetch 1D intraday prices:", error);
+      return [];
+    }
+  }
+
   async getTopGainers(limit: number = 10): Promise<MarketMover[]> {
     try {
       const response = await this.client.get("/biggest-gainers", {
