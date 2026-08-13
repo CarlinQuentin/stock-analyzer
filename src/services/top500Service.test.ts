@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { top500Service } from "./top500Service";
+import { top500Service, isOperatingCommonCompany } from "./top500Service";
 import { fmpService } from "./financialModelingPrep";
 import { squarify, CANVAS_MARGIN, getTileContentConfig } from "../components/SP500Treemap";
 
@@ -28,11 +28,11 @@ describe("Top500Service Unit Tests", () => {
 
   it("1. Filters invalid/null/zero market caps, sorts descending by marketCap, and caps to top 100", async () => {
     const mockUnsortedCandidates = [
-      { symbol: "SMALL", companyName: "Small Corp", sector: "Industrials", price: 10, marketCap: 50000000 },
-      { symbol: "INVALID_ZERO", companyName: "Zero Cap", sector: "Technology", price: 5, marketCap: 0 },
-      { symbol: "INVALID_NULL", companyName: "Null Cap", sector: "Technology", price: 5, marketCap: null },
-      { symbol: "MEGA", companyName: "Mega Corp", sector: "Technology", price: 200, marketCap: 3000000000000 },
-      { symbol: "LARGE", companyName: "Large Corp", sector: "Technology", price: 100, marketCap: 1000000000000 },
+      { symbol: "SMALL", companyName: "Small Corp Inc", sector: "Industrials", price: 10, marketCap: 50000000 },
+      { symbol: "INVALID_ZERO", companyName: "Zero Cap Inc", sector: "Technology", price: 5, marketCap: 0 },
+      { symbol: "INVALID_NULL", companyName: "Null Cap Inc", sector: "Technology", price: 5, marketCap: null },
+      { symbol: "MEGA", companyName: "Mega Corp Inc", sector: "Technology", price: 200, marketCap: 3000000000000 },
+      { symbol: "LARGE", companyName: "Large Corp Inc", sector: "Technology", price: 100, marketCap: 1000000000000 },
     ];
 
     const spy = vi.spyOn(fmpService, "getCompanyScreenerPool").mockResolvedValue(mockUnsortedCandidates);
@@ -99,7 +99,7 @@ describe("Top500Service Unit Tests", () => {
   it("4. Caps candidate pool to top 100 companies by market cap", async () => {
     const candidates = Array.from({ length: 150 }, (_, i) => ({
       symbol: `SYM${i}`,
-      companyName: `Company ${i}`,
+      companyName: `Company ${i} Inc`,
       sector: "Technology",
       price: 100,
       marketCap: (150 - i) * 1000000000,
@@ -158,5 +158,23 @@ describe("Top500Service Unit Tests", () => {
     expect(small.showName).toBe(false);
     expect(small.showChange).toBe(false);
     expect(small.tickerFontSize).toBeGreaterThanOrEqual(8);
+  });
+
+  it("7. Filters out ETFs, Funds, Warrants, Rights, Units, Preferreds while preserving operating financials (JPM, BLK, BAC, V)", () => {
+    // Operating Companies (MUST KEEP)
+    expect(isOperatingCommonCompany({ symbol: "JPM", companyName: "JPMorgan Chase & Co.", sector: "Financial Services" })).toBe(true);
+    expect(isOperatingCommonCompany({ symbol: "BLK", companyName: "BlackRock, Inc.", sector: "Financial Services" })).toBe(true);
+    expect(isOperatingCommonCompany({ symbol: "BAC", companyName: "Bank of America Corporation", sector: "Financial Services" })).toBe(true);
+    expect(isOperatingCommonCompany({ symbol: "V", companyName: "Visa Inc.", sector: "Financial Services" })).toBe(true);
+    expect(isOperatingCommonCompany({ symbol: "BRK-B", companyName: "Berkshire Hathaway Inc. Class B", sector: "Financial Services" })).toBe(true);
+
+    // Non-Operating Securities & Funds (MUST EXCLUDE)
+    expect(isOperatingCommonCompany({ symbol: "SPY", companyName: "SPDR S&P 500 ETF Trust", isEtf: true })).toBe(false);
+    expect(isOperatingCommonCompany({ symbol: "QQQ", companyName: "Invesco QQQ Trust", isEtf: true })).toBe(false);
+    expect(isOperatingCommonCompany({ symbol: "BKN", companyName: "BlackRock Municipal Income Trust", isFund: true })).toBe(false);
+    expect(isOperatingCommonCompany({ symbol: "XYZ-W", companyName: "XYZ Corp Warrant", type: "warrant" })).toBe(false);
+    expect(isOperatingCommonCompany({ symbol: "ABC-RT", companyName: "ABC Inc Rights", type: "right" })).toBe(false);
+    expect(isOperatingCommonCompany({ symbol: "DEF-UN", companyName: "DEF Units", type: "unit" })).toBe(false);
+    expect(isOperatingCommonCompany({ symbol: "GHI-PR", companyName: "GHI Preferred Stock", type: "preferred" })).toBe(false);
   });
 });

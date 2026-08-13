@@ -367,6 +367,7 @@ class FinancialModelingPrepService {
           exchange: "NASDAQ,NYSE,AMEX",
           country: "US",
           isEtf: false,
+          isFund: false,
           isActivelyTrading: true,
           limit: 1000,
         },

@@ -28,7 +28,16 @@ export interface Top500MarketData {
   lastUpdated: string;
 }
 
-const CACHE_KEY = "investors_edge_top100_treemap_cache_v5";
+export interface SecurityExclusionCounts {
+  etfs: number;
+  funds: number;
+  warrantsUnitsRightsPreferreds: number;
+  nonCommonTypes: number;
+  investmentVehicles: number;
+  totalExcluded: number;
+}
+
+const CACHE_KEY = "investors_edge_top100_operating_companies_v6";
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache TTL
 
 const SECTOR_NAME_MAP: Record<string, string> = {
@@ -48,6 +57,90 @@ const SECTOR_NAME_MAP: Record<string, string> = {
 export function normalizeSectorName(rawSector: string): string {
   if (!rawSector) return "Other";
   return SECTOR_NAME_MAP[rawSector] || rawSector;
+}
+
+/**
+ * Validates whether a candidate security is an actual operating company (common stock),
+ * filtering out ETFs, mutual funds, trusts, ETNs, warrants, rights, units, and preferred securities.
+ * Preserves operating financial companies (Banks, Insurance, Brokerages, Asset Managers like JPM, BLK, WFC, BAC, MA, V).
+ */
+export function isOperatingCommonCompany(
+  item: any,
+  exclusionCategoryLogger?: (category: keyof SecurityExclusionCounts) => void,
+): boolean {
+  if (!item || !item.symbol) return false;
+
+  const symbol = (item.symbol || "").toUpperCase().trim();
+  const name = (item.companyName || item.name || "").toLowerCase();
+  const industry = (item.industry || "").toLowerCase();
+  const type = (item.type || item.securityType || "").toLowerCase();
+
+  // 1. Explicit API Flags: ETFs and Funds
+  if (item.isEtf === true || type === "etf" || type.includes("etf")) {
+    exclusionCategoryLogger?.("etfs");
+    return false;
+  }
+
+  if (item.isFund === true || type === "fund" || type === "mutualfund" || type.includes("fund")) {
+    exclusionCategoryLogger?.("funds");
+    return false;
+  }
+
+  // 2. Non-Common Security Types & Suffixes (Warrants, Rights, Units, Preferreds, ETNs, CEFs)
+  if (
+    type === "warrant" ||
+    type === "right" ||
+    type === "unit" ||
+    type === "preferred" ||
+    type === "etn" ||
+    type === "cef" ||
+    type === "trust"
+  ) {
+    exclusionCategoryLogger?.("nonCommonTypes");
+    return false;
+  }
+
+  // Check symbol derivative suffixes
+  // Examples: AAPL-W, AAPL.WS (Warrants), UHAL-B (Units/Shares), BRK-P (Preferreds), GPC-RT (Rights)
+  const isDerivativeSuffix =
+    /[-.](WS|W|UN|U|RT|PR|P)[A-Z0-9]?$/i.test(symbol) &&
+    !/^BRK[-.]B$/i.test(symbol) && // Preserve BRK-B / BRK.B
+    !/^UHAL[-.]B$/i.test(symbol) && // Preserve UHAL-B
+    !/^BF[-.]B$/i.test(symbol) && // Preserve BF-B (Brown-Forman)
+    !/^HEI[-.]A$/i.test(symbol) && // Preserve HEI-A (Heico)
+    !/^CW[-.]A$/i.test(symbol);
+
+  if (isDerivativeSuffix) {
+    exclusionCategoryLogger?.("warrantsUnitsRightsPreferreds");
+    return false;
+  }
+
+  // 3. Pooled Investment Vehicle / Fund Industry & Name Patterns
+  const isFundIndustry =
+    industry.includes("exchange traded fund") ||
+    industry.includes("etf") ||
+    industry.includes("closed-end fund") ||
+    industry.includes("mutual fund");
+
+  if (isFundIndustry) {
+    exclusionCategoryLogger?.("funds");
+    return false;
+  }
+
+  // Check name patterns for pooled funds / trusts (while safeguarding operating companies like BlackRock, Inc.)
+  // Operating financial companies: "BlackRock, Inc." (BLK), "T. Rowe Price Group", "JPMorgan Chase & Co."
+  // Pooled investment vehicles: "BlackRock Municipal Income Trust", "SPDR S&P 500 ETF Trust", "iShares Core S&P 500 ETF", "Vanguard Index Funds"
+  const isOperatingInc = /\b(inc|incorporated|corp|corporation|plc|sa|nv|ltd|limited|holdings)\b/i.test(name);
+  const isTrustOrFundName =
+    /\b(etf|index fund|pooled fund|unit investment trust|closed-end fund|income trust|municipal trust|target term trust|etn)\b/i.test(name) ||
+    (!isOperatingInc && /\b(trust|fund|funds)\b/i.test(name));
+
+  if (isTrustOrFundName) {
+    exclusionCategoryLogger?.("investmentVehicles");
+    return false;
+  }
+
+  return true;
 }
 
 /**
@@ -132,7 +225,7 @@ class Top500Service {
   }
 
   /**
-   * Purge legacy cache keys from previous 500-company iterations
+   * Purge legacy cache keys from previous 500-company and non-operating universe iterations
    */
   private purgeStaleCaches() {
     if (typeof window === "undefined" || !window.localStorage) return;
@@ -140,6 +233,7 @@ class Top500Service {
       "investors_edge_sp500_treemap_cache_v2",
       "investors_edge_top500_treemap_cache_v3",
       "investors_edge_top500_treemap_cache_v4",
+      "investors_edge_top100_treemap_cache_v5",
     ];
     legacyKeys.forEach((key) => {
       try {
@@ -172,8 +266,8 @@ class Top500Service {
   }
 
   /**
-   * Fetch largest 100 U.S. Companies by Market Capitalization using EXACTLY 1 FMP API call.
-   * Pipeline: Screener candidate pool -> Exclude invalid market caps -> Sort by marketCap DESC -> Deduplicate share classes -> Take top 100.
+   * Fetch largest 100 U.S. Operating Companies by Market Capitalization using EXACTLY 1 FMP API call.
+   * Pipeline: Screener candidate pool -> Exclude invalid market caps -> Filter operating common stock companies -> Sort by marketCap DESC -> Deduplicate share classes -> Take top 100.
    */
   async getTop500MarketData(forceRefresh: boolean = false): Promise<Top500MarketData> {
     if (!forceRefresh) {
@@ -202,18 +296,42 @@ class Top500Service {
           return typeof mktCap === "number" && !isNaN(mktCap) && mktCap > 0;
         });
 
-        // 2. Explicitly sort companies locally by marketCap in descending order
-        validCompanies.sort((a: any, b: any) => {
+        // 2. Filter out non-operating investment vehicles (ETFs, Funds, ETNs, Warrants, Rights, Units, Preferreds)
+        const counts: SecurityExclusionCounts = {
+          etfs: 0,
+          funds: 0,
+          warrantsUnitsRightsPreferreds: 0,
+          nonCommonTypes: 0,
+          investmentVehicles: 0,
+          totalExcluded: 0,
+        };
+
+        const operatingCompanies = validCompanies.filter((item: any) => {
+          return isOperatingCommonCompany(item, (category) => {
+            counts[category]++;
+            counts.totalExcluded++;
+          });
+        });
+
+        console.log(
+          `[Top100UniverseFilter] Filtered out ${counts.totalExcluded} non-operating securities ` +
+            `(ETFs: ${counts.etfs}, Funds: ${counts.funds}, Warrants/Units/Rights/Preferreds: ${counts.warrantsUnitsRightsPreferreds}, ` +
+            `Non-Common Types: ${counts.nonCommonTypes}, Investment Vehicles: ${counts.investmentVehicles}). ` +
+            `Retained ${operatingCompanies.length} operating common stock candidates.`
+        );
+
+        // 3. Explicitly sort operating companies locally by marketCap in descending order
+        operatingCompanies.sort((a: any, b: any) => {
           const mktCapA = typeof a.marketCap === "number" ? a.marketCap : parseFloat(a.marketCap) || 0;
           const mktCapB = typeof b.marketCap === "number" ? b.marketCap : parseFloat(b.marketCap) || 0;
           return mktCapB - mktCapA;
         });
 
-        // 3. Deduplicate multiple share classes for the same company (keeping 1 primary ticker per company)
+        // 4. Deduplicate multiple share classes for the same company (keeping 1 primary ticker per company)
         const dedupedCompanies: any[] = [];
         const seenKeys = new Set<string>();
 
-        validCompanies.forEach((item: any) => {
+        operatingCompanies.forEach((item: any) => {
           const key = getCompanyDedupKey(item.companyName || item.name || "", item.symbol || "");
           if (!seenKeys.has(key)) {
             seenKeys.add(key);
@@ -221,7 +339,7 @@ class Top500Service {
           }
         });
 
-        // 4. Take EXCLUSIVELY the first 100 unique companies after sorting & deduplication
+        // 5. Take EXCLUSIVELY the first 100 unique operating companies after sorting & deduplication
         const top100Pool = dedupedCompanies.slice(0, 100);
 
         const companies: Top500Company[] = [];
