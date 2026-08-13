@@ -24,9 +24,14 @@ interface PlacedNode<T> {
 }
 
 /**
+ * Safe canvas inset margin around the perimeter of the treemap container (in pixels)
+ */
+export const CANVAS_MARGIN = 12;
+
+/**
  * Strict rectangle bounds clamping to prevent any pixel from overflowing parent container
  */
-function clampRect(rect: Rect, outer: Rect): Rect {
+export function clampRect(rect: Rect, outer: Rect): Rect {
   const minX = Math.max(outer.x, Math.min(rect.x, outer.x + outer.w));
   const minY = Math.max(outer.y, Math.min(rect.y, outer.y + outer.h));
   const maxX = Math.min(outer.x + outer.w, Math.max(minX, rect.x + rect.w));
@@ -43,7 +48,7 @@ function clampRect(rect: Rect, outer: Rect): Rect {
 /**
  * Standard Squarified Treemap Layout Engine (Bruls, Huizing, van Wijk) with strict bounds clamping
  */
-function squarify<T>(items: TreemapItem<T>[], bounds: Rect): PlacedNode<T>[] {
+export function squarify<T>(items: TreemapItem<T>[], bounds: Rect): PlacedNode<T>[] {
   if (!items || items.length === 0 || bounds.w <= 0 || bounds.h <= 0) {
     return [];
   }
@@ -63,7 +68,7 @@ function squarify<T>(items: TreemapItem<T>[], bounds: Rect): PlacedNode<T>[] {
       let rect: Rect;
 
       if (isHorizontal) {
-        const itemH = idx === row.length - 1 ? box.h - offset : box.h * itemFraction;
+        const itemH = idx === row.length - 1 ? Math.max(0, box.h - offset) : box.h * itemFraction;
         rect = {
           x: box.x,
           y: box.y + offset,
@@ -72,7 +77,7 @@ function squarify<T>(items: TreemapItem<T>[], bounds: Rect): PlacedNode<T>[] {
         };
         offset += itemH;
       } else {
-        const itemW = idx === row.length - 1 ? box.w - offset : box.w * itemFraction;
+        const itemW = idx === row.length - 1 ? Math.max(0, box.w - offset) : box.w * itemFraction;
         rect = {
           x: box.x + offset,
           y: box.y,
@@ -255,14 +260,21 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
     return data.companies.filter((c) => c.sector === selectedSectorFilter);
   }, [data, selectedSectorFilter]);
 
-  // Compute Squarified Treemap layout hierarchy: Sectors -> Companies
+  // Compute Squarified Treemap layout hierarchy: Sectors -> Companies within safe inset bounds
   const layout = useMemo(() => {
     if (!data || filteredCompanies.length === 0) {
       return { placedSectors: [], placedCompanies: [] };
     }
 
     const { width, height } = dimensions;
-    const canvasBounds: Rect = { x: 0, y: 0, w: width, h: height };
+
+    // Safe inset layout bounds: all tiles are placed strictly inside this inset boundary
+    const canvasBounds: Rect = {
+      x: CANVAS_MARGIN,
+      y: CANVAS_MARGIN,
+      w: Math.max(100, width - CANVAS_MARGIN * 2),
+      h: Math.max(100, height - CANVAS_MARGIN * 2),
+    };
     const padding = 2;
 
     // Group companies into sectors
@@ -282,7 +294,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
       .filter((s) => s.value > 0)
       .sort((a, b) => b.value - a.value);
 
-    // Lay out sector bounding boxes strictly clamped to canvas bounds
+    // Lay out sector bounding boxes strictly clamped to canvasBounds
     const placedSectors = squarify(sectorItems, canvasBounds).map((sNode) => ({
       ...sNode,
       rect: clampRect(sNode.rect, canvasBounds),
@@ -295,8 +307,8 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
       const { sector, comps } = secNode.data;
       const sRect = secNode.rect;
 
-      const headerHeight = sRect.h < 28 ? 0 : Math.min(22, Math.max(12, Math.floor(sRect.h * 0.12)));
-      const innerRect: Rect = clampRect(
+      const headerHeight = sRect.h < 32 ? 0 : Math.min(22, Math.max(12, Math.floor(sRect.h * 0.12)));
+      let innerRect: Rect = clampRect(
         {
           x: sRect.x + padding,
           y: sRect.y + headerHeight + padding,
@@ -306,7 +318,18 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
         sRect
       );
 
-      if (innerRect.w <= 0 || innerRect.h <= 0) return;
+      // Fallback for extremely small sector boxes to guarantee all company tiles receive valid rects
+      if (innerRect.w <= 0 || innerRect.h <= 0) {
+        innerRect = clampRect(
+          {
+            x: sRect.x + 1,
+            y: sRect.y + 1,
+            w: Math.max(1, sRect.w - 2),
+            h: Math.max(1, sRect.h - 2),
+          },
+          sRect
+        );
+      }
 
       const compItems = comps
         .map((c) => ({ data: c, value: c.marketCap }))
@@ -486,7 +509,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
         ref={containerRef}
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setHoveredCompany(null)}
-        className="relative w-full bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl min-h-[500px] select-none box-border"
+        className="relative w-full bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl min-h-[500px] select-none box-border p-3"
         style={{ height: `${dimensions.height}px` }}
       >
         {/* Render Sector Bounding Area Labels */}

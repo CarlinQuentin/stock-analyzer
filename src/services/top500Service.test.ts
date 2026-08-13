@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { top500Service } from "./top500Service";
 import { fmpService } from "./financialModelingPrep";
+import { squarify, CANVAS_MARGIN } from "../components/SP500Treemap";
 
 describe("Top500Service Unit Tests", () => {
   const store: Record<string, string> = {};
@@ -111,5 +112,32 @@ describe("Top500Service Unit Tests", () => {
     expect(data.companies.length).toBe(100);
     expect(data.companies[0].symbol).toBe("SYM0"); // Highest market cap
     expect(data.companies[99].symbol).toBe("SYM99");
+  });
+
+  it("5. Verifies layout squarify bounds stay 100% strictly inside CANVAS_MARGIN", () => {
+    const width = 1200;
+    const height = 680;
+    const canvasBounds = {
+      x: CANVAS_MARGIN,
+      y: CANVAS_MARGIN,
+      w: width - CANVAS_MARGIN * 2,
+      h: height - CANVAS_MARGIN * 2,
+    };
+
+    const dummyItems = Array.from({ length: 100 }, (_, i) => ({
+      data: { symbol: `SYM${i}` },
+      value: (100 - i) * 1000,
+    }));
+
+    const nodes = squarify(dummyItems, canvasBounds);
+
+    expect(nodes.length).toBe(100);
+
+    nodes.forEach((n) => {
+      expect(n.rect.x).toBeGreaterThanOrEqual(CANVAS_MARGIN);
+      expect(n.rect.y).toBeGreaterThanOrEqual(CANVAS_MARGIN);
+      expect(n.rect.x + n.rect.w).toBeLessThanOrEqual(width - CANVAS_MARGIN + 0.1);
+      expect(n.rect.y + n.rect.h).toBeLessThanOrEqual(height - CANVAS_MARGIN + 0.1);
+    });
   });
 });
