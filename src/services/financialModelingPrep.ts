@@ -361,7 +361,7 @@ class FinancialModelingPrepService {
 
   async getSP500Constituents(): Promise<any[]> {
     try {
-      const response = await this.client.get("/sp500_constituent", {
+      const response = await this.client.get("/sp500-constituent", {
         params: this.getParams(),
       });
       if (!response.data || !Array.isArray(response.data)) return [];
