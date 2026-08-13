@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   formatRawCurrency,
   formatRawEPS,
+  getMetricDirection,
+  getMetricComparisonColor,
 } from "./RawFinancialsSection";
 
 describe("RawFinancialsSection Formatters & Data Mapping", () => {
@@ -61,6 +63,108 @@ describe("RawFinancialsSection Formatters & Data Mapping", () => {
       expect(formatRawEPS(null)).toBe("N/A");
       expect(formatRawEPS(undefined)).toBe("N/A");
       expect(formatRawEPS(NaN)).toBe("N/A");
+    });
+  });
+
+  describe("getMetricDirection", () => {
+    it("classifies Higher-is-Better metrics correctly", () => {
+      expect(getMetricDirection("revenue")).toBe("higher_is_better");
+      expect(getMetricDirection("operatingIncome")).toBe("higher_is_better");
+      expect(getMetricDirection("netIncome")).toBe("higher_is_better");
+      expect(getMetricDirection("eps")).toBe("higher_is_better");
+      expect(getMetricDirection("freeCashFlow")).toBe("higher_is_better");
+      expect(getMetricDirection("cashAndEquivalents")).toBe("higher_is_better");
+      expect(getMetricDirection("grossMargin")).toBe("higher_is_better");
+      expect(getMetricDirection("roic")).toBe("higher_is_better");
+    });
+
+    it("classifies Lower-is-Better metrics correctly", () => {
+      expect(getMetricDirection("totalDebt")).toBe("lower_is_better");
+      expect(getMetricDirection("sharesOutstanding")).toBe("lower_is_better");
+      expect(getMetricDirection("interestExpense")).toBe("lower_is_better");
+      expect(getMetricDirection("operatingExpenses")).toBe("lower_is_better");
+      expect(getMetricDirection("sga")).toBe("lower_is_better");
+      expect(getMetricDirection("costOfRevenue")).toBe("lower_is_better");
+      expect(getMetricDirection("taxRate")).toBe("lower_is_better");
+      expect(getMetricDirection("capex")).toBe("lower_is_better");
+    });
+
+    it("classifies unknown/unclassified metrics as neutral", () => {
+      expect(getMetricDirection("workingCapital")).toBe("neutral");
+      expect(getMetricDirection("randomField")).toBe("neutral");
+    });
+  });
+
+  describe("getMetricComparisonColor", () => {
+    describe("Higher-is-Better metric rules", () => {
+      it("colors green when value increases", () => {
+        const color = getMetricComparisonColor(100, 80, "higher_is_better");
+        expect(color).toContain("emerald");
+      });
+
+      it("colors red when value decreases", () => {
+        const color = getMetricComparisonColor(80, 100, "higher_is_better");
+        expect(color).toContain("rose");
+      });
+
+      it("handles negative numbers: green when negative net income improves (-$50M vs -$100M)", () => {
+        const color = getMetricComparisonColor(-50, -100, "higher_is_better");
+        expect(color).toContain("emerald");
+      });
+
+      it("handles negative numbers: red when negative net income deteriorates (-$100M vs -$50M)", () => {
+        const color = getMetricComparisonColor(-100, -50, "higher_is_better");
+        expect(color).toContain("rose");
+      });
+
+      it("returns default neutral color when values are unchanged", () => {
+        const color = getMetricComparisonColor(100, 100, "higher_is_better");
+        expect(color).toBe("text-slate-900 dark:text-slate-100");
+      });
+    });
+
+    describe("Lower-is-Better metric rules", () => {
+      it("colors green when Total Debt decreases ($8B vs $10B)", () => {
+        const color = getMetricComparisonColor(8e9, 10e9, "lower_is_better");
+        expect(color).toContain("emerald");
+      });
+
+      it("colors red when Total Debt increases ($10B vs $8B)", () => {
+        const color = getMetricComparisonColor(10e9, 8e9, "lower_is_better");
+        expect(color).toContain("rose");
+      });
+
+      it("colors green when Shares Outstanding decrease due to buybacks (1.0B vs 1.2B)", () => {
+        const color = getMetricComparisonColor(1.0e9, 1.2e9, "lower_is_better");
+        expect(color).toContain("emerald");
+      });
+
+      it("colors red when Shares Outstanding increase due to dilution (1.2B vs 1.0B)", () => {
+        const color = getMetricComparisonColor(1.2e9, 1.0e9, "lower_is_better");
+        expect(color).toContain("rose");
+      });
+    });
+
+    describe("Edge cases & First Available Year", () => {
+      it("returns default neutral color when prior value is missing/undefined (First Available Year)", () => {
+        const color = getMetricComparisonColor(100, undefined, "higher_is_better");
+        expect(color).toBe("text-slate-900 dark:text-slate-100");
+      });
+
+      it("returns default neutral color when prior value is null", () => {
+        const color = getMetricComparisonColor(100, null, "higher_is_better");
+        expect(color).toBe("text-slate-900 dark:text-slate-100");
+      });
+
+      it("returns default neutral color when current value is null/undefined", () => {
+        const color = getMetricComparisonColor(null, 100, "higher_is_better");
+        expect(color).toBe("text-slate-900 dark:text-slate-100");
+      });
+
+      it("returns default neutral color for neutral/unclassified metrics", () => {
+        const color = getMetricComparisonColor(100, 80, "neutral");
+        expect(color).toBe("text-slate-900 dark:text-slate-100");
+      });
     });
   });
 });

@@ -11,6 +11,114 @@ interface RawFinancialsSectionProps {
   companyName: string;
 }
 
+export type MetricDirection = "higher_is_better" | "lower_is_better" | "neutral";
+
+/**
+ * Determine if higher or lower values are better for a given metric ID or label.
+ */
+export function getMetricDirection(metricId: string, label?: string): MetricDirection {
+  const id = metricId.toLowerCase();
+  const name = (label || "").toLowerCase();
+
+  // Lower is Better
+  if (
+    id.includes("debt") ||
+    name.includes("debt") ||
+    id.includes("interestexpense") ||
+    name.includes("interest expense") ||
+    id.includes("operatingexpenses") ||
+    name.includes("operating expenses") ||
+    id.includes("sga") ||
+    name.includes("sg&a") ||
+    id.includes("costofrevenue") ||
+    name.includes("cost of revenue") ||
+    id.includes("taxrate") ||
+    name.includes("tax rate") ||
+    id.includes("sharesoutstanding") ||
+    name.includes("shares outstanding") ||
+    id.includes("weightedaverageshsout") ||
+    name.includes("weighted average shares") ||
+    id.includes("capex") ||
+    id.includes("capitalexpenditure") ||
+    name.includes("capital expenditure")
+  ) {
+    return "lower_is_better";
+  }
+
+  // Higher is Better
+  if (
+    id.includes("revenue") ||
+    name.includes("revenue") ||
+    id.includes("profit") ||
+    name.includes("profit") ||
+    id.includes("income") ||
+    name.includes("income") ||
+    id.includes("margin") ||
+    name.includes("margin") ||
+    id.includes("eps") ||
+    name.includes("eps") ||
+    id.includes("cashflow") ||
+    name.includes("cash flow") ||
+    id.includes("fcf") ||
+    id.includes("roic") ||
+    id.includes("roe") ||
+    id.includes("cash") ||
+    name.includes("cash") ||
+    id.includes("dividend") ||
+    name.includes("dividend") ||
+    id.includes("bookvalue") ||
+    name.includes("book value") ||
+    id.includes("assets") ||
+    name.includes("assets")
+  ) {
+    return "higher_is_better";
+  }
+
+  return "neutral";
+}
+
+/**
+ * Computes text color class for a metric value compared to its prior year value
+ */
+export function getMetricComparisonColor(
+  currentVal: number | null | undefined,
+  priorVal: number | null | undefined,
+  direction: MetricDirection,
+): string {
+  if (
+    currentVal === null ||
+    currentVal === undefined ||
+    isNaN(currentVal) ||
+    priorVal === null ||
+    priorVal === undefined ||
+    isNaN(priorVal) ||
+    direction === "neutral"
+  ) {
+    return "text-slate-900 dark:text-slate-100"; // default neutral text color
+  }
+
+  const diff = currentVal - priorVal;
+  if (diff === 0) {
+    return "text-slate-900 dark:text-slate-100"; // no change
+  }
+
+  const isIncrease = diff > 0;
+
+  if (direction === "higher_is_better") {
+    return isIncrease
+      ? "text-emerald-600 dark:text-emerald-400 font-semibold"
+      : "text-rose-600 dark:text-rose-400 font-semibold";
+  }
+
+  if (direction === "lower_is_better") {
+    return isIncrease
+      ? "text-rose-600 dark:text-rose-400 font-semibold"
+      : "text-emerald-600 dark:text-emerald-400 font-semibold";
+  }
+
+  return "text-slate-900 dark:text-slate-100";
+}
+
 /**
  * Format large currency figures cleanly ($18.2B, $850M, $1.2T, $0, -$500M)
  */
@@ -55,6 +163,7 @@ interface MetricRowDef {
   id: string;
   label: string;
   description: string;
+  direction?: MetricDirection;
   getValue: (
     inc?: FinancialStatement,
     bal?: FinancialStatement,
@@ -68,6 +177,7 @@ const RAW_METRIC_ROWS: MetricRowDef[] = [
     id: "revenue",
     label: "Revenue",
     description: "Total top-line sales generated from business operations",
+    direction: "higher_is_better",
     getValue: (inc) => inc?.revenue,
     format: formatRawCurrency,
   },
@@ -75,6 +185,7 @@ const RAW_METRIC_ROWS: MetricRowDef[] = [
     id: "operatingIncome",
     label: "Operating Income",
     description: "Profit earned from core business operations (EBIT)",
+    direction: "higher_is_better",
     getValue: (inc) => inc?.operatingIncome,
     format: formatRawCurrency,
   },
@@ -82,6 +193,7 @@ const RAW_METRIC_ROWS: MetricRowDef[] = [
     id: "netIncome",
     label: "Net Income",
     description: "Bottom-line accounting net profit after all expenses & taxes",
+    direction: "higher_is_better",
     getValue: (inc) => inc?.netIncome,
     format: formatRawCurrency,
   },
@@ -89,6 +201,7 @@ const RAW_METRIC_ROWS: MetricRowDef[] = [
     id: "eps",
     label: "EPS",
     description: "Diluted earnings per share",
+    direction: "higher_is_better",
     getValue: (inc) => inc?.eps,
     format: formatRawEPS,
   },
@@ -96,6 +209,7 @@ const RAW_METRIC_ROWS: MetricRowDef[] = [
     id: "freeCashFlow",
     label: "Free Cash Flow",
     description: "Operating Cash Flow minus Capital Expenditures (CapEx)",
+    direction: "higher_is_better",
     getValue: (_, __, cf) => calculateFCF(cf?.operatingCashFlow, cf?.capitalExpenditure),
     format: formatRawCurrency,
   },
@@ -103,6 +217,7 @@ const RAW_METRIC_ROWS: MetricRowDef[] = [
     id: "totalDebt",
     label: "Total Debt",
     description: "Total short-term and long-term interest-bearing debt obligations",
+    direction: "lower_is_better",
     getValue: (_, bal) => bal?.totalDebt,
     format: formatRawCurrency,
   },
@@ -110,6 +225,7 @@ const RAW_METRIC_ROWS: MetricRowDef[] = [
     id: "cashAndEquivalents",
     label: "Cash & Cash Equivalents",
     description: "Cash, marketable securities, and short-term liquid investments",
+    direction: "higher_is_better",
     getValue: (_, bal) =>
       bal?.cashAndCashEquivalents ?? (bal as any)?.cashAndShortTermInvestments,
     format: formatRawCurrency,
@@ -118,6 +234,7 @@ const RAW_METRIC_ROWS: MetricRowDef[] = [
     id: "sharesOutstanding",
     label: "Shares Outstanding",
     description: "Diluted average shares outstanding used for per-share metrics",
+    direction: "lower_is_better",
     getValue: (inc) =>
       inc?.weightedAverageShsOutDil ?? inc?.weightedAverageShsOut ?? inc?.shares,
     format: formatShortenedShareCount,
@@ -222,42 +339,53 @@ export const RawFinancialsSection: React.FC<RawFinancialsSectionProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-              {RAW_METRIC_ROWS.map((row) => (
-                <tr
-                  key={row.id}
-                  className="hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-colors"
-                >
-                  <td className="py-3.5 px-4 sm:px-6 sticky left-0 bg-white dark:bg-slate-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] z-10">
-                    <div className="font-semibold text-slate-900 dark:text-slate-100">
-                      {row.label}
-                    </div>
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">
-                      {row.description}
-                    </div>
-                  </td>
-                  {years.map((yr) => {
-                    const inc = getIncomeForYear(yr);
-                    const bal = getBalanceForYear(yr);
-                    const cf = getCashFlowForYear(yr);
-                    const rawVal = row.getValue(inc, bal, cf);
-                    const formattedVal = row.format(rawVal);
-                    const isNA = formattedVal === "N/A";
+              {RAW_METRIC_ROWS.map((row) => {
+                const direction = row.direction || getMetricDirection(row.id, row.label);
 
-                    return (
-                      <td
-                        key={yr}
-                        className={`py-3.5 px-4 text-center font-mono font-medium ${
-                          isNA
-                            ? "text-slate-400 dark:text-slate-500"
-                            : "text-slate-900 dark:text-slate-100"
-                        }`}
-                      >
-                        {formattedVal}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+                return (
+                  <tr
+                    key={row.id}
+                    className="hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-colors"
+                  >
+                    <td className="py-3.5 px-4 sm:px-6 sticky left-0 bg-white dark:bg-slate-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] z-10">
+                      <div className="font-semibold text-slate-900 dark:text-slate-100">
+                        {row.label}
+                      </div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">
+                        {row.description}
+                      </div>
+                    </td>
+                    {years.map((yr, idx) => {
+                      const inc = getIncomeForYear(yr);
+                      const bal = getBalanceForYear(yr);
+                      const cf = getCashFlowForYear(yr);
+                      const rawVal = row.getValue(inc, bal, cf);
+                      const formattedVal = row.format(rawVal);
+                      const isNA = formattedVal === "N/A";
+
+                      // Prior year is the next element in years array (since years is sorted descending)
+                      const priorYr = years[idx + 1];
+                      const priorInc = priorYr ? getIncomeForYear(priorYr) : undefined;
+                      const priorBal = priorYr ? getBalanceForYear(priorYr) : undefined;
+                      const priorCf = priorYr ? getCashFlowForYear(priorYr) : undefined;
+                      const priorVal = priorYr ? row.getValue(priorInc, priorBal, priorCf) : undefined;
+
+                      const colorClass = isNA
+                        ? "text-slate-400 dark:text-slate-500"
+                        : getMetricComparisonColor(rawVal, priorVal, direction);
+
+                      return (
+                        <td
+                          key={yr}
+                          className={`py-3.5 px-4 text-center font-mono font-medium ${colorClass}`}
+                        >
+                          {formattedVal}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
