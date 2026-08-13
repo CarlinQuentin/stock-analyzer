@@ -1,4 +1,5 @@
-import { fmpService } from "./financialModelingPrep";
+import { fmpService, FmpNormalizedQuote } from "./financialModelingPrep";
+import { supabase, isSupabaseConfigured } from "./supabaseClient";
 
 export interface Top500Company {
   symbol: string;
@@ -6,8 +7,8 @@ export interface Top500Company {
   sector: string;
   industry: string;
   price: number;
-  change: number;
-  changesPercentage: number;
+  change: number | null;
+  changesPercentage: number | null;
   marketCap: number;
   qualityScore: number;
 }
@@ -27,6 +28,12 @@ export interface Top500MarketData {
   sectorSummaries: SectorSummary[];
   marketStatus: "Open" | "Closed";
   lastUpdated: string;
+  fetchedAt?: number;
+}
+
+export interface MarketDataSnapshot extends Top500MarketData {
+  id: string;
+  fetchedAt: number;
 }
 
 export interface SecurityExclusionCounts {
@@ -38,8 +45,11 @@ export interface SecurityExclusionCounts {
   totalExcluded: number;
 }
 
-const CACHE_KEY = "investors_edge_top100_operating_companies_v7";
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache TTL
+export const SNAPSHOT_DB_KEY = "investors_edge_top100_snapshot_v10";
+export const SNAPSHOT_DB_TABLE = "top100_market_snapshots";
+export const LEASE_LOCK_KEY = "investors_edge_top100_lease_v1";
+export const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache TTL
+export const LEASE_DURATION_MS = 60 * 1000; // 60 seconds lease duration
 
 const SECTOR_NAME_MAP: Record<string, string> = {
   Technology: "Information Technology",
@@ -203,36 +213,232 @@ export function getCompanyDedupKey(companyName: string, symbol: string): string 
   return cleanSym;
 }
 
-function getDailyChangePct(item: any): { changePct: number; dollarChange: number } {
-  if (typeof item.changesPercentage === "number") {
-    return { changePct: item.changesPercentage, dollarChange: item.change || 0 };
-  }
-  if (typeof item.changePercentage === "number") {
-    return { changePct: item.changePercentage, dollarChange: item.change || 0 };
-  }
-  if (typeof item.changes === "number") {
-    return { changePct: item.changes, dollarChange: item.change || 0 };
+/**
+ * Extracts authoritative real-time market performance values directly from FMP quote data.
+ * Returns exact changePct and dollarChange if present in raw FMP market data; returns null if unavailable.
+ * Never fabricates, estimates, or uses placeholders for daily price movement.
+ */
+export function getAuthoritativeDailyChange(item: any): { changePct: number | null; dollarChange: number | null } {
+  if (!item) return { changePct: null, dollarChange: null };
+
+  let rawPct: number | null = null;
+  const candidatePct =
+    item.changesPercentage ?? item.changePercentage ?? item.changes ?? item.changesPct ?? item.pctChange;
+
+  if (candidatePct !== undefined && candidatePct !== null) {
+    const parsed = typeof candidatePct === "number" ? candidatePct : parseFloat(String(candidatePct));
+    if (!isNaN(parsed)) {
+      rawPct = parsed;
+    }
   }
 
-  // Deterministic daily change calculation derived from stock beta & symbol hash
-  let hash = 0;
-  const sym = item.symbol || "";
-  for (let i = 0; i < sym.length; i++) {
-    hash = (hash << 5) - hash + sym.charCodeAt(i);
-    hash |= 0;
+  let rawDollar: number | null = null;
+  const candidateDollar = item.change ?? item.dollarChange ?? item.priceChange;
+  if (candidateDollar !== undefined && candidateDollar !== null) {
+    const parsed = typeof candidateDollar === "number" ? candidateDollar : parseFloat(String(candidateDollar));
+    if (!isNaN(parsed)) {
+      rawDollar = parsed;
+    }
   }
 
-  const beta = typeof item.beta === "number" ? item.beta : 1.0;
-  const rawPct = ((hash % 400) / 100) * Math.min(2.2, Math.max(0.5, beta));
-  const roundedPct = Math.round(rawPct * 100) / 100;
-  const price = typeof item.price === "number" ? item.price : 100;
-  const dollarChange = Math.round(((price * roundedPct) / 100) * 100) / 100;
+  const changePct = rawPct !== null ? Math.round(rawPct * 100) / 100 : null;
+  const dollarChange = rawDollar !== null ? Math.round(rawDollar * 100) / 100 : null;
 
-  return { changePct: roundedPct, dollarChange };
+  return { changePct, dollarChange };
+}
+
+/**
+ * Determines snapshot age and freshness relative to 5-minute TTL boundary
+ */
+export function getSnapshotFreshness(snapshot: MarketDataSnapshot | null): {
+  isFresh: boolean;
+  isStale: boolean;
+  ageMs: number;
+} {
+  if (!snapshot || typeof snapshot.fetchedAt !== "number") {
+    return { isFresh: false, isStale: false, ageMs: Infinity };
+  }
+  const ageMs = Date.now() - snapshot.fetchedAt;
+  const isFresh = ageMs <= CACHE_TTL_MS;
+  const isStale = ageMs > CACHE_TTL_MS;
+  return { isFresh, isStale, ageMs };
+}
+
+export function loadSnapshotFromLocalStorage(): MarketDataSnapshot | null {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return null;
+    const raw = localStorage.getItem(SNAPSHOT_DB_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.companies && parsed.companies.length > 0) {
+      return parsed as MarketDataSnapshot;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSnapshotToLocalStorage(snapshot: MarketDataSnapshot): void {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    localStorage.setItem(SNAPSHOT_DB_KEY, JSON.stringify(snapshot));
+  } catch (e) {
+    console.warn("[Top100Db] Failed to save snapshot to localStorage:", e);
+  }
+}
+
+export async function loadSnapshotFromDb(): Promise<MarketDataSnapshot | null> {
+  // 1. If Supabase DB is configured, attempt to query latest snapshot row from Supabase
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from(SNAPSHOT_DB_TABLE)
+        .select("*")
+        .eq("id", "top100_latest")
+        .limit(1);
+
+      if (!error && data && data.length > 0) {
+        const row = data[0];
+        const snapshot: MarketDataSnapshot = typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
+        if (snapshot && snapshot.companies && snapshot.companies.length > 0) {
+          saveSnapshotToLocalStorage(snapshot);
+          return snapshot;
+        }
+      }
+    } catch (e) {
+      console.warn("[Top100Db] Supabase snapshot read error, using local DB storage:", e);
+    }
+  }
+
+  // 2. Local Storage DB Fallback
+  return loadSnapshotFromLocalStorage();
+}
+
+export async function saveSnapshotToDb(snapshot: MarketDataSnapshot): Promise<void> {
+  saveSnapshotToLocalStorage(snapshot);
+  releaseLocalLease();
+
+  if (isSupabaseConfigured) {
+    try {
+      await supabase.from(SNAPSHOT_DB_TABLE).upsert({
+        id: "top100_latest",
+        fetched_at: snapshot.fetchedAt,
+        status: "fresh",
+        company_count: snapshot.companies.length,
+        payload: snapshot,
+        locked_until: null, // Clear refresh lease upon successful snapshot write!
+        updated_at: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.warn("[Top100Db] Supabase snapshot save warning:", e);
+    }
+  }
+}
+
+/**
+ * Attempts to acquire atomic snapshot lease across Supabase DB / local environments.
+ * Returns true if this client acquired the lease, false if denied.
+ */
+export async function tryAcquireSnapshotLease(): Promise<boolean> {
+  // 1. Try Supabase RPC / query if Supabase DB is configured
+  if (isSupabaseConfigured) {
+    try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc("acquire_top100_refresh_lease", {
+        lease_seconds: 60,
+      });
+
+      if (!rpcError && typeof rpcData === "boolean") {
+        return rpcData;
+      }
+
+      // Fallback query if RPC is not yet applied on remote Supabase instance
+      const nowIso = new Date().toISOString();
+      const lockUntilIso = new Date(Date.now() + LEASE_DURATION_MS).toISOString();
+
+      const { data: updateData, error: updateErr } = await supabase
+        .from(SNAPSHOT_DB_TABLE)
+        .update({ locked_until: lockUntilIso, updated_at: nowIso })
+        .eq("id", "top100_latest")
+        .or(`locked_until.is.null,locked_until.lt.${nowIso}`)
+        .select();
+
+      if (!updateErr && updateData && updateData.length > 0) {
+        return true;
+      }
+
+      // Handle Empty Database Initial Load
+      const { data: insertData, error: insertErr } = await supabase
+        .from(SNAPSHOT_DB_TABLE)
+        .upsert(
+          { id: "top100_latest", locked_until: lockUntilIso, updated_at: nowIso },
+          { onConflict: "id", ignoreDuplicates: false }
+        )
+        .select();
+
+      if (!insertErr && insertData && insertData.length > 0) {
+        return true;
+      }
+    } catch (e) {
+      console.warn("[Top100Lease] Supabase lease acquisition check warning:", e);
+    }
+  }
+
+  // 2. Local Storage Distributed Lock Fallback (for browser tabs / offline / local test environments)
+  return tryAcquireLocalLease();
+}
+
+/**
+ * Releases snapshot refresh lease in Supabase DB / local storage
+ */
+export async function releaseSnapshotLease(): Promise<void> {
+  releaseLocalLease();
+
+  if (isSupabaseConfigured) {
+    try {
+      await supabase.rpc("release_top100_refresh_lease");
+    } catch {
+      try {
+        await supabase
+          .from(SNAPSHOT_DB_TABLE)
+          .update({ locked_until: null, updated_at: new Date().toISOString() })
+          .eq("id", "top100_latest");
+      } catch (e) {
+        console.warn("[Top100Lease] Supabase lease release warning:", e);
+      }
+    }
+  }
+}
+
+export function tryAcquireLocalLease(): boolean {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return true;
+    const raw = localStorage.getItem(LEASE_LOCK_KEY);
+    const now = Date.now();
+
+    if (raw) {
+      const lockUntil = parseInt(raw, 10);
+      if (!isNaN(lockUntil) && lockUntil > now) {
+        return false; // Lease is active and held by another browser tab/process!
+      }
+    }
+
+    localStorage.setItem(LEASE_LOCK_KEY, String(now + LEASE_DURATION_MS));
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+export function releaseLocalLease(): void {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    localStorage.removeItem(LEASE_LOCK_KEY);
+  } catch {}
 }
 
 class Top500Service {
-  private pendingRequest: Promise<Top500MarketData> | null = null;
+  private inFlightRefreshPromise: Promise<MarketDataSnapshot> | null = null;
 
   constructor() {
     this.purgeStaleCaches();
@@ -249,6 +455,9 @@ class Top500Service {
       "investors_edge_top500_treemap_cache_v4",
       "investors_edge_top100_treemap_cache_v5",
       "investors_edge_top100_operating_companies_v6",
+      "investors_edge_top100_operating_companies_v7",
+      "investors_edge_top100_operating_companies_v8",
+      "investors_edge_top100_operating_companies_v9",
     ];
     legacyKeys.forEach((key) => {
       try {
@@ -270,7 +479,6 @@ class Top500Service {
       const minutes = estDate.getMinutes();
       const totalMinutes = hours * 60 + minutes;
 
-      // US Market Hours: Mon-Fri (1-5), 9:30 AM (570 mins) - 4:00 PM (960 mins)
       const isWeekday = day >= 1 && day <= 5;
       const isMarketHours = totalMinutes >= 570 && totalMinutes < 960;
 
@@ -281,211 +489,236 @@ class Top500Service {
   }
 
   /**
-   * Fetch largest 100 U.S. Operating Companies by Market Capitalization using EXACTLY 1 FMP API call.
-   * Pipeline: Screener candidate pool -> Exclude invalid market caps -> Filter operating common stock companies -> Sort by marketCap DESC -> Deduplicate share classes -> Take top 100.
+   * Fetch largest 100 U.S. Operating Companies using DB-Cached Stale-While-Revalidate Architecture.
+   * - 0-5 mins old: Fresh DB snapshot returned immediately. 0 FMP API calls!
+   * - 5+ mins old: Return existing DB snapshot immediately + 1 global single-flight background FMP refresh.
+   * - Empty DB / First Load: Execute initial FMP refresh & save DB snapshot.
    */
   async getTop500MarketData(forceRefresh: boolean = false): Promise<Top500MarketData> {
-    if (!forceRefresh) {
-      const cached = this.getValidCache();
-      if (cached) {
-        return cached;
-      }
+    if (forceRefresh && this.inFlightRefreshPromise) {
+      return this.inFlightRefreshPromise;
     }
 
-    if (this.pendingRequest) {
-      return this.pendingRequest;
+    const dbSnapshot = await loadSnapshotFromDb();
+    const { isFresh, isStale } = getSnapshotFreshness(dbSnapshot);
+
+    // Scenario A: DB snapshot is FRESH (0 - 5 minutes old)
+    if (isFresh && dbSnapshot && !forceRefresh) {
+      console.log(`[Top100Db] Snapshot is FRESH (age: ${Math.round((Date.now() - dbSnapshot.fetchedAt) / 1000)}s). 0 FMP API calls made.`);
+      return dbSnapshot;
     }
 
-    this.pendingRequest = (async () => {
-      try {
-        // EXACTLY 1 FMP API CALL to fetch U.S. company screener candidate pool
-        const screenerData = await fmpService.getCompanyScreenerPool();
-        if (!screenerData || !Array.isArray(screenerData) || screenerData.length === 0) {
-          throw new Error("Failed to retrieve Top 100 company market data.");
+    // Scenario B: DB snapshot is STALE (> 5 minutes old) -> Return cached snapshot immediately + trigger single-flight background refresh
+    if (isStale && dbSnapshot && !forceRefresh) {
+      console.log(`[Top100Db] Snapshot is STALE (age: ${Math.round((Date.now() - dbSnapshot.fetchedAt) / 1000)}s). Returning DB snapshot immediately & attempting global DB refresh lease.`);
+      this.triggerSingleFlightBackgroundRefresh();
+      return dbSnapshot;
+    }
+
+    // Scenario C: No DB snapshot exists at all OR explicit forceRefresh requested
+    if (!this.inFlightRefreshPromise) {
+      this.inFlightRefreshPromise = (async () => {
+        const leaseAcquired = await tryAcquireSnapshotLease();
+        if (!leaseAcquired && dbSnapshot) {
+          console.log("[Top100Db] Global DB refresh lease DENIED during forceRefresh/initial load. Returning existing DB snapshot.");
+          return dbSnapshot;
         }
 
-        // 1. Exclude companies with missing, null, zero, or invalid market-cap values
-        const validCompanies = screenerData.filter((item: any) => {
-          if (!item || !item.symbol) return false;
-          const mktCap = typeof item.marketCap === "number" ? item.marketCap : parseFloat(item.marketCap);
-          return typeof mktCap === "number" && !isNaN(mktCap) && mktCap > 0;
-        });
+        try {
+          return await this.executeFmpRefreshAndSaveDb();
+        } finally {
+          await releaseSnapshotLease();
+        }
+      })().finally(() => {
+        this.inFlightRefreshPromise = null;
+      });
+    }
 
-        // 2. Filter out non-operating investment vehicles (ETFs, Funds, ETNs, Warrants, Rights, Units, Preferreds)
-        const counts: SecurityExclusionCounts = {
-          etfs: 0,
-          funds: 0,
-          warrantsUnitsRightsPreferreds: 0,
-          nonCommonTypes: 0,
-          investmentVehicles: 0,
-          totalExcluded: 0,
-        };
+    return this.inFlightRefreshPromise;
+  }
 
-        const operatingCompanies = validCompanies.filter((item: any) => {
-          return isOperatingCommonCompany(item, (category) => {
-            counts[category]++;
-            counts.totalExcluded++;
-          });
-        });
+  /**
+   * Single-flight background refresh lock mechanism:
+   * Guarantees only ONE FMP refresh runs worldwide even if 10 users or tabs load stale cache concurrently.
+   */
+  private triggerSingleFlightBackgroundRefresh(): void {
+    if (this.inFlightRefreshPromise) {
+      console.log("[Top100Db] Browser-level lock active: Background FMP refresh already in progress.");
+      return;
+    }
 
-        console.log(
-          `[Top100UniverseFilter] Filtered out ${counts.totalExcluded} non-operating securities ` +
-            `(ETFs: ${counts.etfs}, Funds: ${counts.funds}, Warrants/Units/Rights/Preferreds: ${counts.warrantsUnitsRightsPreferreds}, ` +
-            `Non-Common Types: ${counts.nonCommonTypes}, Investment Vehicles: ${counts.investmentVehicles}). ` +
-            `Retained ${operatingCompanies.length} operating common stock candidates.`
-        );
+    this.inFlightRefreshPromise = (async () => {
+      // 1. Attempt to acquire global database-level refresh lease
+      const leaseAcquired = await tryAcquireSnapshotLease();
+      if (!leaseAcquired) {
+        console.log("[Top100Db] Global DB refresh lease DENIED: Another browser/client is currently refreshing. 0 FMP calls made.");
+        const existing = await loadSnapshotFromDb();
+        return existing || (loadSnapshotFromLocalStorage() as any);
+      }
 
-        // 3. Explicitly sort operating companies locally by marketCap in descending order
-        operatingCompanies.sort((a: any, b: any) => {
-          const mktCapA = typeof a.marketCap === "number" ? a.marketCap : parseFloat(a.marketCap) || 0;
-          const mktCapB = typeof b.marketCap === "number" ? b.marketCap : parseFloat(b.marketCap) || 0;
-          return mktCapB - mktCapA;
-        });
+      console.log("[Top100Db] Global DB refresh lease ACQUIRED! Launching ONE FMP refresh...");
 
-        // 4. Deduplicate multiple share classes for the same company (keeping 1 primary ticker per company)
-        const dedupedCompanies: any[] = [];
-        const seenKeys = new Set<string>();
+      try {
+        const freshSnapshot = await this.executeFmpRefreshAndSaveDb();
+        return freshSnapshot;
+      } catch (err) {
+        console.warn("[Top100Db] Background FMP refresh failed. Preserving existing DB snapshot intact.", err);
+        const existing = await loadSnapshotFromDb();
+        return existing || (loadSnapshotFromLocalStorage() as any);
+      } finally {
+        await releaseSnapshotLease();
+      }
+    })().finally(() => {
+      this.inFlightRefreshPromise = null;
+    });
+  }
 
-        operatingCompanies.forEach((item: any) => {
-          const key = getCompanyDedupKey(item.companyName || item.name || "", item.symbol || "");
-          if (!seenKeys.has(key)) {
-            seenKeys.add(key);
-            dedupedCompanies.push(item);
+  /**
+   * Performs real FMP market fetch and updates DB snapshot
+   */
+  public async executeFmpRefreshAndSaveDb(): Promise<MarketDataSnapshot> {
+    try {
+      // 1. Fetch Top 100 candidate pool from FMP screener
+      const screenerData = await fmpService.getCompanyScreenerPool();
+      if (!screenerData || !Array.isArray(screenerData) || screenerData.length === 0) {
+        throw new Error("Failed to retrieve Top 100 company market data.");
+      }
+
+      // Exclude invalid market caps
+      const validCompanies = screenerData.filter((item: any) => {
+        if (!item || !item.symbol) return false;
+        const mktCap = typeof item.marketCap === "number" ? item.marketCap : parseFloat(item.marketCap);
+        return typeof mktCap === "number" && !isNaN(mktCap) && mktCap > 0;
+      });
+
+      // Filter operating common stock candidates
+      const operatingCompanies = validCompanies.filter((item: any) => isOperatingCommonCompany(item));
+      operatingCompanies.sort((a: any, b: any) => {
+        const mktCapA = typeof a.marketCap === "number" ? a.marketCap : parseFloat(a.marketCap) || 0;
+        const mktCapB = typeof b.marketCap === "number" ? b.marketCap : parseFloat(b.marketCap) || 0;
+        return mktCapB - mktCapA;
+      });
+
+      // Deduplicate share classes
+      const dedupedCompanies: any[] = [];
+      const seenKeys = new Set<string>();
+      operatingCompanies.forEach((item: any) => {
+        const key = getCompanyDedupKey(item.companyName || item.name || "", item.symbol || "");
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          dedupedCompanies.push(item);
+        }
+      });
+
+      const top100Pool = dedupedCompanies.slice(0, 100);
+      const top100Symbols = top100Pool.map((c) => c.symbol.toUpperCase());
+
+      // 2. Fetch authoritative live market quotes from FMP for all Top 100 symbols
+      let quoteMap = new Map<string, FmpNormalizedQuote>();
+      try {
+        const batchQuotes = await fmpService.getBatchQuotes(top100Symbols);
+        batchQuotes.forEach((q) => {
+          if (q && q.symbol) {
+            quoteMap.set(q.symbol.toUpperCase(), q);
           }
         });
+      } catch (e) {
+        console.warn("[Top100Db] Batch quote fetch warning:", e);
+      }
 
-        // 5. Take EXCLUSIVELY the first 100 unique operating companies after sorting & deduplication
-        const top100Pool = dedupedCompanies.slice(0, 100);
+      const companies: Top500Company[] = [];
+      let totalMarketCap = 0;
+      let totalWeightedChange = 0;
+      let validChangeMarketCapSum = 0;
 
-        const companies: Top500Company[] = [];
-        let totalMarketCap = 0;
-        let totalWeightedChange = 0;
+      const sectorMap = new Map<string, { marketCap: number; count: number; weightedChangeSum: number; validCapSum: number }>();
 
-        const sectorMap = new Map<string, { marketCap: number; count: number; weightedChangeSum: number }>();
+      top100Pool.forEach((item: any) => {
+        const symbol = item.symbol.toUpperCase();
+        const name = item.companyName || item.name || symbol;
+        const sector = normalizeSectorName(item.sector);
+        const industry = item.industry || "General";
 
-        top100Pool.forEach((item: any) => {
-          const symbol = item.symbol.toUpperCase();
-          const name = item.companyName || item.name || symbol;
-          const sector = normalizeSectorName(item.sector);
-          const industry = item.industry || "General";
-          const price = typeof item.price === "number" ? item.price : parseFloat(item.price) || 0;
-          const marketCap = typeof item.marketCap === "number" ? item.marketCap : parseFloat(item.marketCap) || 0;
+        const quote = quoteMap.get(symbol);
+        const price = quote?.price ?? (typeof item.price === "number" ? item.price : parseFloat(item.price) || 0);
+        const marketCap = quote?.marketCap && quote.marketCap > 0 ? quote.marketCap : (typeof item.marketCap === "number" ? item.marketCap : parseFloat(item.marketCap) || 0);
 
-          const { changePct, dollarChange } = getDailyChangePct(item);
+        const changePct = quote ? quote.changesPercentage : getAuthoritativeDailyChange(item).changePct;
+        const dollarChange = quote ? quote.change : getAuthoritativeDailyChange(item).dollarChange;
 
-          const company: Top500Company = {
-            symbol,
-            name,
-            sector,
-            industry,
-            price,
-            change: dollarChange,
-            changesPercentage: changePct,
-            marketCap,
-            qualityScore: getBusinessQualityScore(item),
-          };
-
-          companies.push(company);
-          totalMarketCap += marketCap;
-          totalWeightedChange += changePct * marketCap;
-
-          const secStats = sectorMap.get(sector) || { marketCap: 0, count: 0, weightedChangeSum: 0 };
-          secStats.marketCap += marketCap;
-          secStats.count += 1;
-          secStats.weightedChangeSum += changePct * marketCap;
-          sectorMap.set(sector, secStats);
-        });
-
-        const sectorSummaries: SectorSummary[] = Array.from(sectorMap.entries())
-          .map(([sector, stats]) => ({
-            sector,
-            marketCap: stats.marketCap,
-            companyCount: stats.count,
-            weightedChangePercent: stats.marketCap > 0 ? stats.weightedChangeSum / stats.marketCap : 0,
-          }))
-          .sort((a, b) => b.marketCap - a.marketCap);
-
-        const overallWeightedChange = totalMarketCap > 0 ? totalWeightedChange / totalMarketCap : 0;
-        const avgChange =
-          companies.length > 0 ? companies.reduce((s, c) => s + c.changesPercentage, 0) / companies.length : 0;
-
-        const data: Top500MarketData = {
-          companies,
-          totalMarketCap,
-          averageChangePercent: avgChange,
-          weightedChangePercent: overallWeightedChange,
-          sectorSummaries,
-          marketStatus: this.getMarketStatus(),
-          lastUpdated: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+        const company: Top500Company = {
+          symbol,
+          name,
+          sector,
+          industry,
+          price,
+          change: dollarChange,
+          changesPercentage: changePct,
+          marketCap,
+          qualityScore: getBusinessQualityScore(item),
         };
 
-        this.setCache(data);
-        return data;
-      } catch (error) {
-        console.error("Top100MarketData fetch error:", error);
-        const staleCache = this.getCacheIgnoreTTL();
-        if (staleCache) return staleCache;
-        throw error;
-      } finally {
-        this.pendingRequest = null;
-      }
-    })();
+        companies.push(company);
+        totalMarketCap += marketCap;
 
-    return this.pendingRequest;
+        if (changePct !== null) {
+          totalWeightedChange += changePct * marketCap;
+          validChangeMarketCapSum += marketCap;
+        }
+
+        const secStats = sectorMap.get(sector) || { marketCap: 0, count: 0, weightedChangeSum: 0, validCapSum: 0 };
+        secStats.marketCap += marketCap;
+        secStats.count += 1;
+        if (changePct !== null) {
+          secStats.weightedChangeSum += changePct * marketCap;
+          secStats.validCapSum += marketCap;
+        }
+        sectorMap.set(sector, secStats);
+      });
+
+      const sectorSummaries: SectorSummary[] = Array.from(sectorMap.entries())
+        .map(([sector, stats]) => ({
+          sector,
+          marketCap: stats.marketCap,
+          companyCount: stats.count,
+          weightedChangePercent: stats.validCapSum > 0 ? stats.weightedChangeSum / stats.validCapSum : 0,
+        }))
+        .sort((a, b) => b.marketCap - a.marketCap);
+
+      const overallWeightedChange = validChangeMarketCapSum > 0 ? totalWeightedChange / validChangeMarketCapSum : 0;
+      const validCompaniesWithChange = companies.filter((c) => c.changesPercentage !== null);
+      const avgChange =
+        validCompaniesWithChange.length > 0
+          ? validCompaniesWithChange.reduce((s, c) => s + (c.changesPercentage || 0), 0) / validCompaniesWithChange.length
+          : 0;
+
+      const snapshot: MarketDataSnapshot = {
+        id: "top100_latest",
+        fetchedAt: Date.now(),
+        companies,
+        totalMarketCap,
+        averageChangePercent: avgChange,
+        weightedChangePercent: overallWeightedChange,
+        sectorSummaries,
+        marketStatus: this.getMarketStatus(),
+        lastUpdated: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+      };
+
+      await saveSnapshotToDb(snapshot);
+      return snapshot;
+    } catch (error) {
+      console.error("[Top100Db] FMP Refresh error:", error);
+      const existingSnapshot = await loadSnapshotFromDb();
+      if (existingSnapshot && existingSnapshot.companies && existingSnapshot.companies.length > 0) {
+        console.warn("[Top100Db] Preserving last successful DB snapshot following FMP refresh error.");
+        return existingSnapshot;
+      }
+      throw error;
+    }
   }
 
   async getSP500MarketData(forceRefresh: boolean = false): Promise<Top500MarketData> {
     return this.getTop500MarketData(forceRefresh);
-  }
-
-  private getValidCache(): Top500MarketData | null {
-    try {
-      if (typeof window === "undefined" || !window.localStorage) return null;
-      const raw = localStorage.getItem(CACHE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (Date.now() - parsed.timestamp < CACHE_TTL_MS && parsed.data?.companies?.length > 0) {
-        // Strict assertion: Reject cache if it contains more than 100 companies from an older build
-        if (parsed.data.companies.length > 100) {
-          localStorage.removeItem(CACHE_KEY);
-          return null;
-        }
-        return parsed.data;
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  }
-
-  private getCacheIgnoreTTL(): Top500MarketData | null {
-    try {
-      if (typeof window === "undefined" || !window.localStorage) return null;
-      const raw = localStorage.getItem(CACHE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (parsed.data?.companies?.length > 100) {
-        parsed.data.companies = parsed.data.companies.slice(0, 100);
-      }
-      return parsed.data || null;
-    } catch {
-      return null;
-    }
-  }
-
-  private setCache(data: Top500MarketData) {
-    try {
-      if (typeof window === "undefined" || !window.localStorage) return;
-      localStorage.setItem(
-        CACHE_KEY,
-        JSON.stringify({
-          timestamp: Date.now(),
-          data,
-        })
-      );
-    } catch (e) {
-      console.warn("Failed to set Top 100 cache in localStorage:", e);
-    }
   }
 }
 

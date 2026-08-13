@@ -194,9 +194,9 @@ export function squarify<T>(items: TreemapItem<T>[], bounds: Rect): PlacedNode<T
 }
 
 /**
- * Finviz-style performance color mapping function
+ * Finviz-style performance color mapping function based strictly on empirical FMP percentage
  */
-function getPerformanceColor(pct: number): { bg: string; text: string; border: string } {
+function getPerformanceColor(pct: number | null): { bg: string; text: string; border: string } {
   if (pct === null || pct === undefined || isNaN(pct)) {
     return { bg: "#1e293b", text: "#94a3b8", border: "#334155" };
   }
@@ -762,8 +762,9 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
                           color: color.text,
                         }}
                       >
-                        {company.changesPercentage >= 0 ? "+" : ""}
-                        {company.changesPercentage.toFixed(2)}%
+                        {company.changesPercentage !== null
+                          ? `${company.changesPercentage >= 0 ? "+" : ""}${company.changesPercentage.toFixed(2)}%`
+                          : "N/A"}
                       </div>
                     )}
                   </div>
@@ -802,11 +803,19 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
                 <span className="text-slate-400 text-[10px] block font-sans">Today's Change</span>
                 <span
                   className={`font-bold ${
-                    hoveredCompany.changesPercentage >= 0 ? "text-emerald-400" : "text-rose-400"
+                    hoveredCompany.changesPercentage !== null
+                      ? hoveredCompany.changesPercentage >= 0
+                        ? "text-emerald-400"
+                        : "text-rose-400"
+                      : "text-slate-400"
                   }`}
                 >
-                  {hoveredCompany.changesPercentage >= 0 ? "+" : ""}
-                  {hoveredCompany.changesPercentage.toFixed(2)}%
+                  {hoveredCompany.changesPercentage !== null
+                    ? `${hoveredCompany.changesPercentage >= 0 ? "+" : ""}${hoveredCompany.changesPercentage.toFixed(2)}%`
+                    : "N/A"}
+                  {hoveredCompany.change !== null
+                    ? ` (${hoveredCompany.change >= 0 ? "+" : ""}$${hoveredCompany.change.toFixed(2)})`
+                    : ""}
                 </span>
               </div>
               <div className="col-span-2">

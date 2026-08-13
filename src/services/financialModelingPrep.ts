@@ -13,6 +13,14 @@ import {
   FutureOutlookData,
 } from "../types";
 
+export interface FmpNormalizedQuote {
+  symbol: string;
+  price: number;
+  change: number | null;
+  changesPercentage: number | null;
+  marketCap: number;
+}
+
 const BASE_URL = "https://financialmodelingprep.com/stable";
 const API_KEY = import.meta.env.VITE_FMP_API_KEY;
 
@@ -385,18 +393,56 @@ class FinancialModelingPrepService {
     return this.getCompanyScreenerPool();
   }
 
-  async getBatchQuotes(symbols: string[]): Promise<any[]> {
+  async getBatchQuotes(symbols: string[]): Promise<FmpNormalizedQuote[]> {
     if (!symbols || symbols.length === 0) return [];
-    const safeSymbols = symbols.slice(0, 10);
     try {
-      const promises = safeSymbols.map((sym) =>
-        this.client
-          .get("/quote", { params: { ...this.getParams(), symbol: sym } })
-          .then((res) => (res.data && Array.isArray(res.data) && res.data[0] ? res.data[0] : null))
-          .catch(() => null)
-      );
+      const promises = symbols.map(async (sym) => {
+        try {
+          const res = await this.client.get("/quote", {
+            params: { ...this.getParams(), symbol: sym.toUpperCase() },
+          });
+
+          if (!res.data || !Array.isArray(res.data) || res.data.length === 0) {
+            return null;
+          }
+
+          const raw = res.data[0];
+          const rawChangePct = raw.changePercentage ?? raw.changesPercentage ?? null;
+          const rawDollarChange = raw.change ?? raw.dollarChange ?? null;
+
+          const parsedPct =
+            typeof rawChangePct === "number"
+              ? rawChangePct
+              : typeof rawChangePct === "string"
+              ? parseFloat(rawChangePct)
+              : null;
+          const parsedDollar =
+            typeof rawDollarChange === "number"
+              ? rawDollarChange
+              : typeof rawDollarChange === "string"
+              ? parseFloat(rawDollarChange)
+              : null;
+
+          const changePct = parsedPct !== null && !isNaN(parsedPct) ? Math.round(parsedPct * 100) / 100 : null;
+          const dollarChange = parsedDollar !== null && !isNaN(parsedDollar) ? Math.round(parsedDollar * 100) / 100 : null;
+
+          const price = typeof raw.price === "number" ? raw.price : parseFloat(raw.price) || 0;
+          const marketCap = typeof raw.marketCap === "number" ? raw.marketCap : parseFloat(raw.marketCap) || 0;
+
+          return {
+            symbol: sym.toUpperCase(),
+            price,
+            change: dollarChange,
+            changesPercentage: changePct,
+            marketCap,
+          };
+        } catch {
+          return null;
+        }
+      });
+
       const results = await Promise.all(promises);
-      return results.filter(Boolean);
+      return results.filter((q): q is FmpNormalizedQuote => q !== null);
     } catch (error) {
       console.warn("Failed to fetch batch quotes:", error);
       return [];

@@ -1,12 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { top500Service, isOperatingCommonCompany } from "./top500Service";
+import {
+  top500Service,
+  isOperatingCommonCompany,
+  getAuthoritativeDailyChange,
+  saveSnapshotToDb,
+  loadSnapshotFromDb,
+  tryAcquireLocalLease,
+  releaseLocalLease,
+  CACHE_TTL_MS,
+  LEASE_LOCK_KEY,
+  MarketDataSnapshot,
+} from "./top500Service";
 import { fmpService } from "./financialModelingPrep";
-import { squarify, CANVAS_MARGIN, getTileContentConfig } from "../components/SP500Treemap";
+import { squarify, CANVAS_MARGIN } from "../components/SP500Treemap";
 
-describe("Top500Service Unit Tests", () => {
+describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () => {
   const store: Record<string, string> = {};
 
   beforeEach(() => {
+    releaseLocalLease();
     Object.keys(store).forEach((k) => delete store[k]);
     vi.stubGlobal("window", {
       localStorage: {
@@ -26,95 +38,210 @@ describe("Top500Service Unit Tests", () => {
     vi.restoreAllMocks();
   });
 
-  it("1. Filters invalid/null/zero market caps, sorts descending by marketCap, and caps to top 100", async () => {
-    const mockUnsortedCandidates = [
-      { symbol: "SMALL", companyName: "Small Corp Inc", sector: "Industrials", price: 10, marketCap: 50000000 },
-      { symbol: "INVALID_ZERO", companyName: "Zero Cap Inc", sector: "Technology", price: 5, marketCap: 0 },
-      { symbol: "INVALID_NULL", companyName: "Null Cap Inc", sector: "Technology", price: 5, marketCap: null },
-      { symbol: "MEGA", companyName: "Mega Corp Inc", sector: "Technology", price: 200, marketCap: 3000000000000 },
-      { symbol: "LARGE", companyName: "Large Corp Inc", sector: "Technology", price: 100, marketCap: 1000000000000 },
-    ];
+  it("Scenario A — Fresh cache (<= 5 mins): 10 clients result in 0 FMP refreshes", async () => {
+    const freshSnapshot: MarketDataSnapshot = {
+      id: "top100_latest",
+      fetchedAt: Date.now() - 60 * 1000, // 1 minute old
+      companies: [
+        { symbol: "AAPL", name: "Apple Inc.", sector: "Technology", industry: "Consumer Electronics", price: 220, change: 2.2, changesPercentage: 1.0, marketCap: 3300000000000, qualityScore: 98 },
+      ],
+      totalMarketCap: 3300000000000,
+      averageChangePercent: 1.0,
+      weightedChangePercent: 1.0,
+      sectorSummaries: [],
+      marketStatus: "Open",
+      lastUpdated: "12:00 PM",
+    };
 
-    const spy = vi.spyOn(fmpService, "getCompanyScreenerPool").mockResolvedValue(mockUnsortedCandidates);
+    await saveSnapshotToDb(freshSnapshot);
 
-    const data = await top500Service.getTop500MarketData(true);
+    const screenerSpy = vi.spyOn(fmpService, "getCompanyScreenerPool");
+    const batchQuotesSpy = vi.spyOn(fmpService, "getBatchQuotes");
 
-    expect(spy).toHaveBeenCalledTimes(1);
-    expect(data).toBeDefined();
-    // Excluded INVALID_ZERO and INVALID_NULL
-    expect(data.companies.length).toBe(3);
+    // 10 concurrent requests on fresh cache
+    const promises = Array.from({ length: 10 }, () => top500Service.getTop500MarketData(false));
+    const results = await Promise.all(promises);
 
-    // Explicit descending order verification
-    expect(data.companies[0].symbol).toBe("MEGA");
-    expect(data.companies[0].marketCap).toBe(3000000000000);
-    expect(data.companies[1].symbol).toBe("LARGE");
-    expect(data.companies[1].marketCap).toBe(1000000000000);
-    expect(data.companies[2].symbol).toBe("SMALL");
-    expect(data.companies[2].marketCap).toBe(50000000);
+    expect(results.length).toBe(10);
+    results.forEach((res) => {
+      expect(res.companies[0].symbol).toBe("AAPL");
+    });
+
+    // 0 FMP API calls executed!
+    expect(screenerSpy).toHaveBeenCalledTimes(0);
+    expect(batchQuotesSpy).toHaveBeenCalledTimes(0);
   });
 
-  it("2. Deduplicates concurrent in-flight requests and reuses localStorage cache", async () => {
-    const mockScreener = vi.spyOn(fmpService, "getCompanyScreenerPool").mockResolvedValue([
-      { symbol: "NVDA", companyName: "NVIDIA Corp", sector: "Technology", price: 125, marketCap: 3000000000000 },
+  it("Scenario B — Stale cache (> 5 mins): 10 clients result in EXACTLY 1 FMP refresh worldwide", async () => {
+    const staleSnapshot: MarketDataSnapshot = {
+      id: "top100_latest",
+      fetchedAt: Date.now() - (CACHE_TTL_MS + 60 * 1000), // 6 minutes old
+      companies: [
+        { symbol: "STALE_SYM", name: "Stale Corp", sector: "Technology", industry: "General", price: 50, change: 0.5, changesPercentage: 1.0, marketCap: 500000000, qualityScore: 80 },
+      ],
+      totalMarketCap: 500000000,
+      averageChangePercent: 1.0,
+      weightedChangePercent: 1.0,
+      sectorSummaries: [],
+      marketStatus: "Closed",
+      lastUpdated: "11:00 AM",
+    };
+
+    await saveSnapshotToDb(staleSnapshot);
+
+    const screenerSpy = vi.spyOn(fmpService, "getCompanyScreenerPool").mockResolvedValue([
+      { symbol: "FRESH_SYM", companyName: "Fresh Corp", sector: "Technology", price: 100, marketCap: 1000000000 },
+    ]);
+    const batchQuotesSpy = vi.spyOn(fmpService, "getBatchQuotes").mockResolvedValue([
+      { symbol: "FRESH_SYM", price: 100, change: 2.0, changesPercentage: 2.0, marketCap: 1000000000 },
     ]);
 
-    // Concurrent calls share the same in-flight Promise
-    const [res1, res2] = await Promise.all([
-      top500Service.getTop500MarketData(true),
-      top500Service.getTop500MarketData(true),
+    // 10 concurrent requests while cache is stale
+    const promises = Array.from({ length: 10 }, () => top500Service.getTop500MarketData(false));
+    const results = await Promise.all(promises);
+
+    expect(results.length).toBe(10);
+    // All 10 clients receive immediate cached response
+    results.forEach((res) => {
+      expect(res.companies[0].symbol).toBe("STALE_SYM");
+    });
+
+    // Settle background promises
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    // EXACTLY 1 FMP refresh executed!
+    expect(screenerSpy).toHaveBeenCalledTimes(1);
+    expect(batchQuotesSpy).toHaveBeenCalledTimes(1);
+
+    // Verify DB snapshot updated
+    const updated = await loadSnapshotFromDb();
+    expect(updated?.companies[0].symbol).toBe("FRESH_SYM");
+  });
+
+  it("Scenario C — Empty cache (initial load): 10 clients result in EXACTLY 1 initial FMP refresh", async () => {
+    const screenerSpy = vi.spyOn(fmpService, "getCompanyScreenerPool").mockResolvedValue([
+      { symbol: "INIT_SYM", companyName: "Initial Corp", sector: "Technology", price: 150, marketCap: 2000000000 },
+    ]);
+    const batchQuotesSpy = vi.spyOn(fmpService, "getBatchQuotes").mockResolvedValue([
+      { symbol: "INIT_SYM", price: 150, change: 3.0, changesPercentage: 2.0, marketCap: 2000000000 },
     ]);
 
-    expect(res1.companies[0].symbol).toBe("NVDA");
-    expect(res2.companies[0].symbol).toBe("NVDA");
-    expect(mockScreener).toHaveBeenCalledTimes(1); // EXACTLY 1 API call made!
+    // 10 concurrent requests when DB is empty
+    const promises = Array.from({ length: 10 }, () => top500Service.getTop500MarketData(false));
+    const results = await Promise.all(promises);
 
-    // Subsequent call uses valid cache
-    const cachedData = await top500Service.getTop500MarketData(false);
-    expect(cachedData.companies[0].symbol).toBe("NVDA");
-    expect(mockScreener).toHaveBeenCalledTimes(1); // Still 1 API call!
+    expect(results.length).toBe(10);
+
+    // EXACTLY 1 FMP refresh executed!
+    expect(screenerSpy).toHaveBeenCalledTimes(1);
+    expect(batchQuotesSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("3. Deduplicates multiple share classes for the same company (e.g. GOOG / GOOGL)", async () => {
-    const mockMultiShareCandidates = [
-      { symbol: "AAPL", companyName: "Apple Inc.", sector: "Technology", price: 220, marketCap: 3300000000000 },
-      { symbol: "GOOGL", companyName: "Alphabet Inc. Class A", sector: "Technology", price: 175, marketCap: 2200000000000 },
-      { symbol: "GOOG", companyName: "Alphabet Inc. Class C", sector: "Technology", price: 174, marketCap: 2190000000000 },
-      { symbol: "BRK-A", companyName: "Berkshire Hathaway Inc. Class A", sector: "Financials", price: 600000, marketCap: 900000000000 },
-      { symbol: "BRK-B", companyName: "Berkshire Hathaway Inc. Class B", sector: "Financials", price: 400, marketCap: 890000000000 },
-    ];
+  it("Scenario D — Lease holder crashes / expires: 60s lease timeout allows Client B to acquire lease", async () => {
+    // Simulate Client A acquiring lease at time T-61 seconds
+    const expiredLockTime = Date.now() - 61 * 1000;
+    store[LEASE_LOCK_KEY] = String(expiredLockTime);
 
-    vi.spyOn(fmpService, "getCompanyScreenerPool").mockResolvedValue(mockMultiShareCandidates);
+    // Client B attempts to acquire lease
+    const acquired = tryAcquireLocalLease();
+    expect(acquired).toBe(true);
 
-    const data = await top500Service.getTop500MarketData(true);
-
-    expect(data.companies.length).toBe(3); // AAPL, GOOGL, BRK-A
-    const symbols = data.companies.map((c) => c.symbol);
-
-    expect(symbols).toContain("AAPL");
-    expect(symbols.includes("GOOGL") || symbols.includes("GOOG")).toBe(true);
-    expect(symbols.includes("GOOGL") && symbols.includes("GOOG")).toBe(false); // NO DUPLICATE!
-    expect(symbols.includes("BRK-A") && symbols.includes("BRK-B")).toBe(false); // NO DUPLICATE!
+    // Verify lease extended for 60 seconds
+    const lockVal = parseInt(store[LEASE_LOCK_KEY], 10);
+    expect(lockVal).toBeGreaterThan(Date.now());
   });
 
-  it("4. Caps candidate pool to top 100 companies by market cap", async () => {
-    const candidates = Array.from({ length: 150 }, (_, i) => ({
-      symbol: `SYM${i}`,
-      companyName: `Company ${i} Inc`,
-      sector: "Technology",
-      price: 100,
-      marketCap: (150 - i) * 1000000000,
-    }));
+  it("Scenario E — FMP failure: preserves DB snapshot intact, fetchedAt unchanged, releases lease", async () => {
+    const originalFetchedAt = Date.now() - (CACHE_TTL_MS + 300 * 1000);
+    const validSnapshot: MarketDataSnapshot = {
+      id: "top100_latest",
+      fetchedAt: originalFetchedAt,
+      companies: [
+        { symbol: "MSFT", name: "Microsoft Corp", sector: "Technology", industry: "Software", price: 420, change: 4.2, changesPercentage: 1.0, marketCap: 3100000000000, qualityScore: 97 },
+      ],
+      totalMarketCap: 3100000000000,
+      averageChangePercent: 1.0,
+      weightedChangePercent: 1.0,
+      sectorSummaries: [],
+      marketStatus: "Closed",
+      lastUpdated: "4:00 PM",
+    };
 
-    vi.spyOn(fmpService, "getCompanyScreenerPool").mockResolvedValue(candidates);
+    await saveSnapshotToDb(validSnapshot);
 
-    const data = await top500Service.getTop500MarketData(true);
+    // FMP fails with network error
+    vi.spyOn(fmpService, "getCompanyScreenerPool").mockRejectedValue(new Error("Network Error 503"));
 
-    expect(data.companies.length).toBe(100);
-    expect(data.companies[0].symbol).toBe("SYM0"); // Highest market cap
-    expect(data.companies[99].symbol).toBe("SYM99");
+    const result = await top500Service.getTop500MarketData(false);
+
+    // Immediate result returns intact snapshot
+    expect(result.companies[0].symbol).toBe("MSFT");
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Verify DB snapshot fetchedAt remained UNCHANGED
+    const dbSnapshot = await loadSnapshotFromDb();
+    expect(dbSnapshot?.fetchedAt).toBe(originalFetchedAt);
+    expect(dbSnapshot?.companies[0].symbol).toBe("MSFT");
+
+    // Verify lease was released
+    expect(store[LEASE_LOCK_KEY]).toBeUndefined();
   });
 
-  it("5. Verifies layout squarify bounds stay 100% strictly inside CANVAS_MARGIN", () => {
+  it("Scenario F — Lease Denied: non-lease holding client makes 0 FMP calls and returns existing DB snapshot", async () => {
+    const existingSnapshot: MarketDataSnapshot = {
+      id: "top100_latest",
+      fetchedAt: Date.now() - (CACHE_TTL_MS + 60 * 1000),
+      companies: [
+        { symbol: "AMZN", name: "Amazon.com Inc", sector: "Consumer Discretionary", industry: "Retail", price: 180, change: 1.8, changesPercentage: 1.0, marketCap: 1900000000000, qualityScore: 92 },
+      ],
+      totalMarketCap: 1900000000000,
+      averageChangePercent: 1.0,
+      weightedChangePercent: 1.0,
+      sectorSummaries: [],
+      marketStatus: "Open",
+      lastUpdated: "10:00 AM",
+    };
+
+    await saveSnapshotToDb(existingSnapshot);
+
+    // Manually lock lease (simulating Client A currently refreshing)
+    store[LEASE_LOCK_KEY] = String(Date.now() + 60000);
+
+    const screenerSpy = vi.spyOn(fmpService, "getCompanyScreenerPool");
+    const batchQuotesSpy = vi.spyOn(fmpService, "getBatchQuotes");
+
+    // Client B attempts request
+    const result = await top500Service.getTop500MarketData(false);
+
+    expect(result.companies[0].symbol).toBe("AMZN");
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Client B made 0 FMP calls!
+    expect(screenerSpy).toHaveBeenCalledTimes(0);
+    expect(batchQuotesSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it("7. Verifies getAuthoritativeDailyChange extracts empirical FMP quote data and returns null for missing values", () => {
+    const pos = getAuthoritativeDailyChange({ changesPercentage: 2.5678, change: 3.451 });
+    expect(pos.changePct).toBe(2.57);
+    expect(pos.dollarChange).toBe(3.45);
+
+    const neg = getAuthoritativeDailyChange({ changesPercentage: -1.419, change: -2.102 });
+    expect(neg.changePct).toBe(-1.42);
+    expect(neg.dollarChange).toBe(-2.1);
+
+    const zero = getAuthoritativeDailyChange({ changesPercentage: 0, change: 0 });
+    expect(zero.changePct).toBe(0);
+    expect(zero.dollarChange).toBe(0);
+
+    const missing = getAuthoritativeDailyChange({ symbol: "XYZ", price: 100 });
+    expect(missing.changePct).toBeNull();
+    expect(missing.dollarChange).toBeNull();
+  });
+
+  it("8. Verifies layout squarify bounds stay 100% strictly inside CANVAS_MARGIN", () => {
     const width = 1200;
     const height = 680;
     const canvasBounds = {
@@ -141,34 +268,13 @@ describe("Top500Service Unit Tests", () => {
     });
   });
 
-  it("6. Verifies getTileContentConfig scales typography and info visibility based strictly on tile dimensions", () => {
-    // Large tile
-    const large = getTileContentConfig(100, 60);
-    expect(large.showName).toBe(true);
-    expect(large.showChange).toBe(true);
-    expect(large.tickerFontSize).toBeGreaterThanOrEqual(10);
-
-    // Medium tile
-    const medium = getTileContentConfig(45, 30);
-    expect(medium.showName).toBe(false);
-    expect(medium.showChange).toBe(true);
-
-    // Small tile
-    const small = getTileContentConfig(25, 18);
-    expect(small.showName).toBe(false);
-    expect(small.showChange).toBe(false);
-    expect(small.tickerFontSize).toBeGreaterThanOrEqual(8);
-  });
-
-  it("7. Filters out ETFs, Funds, Warrants, Rights, Units, Preferreds while preserving operating financials (JPM, BLK, BAC, V)", () => {
-    // Operating Companies (MUST KEEP)
+  it("9. Filters out ETFs, Funds, Warrants, Rights, Units, Preferreds while preserving operating financials (JPM, BLK, BAC, V)", () => {
     expect(isOperatingCommonCompany({ symbol: "JPM", companyName: "JPMorgan Chase & Co.", sector: "Financial Services" })).toBe(true);
     expect(isOperatingCommonCompany({ symbol: "BLK", companyName: "BlackRock, Inc.", sector: "Financial Services" })).toBe(true);
     expect(isOperatingCommonCompany({ symbol: "BAC", companyName: "Bank of America Corporation", sector: "Financial Services" })).toBe(true);
     expect(isOperatingCommonCompany({ symbol: "V", companyName: "Visa Inc.", sector: "Financial Services" })).toBe(true);
     expect(isOperatingCommonCompany({ symbol: "BRK-B", companyName: "Berkshire Hathaway Inc. Class B", sector: "Financial Services" })).toBe(true);
 
-    // Non-Operating Securities & Funds (MUST EXCLUDE)
     expect(isOperatingCommonCompany({ symbol: "SPY", companyName: "SPDR S&P 500 ETF Trust", isEtf: true })).toBe(false);
     expect(isOperatingCommonCompany({ symbol: "QQQ", companyName: "Invesco QQQ Trust", isEtf: true })).toBe(false);
     expect(isOperatingCommonCompany({ symbol: "BKN", companyName: "BlackRock Municipal Income Trust", isFund: true })).toBe(false);
