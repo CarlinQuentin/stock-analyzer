@@ -26,7 +26,7 @@ interface PlacedNode<T> {
 /**
  * Safe canvas inset margin around the perimeter of the treemap container (in pixels)
  */
-export const CANVAS_MARGIN = 12;
+export const CANVAS_MARGIN = 14;
 
 /**
  * Strict rectangle bounds clamping to prevent any pixel from overflowing parent container
@@ -42,6 +42,35 @@ export function clampRect(rect: Rect, outer: Rect): Rect {
     y: Math.floor(minY * 10) / 10,
     w: Math.max(0, Math.floor((maxX - minX) * 10) / 10),
     h: Math.max(0, Math.floor((maxY - minY) * 10) / 10),
+  };
+}
+
+/**
+ * Calculate responsive dynamic typography and content mode for a treemap tile
+ */
+export function getTileContentConfig(w: number, h: number) {
+  const innerW = Math.max(0, w - 2);
+  const innerH = Math.max(0, h - 2);
+
+  // Dynamic font sizing based on actual tile dimensions
+  const tickerFontSize = Math.max(8, Math.min(13, Math.floor(Math.min(innerW * 0.24, innerH * 0.35))));
+  const changeFontSize = Math.max(7, Math.min(10, Math.floor(tickerFontSize * 0.82)));
+
+  let showName = false;
+  let showChange = false;
+
+  if (innerW >= 68 && innerH >= 42) {
+    showName = true;
+    showChange = true;
+  } else if (innerW >= 34 && innerH >= 22) {
+    showChange = true;
+  }
+
+  return {
+    tickerFontSize,
+    changeFontSize,
+    showName,
+    showChange,
   };
 }
 
@@ -307,7 +336,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
       const { sector, comps } = secNode.data;
       const sRect = secNode.rect;
 
-      const headerHeight = sRect.h < 32 ? 0 : Math.min(22, Math.max(12, Math.floor(sRect.h * 0.12)));
+      const headerHeight = sRect.h < 28 ? 0 : Math.min(22, Math.max(12, Math.floor(sRect.h * 0.12)));
       let innerRect: Rect = clampRect(
         {
           x: sRect.x + padding,
@@ -509,7 +538,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
         ref={containerRef}
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setHoveredCompany(null)}
-        className="relative w-full bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl min-h-[500px] select-none box-border p-3"
+        className="relative w-full bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl min-h-[500px] select-none box-border p-3.5"
         style={{ height: `${dimensions.height}px` }}
       >
         {/* Render Sector Bounding Area Labels */}
@@ -531,11 +560,11 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
                 }}
               >
                 {r.h >= 24 && (
-                  <div className="px-2 py-0.5 text-[11px] font-black uppercase tracking-wider text-slate-400/90 truncate flex items-center justify-between border-b border-slate-800/40 bg-slate-900/80">
-                    <span className="truncate">{sector}</span>
-                    {secSummary && r.w > 120 && (
+                  <div className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-slate-400/90 truncate flex items-center justify-between border-b border-slate-800/40 bg-slate-900/80 leading-none">
+                    <span className="truncate max-w-[70%]">{sector}</span>
+                    {secSummary && r.w > 110 && (
                       <span
-                        className={`font-mono text-[10px] font-bold ${
+                        className={`font-mono text-[9px] font-bold ${
                           secSummary.weightedChangePercent >= 0 ? "text-emerald-400" : "text-rose-400"
                         }`}
                       >
@@ -554,17 +583,14 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
           layout.placedCompanies.map(({ company, rect }) => {
             const color = getPerformanceColor(company.changesPercentage);
             const isHovered = hoveredCompany?.symbol === company.symbol;
-
-            const isLarge = rect.w >= 75 && rect.h >= 45;
-            const isMedium = rect.w >= 45 && rect.h >= 28;
-            const isSmall = rect.w >= 28 && rect.h >= 18;
+            const config = getTileContentConfig(rect.w, rect.h);
 
             return (
               <div
                 key={company.symbol}
                 onClick={() => onSelectStock(company.symbol)}
                 onMouseEnter={() => setHoveredCompany(company)}
-                className={`absolute transition-all duration-150 cursor-pointer overflow-hidden flex flex-col items-center justify-center p-0.5 rounded-sm box-border ${
+                className={`absolute transition-all duration-150 cursor-pointer overflow-hidden flex flex-col items-center justify-center p-0.5 rounded-sm box-border select-none ${
                   isHovered ? "z-30 ring-2 ring-white scale-[1.01] shadow-2xl" : "z-10 hover:z-20"
                 }`}
                 style={{
@@ -578,41 +604,34 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
                   boxSizing: "border-box",
                 }}
               >
-                {/* Labels based on block dimensions */}
-                {isLarge ? (
-                  <div className="text-center min-w-0 max-w-full px-0.5 leading-tight overflow-hidden">
-                    <div className="font-extrabold text-xs sm:text-sm tracking-tight text-white truncate drop-shadow-sm">
-                      {company.symbol}
-                    </div>
-                    <div className="text-[10px] text-slate-200/90 font-medium truncate hidden sm:block">
-                      {company.name}
-                    </div>
-                    <div
-                      className="text-[11px] font-black font-mono mt-0.5 drop-shadow-sm"
-                      style={{ color: color.text }}
-                    >
-                      {company.changesPercentage >= 0 ? "+" : ""}
-                      {company.changesPercentage.toFixed(2)}%
-                    </div>
-                  </div>
-                ) : isMedium ? (
-                  <div className="text-center min-w-0 max-w-full px-0.5 leading-tight overflow-hidden">
-                    <div className="font-extrabold text-xs text-white truncate drop-shadow-sm">
-                      {company.symbol}
-                    </div>
-                    <div
-                      className="text-[10px] font-black font-mono drop-shadow-sm"
-                      style={{ color: color.text }}
-                    >
-                      {company.changesPercentage >= 0 ? "+" : ""}
-                      {company.changesPercentage.toFixed(2)}%
-                    </div>
-                  </div>
-                ) : isSmall ? (
-                  <div className="font-black text-[10px] text-white truncate drop-shadow-sm px-0.5 overflow-hidden">
+                {/* Dynamically scaled content fitting tile bounds strictly */}
+                <div className="flex flex-col items-center justify-center w-full h-full p-0.5 overflow-hidden leading-tight select-none pointer-events-none text-center">
+                  <div
+                    className="font-extrabold tracking-tight text-white truncate max-w-full drop-shadow-sm leading-none"
+                    style={{ fontSize: `${config.tickerFontSize}px` }}
+                  >
                     {company.symbol}
                   </div>
-                ) : null}
+
+                  {config.showName && (
+                    <div className="text-[9px] text-slate-200/90 font-medium truncate max-w-full leading-none mt-0.5 hidden sm:block">
+                      {company.name}
+                    </div>
+                  )}
+
+                  {config.showChange && (
+                    <div
+                      className="font-black font-mono leading-none mt-0.5 max-w-full truncate drop-shadow-sm"
+                      style={{
+                        fontSize: `${config.changeFontSize}px`,
+                        color: color.text,
+                      }}
+                    >
+                      {company.changesPercentage >= 0 ? "+" : ""}
+                      {company.changesPercentage.toFixed(2)}%
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })}

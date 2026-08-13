@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { top500Service } from "./top500Service";
 import { fmpService } from "./financialModelingPrep";
-import { squarify, CANVAS_MARGIN } from "../components/SP500Treemap";
+import { squarify, CANVAS_MARGIN, getTileContentConfig } from "../components/SP500Treemap";
 
 describe("Top500Service Unit Tests", () => {
   const store: Record<string, string> = {};
@@ -139,5 +139,24 @@ describe("Top500Service Unit Tests", () => {
       expect(n.rect.x + n.rect.w).toBeLessThanOrEqual(width - CANVAS_MARGIN + 0.1);
       expect(n.rect.y + n.rect.h).toBeLessThanOrEqual(height - CANVAS_MARGIN + 0.1);
     });
+  });
+
+  it("6. Verifies getTileContentConfig scales typography and info visibility based strictly on tile dimensions", () => {
+    // Large tile
+    const large = getTileContentConfig(100, 60);
+    expect(large.showName).toBe(true);
+    expect(large.showChange).toBe(true);
+    expect(large.tickerFontSize).toBeGreaterThanOrEqual(10);
+
+    // Medium tile
+    const medium = getTileContentConfig(45, 30);
+    expect(medium.showName).toBe(false);
+    expect(medium.showChange).toBe(true);
+
+    // Small tile
+    const small = getTileContentConfig(25, 18);
+    expect(small.showName).toBe(false);
+    expect(small.showChange).toBe(false);
+    expect(small.tickerFontSize).toBeGreaterThanOrEqual(8);
   });
 });
