@@ -141,12 +141,36 @@ class FinancialModelingPrepService {
       }
 
       return response.data.map((statement: any) => ({
+        ...statement,
         date: statement.date,
+        symbol: statement.symbol,
+        period: statement.period,
+        calendarYear: statement.calendarYear,
         revenue: statement.revenue,
-        netIncome: statement.netIncome,
+        costOfRevenue: statement.costOfRevenue,
         grossProfit: statement.grossProfit,
+        grossProfitRatio: statement.grossProfitRatio,
+        researchAndDevelopmentExpenses: statement.researchAndDevelopmentExpenses,
+        generalAndAdministrativeExpenses: statement.generalAndAdministrativeExpenses,
+        sellingAndMarketingExpenses: statement.sellingAndMarketingExpenses,
+        sellingGeneralAndAdministrativeExpenses: statement.sellingGeneralAndAdministrativeExpenses,
+        otherExpenses: statement.otherExpenses,
+        operatingExpenses: statement.operatingExpenses,
         operatingIncome: statement.operatingIncome,
+        operatingIncomeRatio: statement.operatingIncomeRatio,
+        interestIncome: statement.interestIncome,
+        interestExpense: statement.interestExpense,
+        depreciationAndAmortization: statement.depreciationAndAmortization,
+        ebitda: statement.ebitda,
+        ebitdaratio: statement.ebitdaratio,
+        totalOtherIncomeExpensesNet: statement.totalOtherIncomeExpensesNet,
+        incomeBeforeTax: statement.incomeBeforeTax,
+        incomeBeforeTaxRatio: statement.incomeBeforeTaxRatio,
+        incomeTaxExpense: statement.incomeTaxExpense,
+        netIncome: statement.netIncome,
+        netIncomeRatio: statement.netIncomeRatio,
         eps: statement.eps,
+        epsdiluted: statement.epsdiluted,
         weightedAverageShsOutDil: statement.weightedAverageShsOutDil ?? statement.weightedAverageSharesDiluted,
         weightedAverageShsOut: statement.weightedAverageShsOut ?? statement.weightedAverageSharesOutstanding,
         shares: statement.weightedAverageShsOutDil ?? statement.weightedAverageShsOut ?? statement.weightedAverageSharesDiluted ?? statement.weightedAverageSharesOutstanding,
@@ -170,12 +194,56 @@ class FinancialModelingPrepService {
       }
 
       return response.data.map((statement: any) => ({
+        ...statement,
         date: statement.date,
-        totalAssets: statement.totalAssets,
-        totalDebt: statement.totalDebt,
-        totalEquity: statement.totalEquity,
-        shares: statement.commonStockSharesIssued,
+        symbol: statement.symbol,
+        period: statement.period,
+        calendarYear: statement.calendarYear,
         cashAndCashEquivalents: statement.cashAndCashEquivalents || 0,
+        shortTermInvestments: statement.shortTermInvestments,
+        cashAndShortTermInvestments: statement.cashAndShortTermInvestments,
+        netReceivables: statement.netReceivables ?? statement.accountsReceivables,
+        inventory: statement.inventory,
+        otherCurrentAssets: statement.otherCurrentAssets,
+        totalCurrentAssets: statement.totalCurrentAssets,
+        propertyPlantEquipmentNet: statement.propertyPlantEquipmentNet,
+        goodwill: statement.goodwill,
+        intangibleAssets: statement.intangibleAssets,
+        goodwillAndIntangibleAssets: statement.goodwillAndIntangibleAssets,
+        longTermInvestments: statement.longTermInvestments,
+        taxAssets: statement.taxAssets,
+        otherNonCurrentAssets: statement.otherNonCurrentAssets,
+        totalNonCurrentAssets: statement.totalNonCurrentAssets,
+        otherAssets: statement.otherAssets,
+        totalAssets: statement.totalAssets,
+        accountPayables: statement.accountPayables ?? statement.accountsPayables,
+        shortTermDebt: statement.shortTermDebt,
+        taxPayables: statement.taxPayables,
+        deferredRevenue: statement.deferredRevenue,
+        otherCurrentLiabilities: statement.otherCurrentLiabilities,
+        totalCurrentLiabilities: statement.totalCurrentLiabilities,
+        longTermDebt: statement.longTermDebt,
+        deferredRevenueNonCurrent: statement.deferredRevenueNonCurrent,
+        deferredTaxLiabilitiesNonCurrent: statement.deferredTaxLiabilitiesNonCurrent,
+        otherNonCurrentLiabilities: statement.otherNonCurrentLiabilities,
+        totalNonCurrentLiabilities: statement.totalNonCurrentLiabilities,
+        otherLiabilities: statement.otherLiabilities,
+        capitalLeaseObligations: statement.capitalLeaseObligations,
+        totalLiabilities: statement.totalLiabilities,
+        preferredStock: statement.preferredStock,
+        commonStock: statement.commonStock,
+        retainedEarnings: statement.retainedEarnings,
+        accumulatedOtherComprehensiveIncomeLoss: statement.accumulatedOtherComprehensiveIncomeLoss,
+        othertotalStockholdersEquity: statement.othertotalStockholdersEquity,
+        totalStockholdersEquity: statement.totalStockholdersEquity,
+        totalEquity: statement.totalEquity ?? statement.totalStockholdersEquity,
+        totalLiabilitiesAndStockholdersEquity: statement.totalLiabilitiesAndStockholdersEquity,
+        minorityInterest: statement.minorityInterest,
+        totalLiabilitiesAndTotalEquity: statement.totalLiabilitiesAndTotalEquity,
+        totalInvestments: statement.totalInvestments,
+        totalDebt: statement.totalDebt,
+        netDebt: statement.netDebt,
+        shares: statement.commonStockSharesIssued,
       }));
     } catch (error) {
       throw this.handleError(error);
@@ -196,9 +264,41 @@ class FinancialModelingPrepService {
       }
 
       return response.data.map((statement: any) => ({
+        ...statement,
         date: statement.date,
-        operatingCashFlow: statement.operatingCashFlow,
+        symbol: statement.symbol,
+        period: statement.period,
+        calendarYear: statement.calendarYear,
+        netIncome: statement.netIncome,
+        depreciationAndAmortization: statement.depreciationAndAmortization,
+        deferredIncomeTax: statement.deferredIncomeTax,
+        stockBasedCompensation: statement.stockBasedCompensation,
+        changeInWorkingCapital: statement.changeInWorkingCapital,
+        accountsReceivables: statement.accountsReceivables,
+        inventory: statement.inventory,
+        accountsPayables: statement.accountsPayables,
+        otherWorkingCapital: statement.otherWorkingCapital,
+        otherNonCashItems: statement.otherNonCashItems,
+        operatingCashFlow: statement.operatingCashFlow ?? statement.netCashProvidedByOperatingActivities,
+        netCashProvidedByOperatingActivities: statement.netCashProvidedByOperatingActivities ?? statement.operatingCashFlow,
+        investmentsInPropertyPlantAndEquipment: statement.investmentsInPropertyPlantAndEquipment,
         capitalExpenditure: statement.capitalExpenditure,
+        acquisitionsNet: statement.acquisitionsNet,
+        purchasesOfInvestments: statement.purchasesOfInvestments,
+        salesMaturitiesOfInvestments: statement.salesMaturitiesOfInvestments,
+        otherInvestingActivites: statement.otherInvestingActivites,
+        netCashUsedForInvestingActivites: statement.netCashUsedForInvestingActivites,
+        debtRepayment: statement.debtRepayment,
+        commonStockIssued: statement.commonStockIssued,
+        commonStockRepurchased: statement.commonStockRepurchased,
+        dividendsPaid: statement.dividendsPaid,
+        otherFinancingActivites: statement.otherFinancingActivites,
+        netCashUsedProvidedByFinancingActivities: statement.netCashUsedProvidedByFinancingActivities,
+        effectOfForexExchangeRate: statement.effectOfForexExchangeRate,
+        netChangeInCash: statement.netChangeInCash,
+        cashAtEndOfPeriod: statement.cashAtEndOfPeriod,
+        cashAtBeginningOfPeriod: statement.cashAtBeginningOfPeriod,
+        freeCashFlow: statement.freeCashFlow,
       }));
     } catch (error) {
       throw this.handleError(error);
@@ -528,6 +628,34 @@ class FinancialModelingPrepService {
     }
   }
 
+  async getKeyMetricsTTM(ticker: string): Promise<any | null> {
+    try {
+      const response = await this.client.get("/key-metrics-ttm", {
+        params: { ...this.getParams(), symbol: ticker.toUpperCase() },
+      });
+      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+        return response.data[0];
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  async getRatiosTTM(ticker: string): Promise<any | null> {
+    try {
+      const response = await this.client.get("/ratios-ttm", {
+        params: { ...this.getParams(), symbol: ticker.toUpperCase() },
+      });
+      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+        return response.data[0];
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   async getStatementData(ticker: string) {
     try {
       const [
@@ -536,27 +664,25 @@ class FinancialModelingPrepService {
         cashFlowStatements,
         dividendHistory,
         dividendMetrics,
+        keyMetricsRes,
+        financialRatiosRes,
+        keyMetricsTTM,
+        ratiosTTM,
       ] = await Promise.all([
         this.getIncomeStatements(ticker),
         this.getBalanceSheets(ticker),
         this.getCashFlowStatements(ticker),
-        this.getDividends(ticker),
-        this.getDividendMetrics(ticker),
+        this.getDividends(ticker).catch(() => []),
+        this.getDividendMetrics(ticker).catch(() => ({
+          dividendYield: null,
+          dividendPerShare: null,
+          dividendPayoutRatio: null,
+        })),
+        this.getKeyMetrics(ticker).catch(() => []),
+        this.getFinancialRatios(ticker).catch(() => []),
+        this.getKeyMetricsTTM(ticker).catch(() => null),
+        this.getRatiosTTM(ticker).catch(() => null),
       ]);
-
-      let keyMetrics: any[] = [];
-      try {
-        keyMetrics = await this.getKeyMetrics(ticker);
-      } catch (err) {
-        console.warn("Failed to fetch key metrics, falling back to manual calculations:", err);
-      }
-
-      let financialRatios: any[] = [];
-      try {
-        financialRatios = await this.getFinancialRatios(ticker);
-      } catch (err) {
-        console.warn("Failed to fetch financial ratios, falling back to manual calculations:", err);
-      }
 
       return {
         incomeStatements,
@@ -564,8 +690,10 @@ class FinancialModelingPrepService {
         cashFlowStatements,
         dividendHistory,
         dividendMetrics,
-        keyMetrics,
-        financialRatios,
+        keyMetrics: keyMetricsRes || [],
+        financialRatios: financialRatiosRes || [],
+        keyMetricsTTM,
+        ratiosTTM,
       };
     } catch (error) {
       throw this.handleError(error);

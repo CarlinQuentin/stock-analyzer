@@ -20,25 +20,123 @@ export interface CompanySearchResult {
 
 export interface FinancialStatement {
   date: string;
+  symbol?: string;
+  period?: string;
+  calendarYear?: string;
+  
+  // Income Statement Fields
   revenue?: number;
+  costOfRevenue?: number;
+  grossProfit?: number;
+  grossProfitRatio?: number;
+  researchAndDevelopmentExpenses?: number;
+  generalAndAdministrativeExpenses?: number;
+  sellingAndMarketingExpenses?: number;
+  sellingGeneralAndAdministrativeExpenses?: number;
+  otherExpenses?: number;
+  operatingExpenses?: number;
+  operatingIncome?: number;
+  operatingIncomeRatio?: number;
+  interestIncome?: number;
+  interestExpense?: number;
+  depreciationAndAmortization?: number;
+  ebitda?: number;
+  ebitdaratio?: number;
+  totalOtherIncomeExpensesNet?: number;
+  incomeBeforeTax?: number;
+  incomeBeforeTaxRatio?: number;
+  incomeTaxExpense?: number;
   netIncome?: number;
-  operatingCashFlow?: number;
-  capitalExpenditure?: number;
-  shares?: number;
+  netIncomeRatio?: number;
+  eps?: number;
+  epsdiluted?: number;
   weightedAverageShsOutDil?: number;
   weightedAverageShsOut?: number;
-  eps?: number;
+  shares?: number;
+
+  // Balance Sheet Fields
+  cashAndCashEquivalents?: number;
+  shortTermInvestments?: number;
+  cashAndShortTermInvestments?: number;
+  netReceivables?: number;
+  inventory?: number;
+  otherCurrentAssets?: number;
+  totalCurrentAssets?: number;
+  propertyPlantEquipmentNet?: number;
+  goodwill?: number;
+  intangibleAssets?: number;
+  goodwillAndIntangibleAssets?: number;
+  longTermInvestments?: number;
+  taxAssets?: number;
+  otherNonCurrentAssets?: number;
+  totalNonCurrentAssets?: number;
+  otherAssets?: number;
   totalAssets?: number;
-  totalDebt?: number;
+  accountPayables?: number;
+  shortTermDebt?: number;
+  taxPayables?: number;
+  deferredRevenue?: number;
+  otherCurrentLiabilities?: number;
+  totalCurrentLiabilities?: number;
+  longTermDebt?: number;
+  deferredRevenueNonCurrent?: number;
+  deferredTaxLiabilitiesNonCurrent?: number;
+  otherNonCurrentLiabilities?: number;
+  totalNonCurrentLiabilities?: number;
+  otherLiabilities?: number;
+  capitalLeaseObligations?: number;
+  totalLiabilities?: number;
+  preferredStock?: number;
+  commonStock?: number;
+  retainedEarnings?: number;
+  accumulatedOtherComprehensiveIncomeLoss?: number;
+  othertotalStockholdersEquity?: number;
+  totalStockholdersEquity?: number;
   totalEquity?: number;
-  grossProfit?: number;
-  operatingIncome?: number;
+  totalLiabilitiesAndStockholdersEquity?: number;
+  minorityInterest?: number;
+  totalLiabilitiesAndTotalEquity?: number;
+  totalInvestments?: number;
+  totalDebt?: number;
+  netDebt?: number;
+
+  // Cash Flow Statement Fields
+  operatingCashFlow?: number;
+  netCashProvidedByOperatingActivities?: number;
+  capitalExpenditure?: number;
+  investmentsInPropertyPlantAndEquipment?: number;
+  freeCashFlow?: number;
+  netCashUsedForInvestingActivites?: number;
+  acquisitionsNet?: number;
+  purchasesOfInvestments?: number;
+  salesMaturitiesOfInvestments?: number;
+  otherInvestingActivites?: number;
+  debtRepayment?: number;
+  commonStockIssued?: number;
+  commonStockRepurchased?: number;
+  dividendsPaid?: number;
+  otherFinancingActivites?: number;
+  netCashUsedProvidedByFinancingActivities?: number;
+  effectOfForexExchangeRate?: number;
+  netChangeInCash?: number;
+  cashAtEndOfPeriod?: number;
+  cashAtBeginningOfPeriod?: number;
+  deferredIncomeTax?: number;
+  stockBasedCompensation?: number;
+  changeInWorkingCapital?: number;
+  accountsReceivables?: number;
+  accountsPayables?: number;
+  otherWorkingCapital?: number;
+  otherNonCashItems?: number;
+
+  // Dividend Fields
   dividend?: number;
   dividendYield?: number;
   dividendPerShare?: number;
   dividendPayoutRatio?: number;
   dividendFrequency?: "Monthly" | "Quarterly" | "Semiannual" | "Annual";
-  cashAndCashEquivalents?: number;
+
+  [key: string]: any;
 }
 
 export interface DividendMetrics {

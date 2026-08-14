@@ -1521,8 +1521,14 @@ function App() {
             incomeStatements={rawStatementData.statementData.incomeStatements}
             balanceSheets={rawStatementData.statementData.balanceSheets}
             cashFlowStatements={rawStatementData.statementData.cashFlowStatements}
+            keyMetrics={rawStatementData.statementData.keyMetrics}
+            financialRatios={rawStatementData.statementData.financialRatios}
+            keyMetricsTTM={(rawStatementData.statementData as any).keyMetricsTTM}
+            ratiosTTM={(rawStatementData.statementData as any).ratiosTTM}
             symbol={result.companyProfile.symbol || result.ticker}
             companyName={result.companyProfile.companyName}
+            currentPrice={result.companyProfile.price}
+            marketCap={result.companyProfile.mktCap}
           />
         )}
 
