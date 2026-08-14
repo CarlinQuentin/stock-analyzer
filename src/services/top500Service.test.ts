@@ -92,6 +92,17 @@ describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () =
 
     await saveSnapshotToDb(staleSnapshot);
 
+    let currentDbSnapshot = staleSnapshot;
+    vi.spyOn(supabase, "rpc").mockResolvedValue({ data: true, error: null } as any);
+    vi.spyOn(supabase, "from").mockReturnValue({
+      select: () => ({ eq: () => ({ limit: () => Promise.resolve({ data: [{ id: "top100_latest", payload: currentDbSnapshot }], error: null }) }) }),
+      upsert: (row: any) => {
+        if (row?.payload) currentDbSnapshot = row.payload;
+        return { select: () => Promise.resolve({ data: [], error: null }) };
+      },
+      update: () => ({ eq: () => ({ or: () => ({ select: () => Promise.resolve({ data: [], error: null }) }) }) }),
+    } as any);
+
     const screenerSpy = vi.spyOn(fmpService, "getCompanyScreenerPool").mockResolvedValue([
       { symbol: "FRESH_SYM", companyName: "Fresh Corp", sector: "Technology", price: 100, marketCap: 1000000000 },
     ]);
@@ -206,6 +217,7 @@ describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () =
   });
 
   it("Scenario F — Lease Denied: non-lease holding client makes 0 FMP calls and returns existing DB snapshot", async () => {
+    clearSnapshotDb();
     const existingSnapshot: MarketDataSnapshot = {
       id: "top100_latest",
       fetchedAt: Date.now() - (CACHE_TTL_MS + 60 * 1000),
@@ -224,6 +236,12 @@ describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () =
 
     // Manually lock lease (simulating Client A currently refreshing)
     store[LEASE_LOCK_KEY] = String(Date.now() + 60000);
+    vi.spyOn(supabase, "rpc").mockResolvedValue({ data: false, error: null } as any);
+    vi.spyOn(supabase, "from").mockReturnValue({
+      select: () => ({ eq: () => ({ limit: () => Promise.resolve({ data: [{ id: "top100_latest", payload: existingSnapshot }], error: null }) }) }),
+      update: () => ({ eq: () => ({ or: () => ({ select: () => Promise.resolve({ data: [], error: null }) }) }) }),
+      upsert: () => ({ select: () => Promise.resolve({ data: [], error: null }) }),
+    } as any);
 
     const screenerSpy = vi.spyOn(fmpService, "getCompanyScreenerPool");
     const batchQuotesSpy = vi.spyOn(fmpService, "getBatchQuotes");

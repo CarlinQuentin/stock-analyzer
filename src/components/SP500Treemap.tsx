@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { top500Service, Top500Company, Top500MarketData } from "../services/top500Service";
 import { formatMarketCap } from "../utils/scoring";
 
@@ -24,26 +24,37 @@ interface PlacedNode<T> {
 }
 
 /**
- * Safe container inner padding margin (in pixels) ensuring generous 28px breathing room on all sides
- * so all treemap data fits completely inside the visible container at default view
+ * Authoritative symmetrical root treemap drawing padding (in pixels)
+ * Used to establish one explicit inner drawing rectangle for all treemap calculations
  */
-export const CANVAS_MARGIN = 28;
+export const ROOT_PADDING = {
+  top: 12,
+  right: 12,
+  bottom: 12,
+  left: 12,
+};
 
+export const CANVAS_MARGIN = ROOT_PADDING.left;
 /**
- * Strict rectangle bounds clamping to prevent any pixel from overflowing parent container
+ * Strict rectangle bounds clamping to guarantee every tile fits completely inside parent rectangle
  */
 export function clampRect(rect: Rect, outer: Rect): Rect {
-  const minX = Math.max(outer.x, Math.min(rect.x, outer.x + outer.w));
-  const minY = Math.max(outer.y, Math.min(rect.y, outer.y + outer.h));
-  const maxX = Math.min(outer.x + outer.w, Math.max(minX, rect.x + rect.w));
-  const maxY = Math.min(outer.y + outer.h, Math.max(minY, rect.y + rect.h));
+  const outerRight = outer.x + outer.w;
+  const outerBottom = outer.y + outer.h;
 
-  return {
-    x: Math.floor(minX * 10) / 10,
-    y: Math.floor(minY * 10) / 10,
-    w: Math.max(0, Math.floor((maxX - minX) * 10) / 10),
-    h: Math.max(0, Math.floor((maxY - minY) * 10) / 10),
-  };
+  const minX = Math.max(outer.x, Math.min(rect.x, outerRight));
+  const minY = Math.max(outer.y, Math.min(rect.y, outerBottom));
+  const maxX = Math.min(outerRight, Math.max(minX, rect.x + rect.w));
+  const maxY = Math.min(outerBottom, Math.max(minY, rect.y + rect.h));
+
+  const x = Math.floor(minX * 100) / 100;
+  const y = Math.floor(minY * 100) / 100;
+  const maxAvailableW = Math.max(0, outerRight - x);
+  const maxAvailableH = Math.max(0, outerBottom - y);
+  const w = Math.max(0, Math.min(Math.floor((maxX - minX) * 100) / 100, maxAvailableW));
+  const h = Math.max(0, Math.min(Math.floor((maxY - minY) * 100) / 100, maxAvailableH));
+
+  return { x, y, w, h };
 }
 
 /**
@@ -83,98 +94,71 @@ export function squarify<T>(items: TreemapItem<T>[], bounds: Rect): PlacedNode<T
     return [];
   }
 
-  const totalValue = items.reduce((acc, item) => acc + item.value, 0);
+  const validItems = items.filter((item) => item && typeof item.value === "number" && !isNaN(item.value) && item.value > 0);
+  if (validItems.length === 0) return [];
+
+  const totalValue = validItems.reduce((acc, item) => acc + item.value, 0);
   if (totalValue <= 0) return [];
 
   const results: PlacedNode<T>[] = [];
 
-  function layoutRow(row: TreemapItem<T>[], _rowArea: number, box: Rect, isHorizontal: boolean): Rect {
-    const rowLength = row.reduce((sum, item) => sum + item.value, 0);
-    const rowThickness = Math.min(rowLength / (isHorizontal ? box.h : box.w), isHorizontal ? box.w : box.h);
+  function worst(row: { data: T; value: number }[], sideLength: number, totalRemVal: number, remBoundsArea: number): number {
+    if (row.length === 0 || sideLength <= 0 || totalRemVal <= 0) return Infinity;
+    const rowValSum = row.reduce((sum, item) => sum + item.value, 0);
+    const rowArea = (rowValSum / totalRemVal) * remBoundsArea;
+    const thickness = rowArea / sideLength;
+    if (thickness <= 0) return Infinity;
 
-    let offset = 0;
-    row.forEach((item, idx) => {
-      const itemFraction = item.value / rowLength;
-      let rect: Rect;
-
-      if (isHorizontal) {
-        const itemH = idx === row.length - 1 ? Math.max(0, box.h - offset) : box.h * itemFraction;
-        rect = {
-          x: box.x,
-          y: box.y + offset,
-          w: rowThickness,
-          h: itemH,
-        };
-        offset += itemH;
-      } else {
-        const itemW = idx === row.length - 1 ? Math.max(0, box.w - offset) : box.w * itemFraction;
-        rect = {
-          x: box.x + offset,
-          y: box.y,
-          w: itemW,
-          h: rowThickness,
-        };
-        offset += itemW;
-      }
-
-      results.push({ data: item.data, rect: clampRect(rect, box) });
-    });
-
-    if (isHorizontal) {
-      return {
-        x: box.x + rowThickness,
-        y: box.y,
-        w: Math.max(0, box.w - rowThickness),
-        h: box.h,
-      };
-    } else {
-      return {
-        x: box.x,
-        y: box.y + rowThickness,
-        w: box.w,
-        h: Math.max(0, box.h - rowThickness),
-      };
+    let maxAspect = -Infinity;
+    for (const item of row) {
+      const itemLength = (item.value / rowValSum) * sideLength;
+      if (itemLength <= 0) return Infinity;
+      const aspect = Math.max(thickness / itemLength, itemLength / thickness);
+      if (aspect > maxAspect) maxAspect = aspect;
     }
+    return maxAspect;
   }
 
-  function worst(row: TreemapItem<T>[], sideLength: number): number {
-    if (row.length === 0 || sideLength <= 0) return Infinity;
-    const s = row.reduce((sum, item) => sum + item.value, 0);
-    let max = -Infinity;
-    let min = Infinity;
+  let remItems = [...validItems];
+  let remTotalVal = totalValue;
+  let remBounds: Rect = {
+    x: bounds.x,
+    y: bounds.y,
+    w: bounds.w,
+    h: bounds.h,
+  };
 
-    row.forEach((item) => {
-      const val = item.value;
-      if (val > max) max = val;
-      if (val < min) min = val;
-    });
+  const boundsRight = bounds.x + bounds.w;
+  const boundsBottom = bounds.y + bounds.h;
 
-    const s2 = s * s;
-    const side2 = sideLength * sideLength;
+  while (remItems.length > 0) {
+    const sideLength = Math.min(remBounds.w, remBounds.h);
+    if (sideLength <= 0) {
+      // Place any remaining zero-space items at safe boundary without overflowing
+      for (const item of remItems) {
+        results.push({
+          data: item.data,
+          rect: {
+            x: Math.min(remBounds.x, boundsRight),
+            y: Math.min(remBounds.y, boundsBottom),
+            w: 0,
+            h: 0,
+          },
+        });
+      }
+      break;
+    }
 
-    return Math.max((side2 * max) / s2, s2 / (side2 * min));
-  }
+    const isHorizontal = remBounds.w >= remBounds.h;
+    const remBoundsArea = remBounds.w * remBounds.h;
 
-  let remainingItems = items.map((item) => ({
-    data: item.data,
-    value: (item.value / totalValue) * (bounds.w * bounds.h),
-  }));
-
-  let currentBounds = { ...bounds };
-
-  while (remainingItems.length > 0) {
-    const sideLength = Math.min(currentBounds.w, currentBounds.h);
-    if (sideLength <= 0) break;
-
-    const isHorizontal = currentBounds.w >= currentBounds.h;
-
-    let currentRow: typeof remainingItems = [remainingItems[0]];
-    let currentWorst = worst(currentRow, sideLength);
+    let currentRow: typeof remItems = [remItems[0]];
+    let currentWorst = worst(currentRow, sideLength, remTotalVal, remBoundsArea);
 
     let i = 1;
-    while (i < remainingItems.length) {
-      const nextRow = [...currentRow, remainingItems[i]];
-      const nextWorst = worst(nextRow, sideLength);
+    while (i < remItems.length) {
+      const nextRow = [...currentRow, remItems[i]];
+      const nextWorst = worst(nextRow, sideLength, remTotalVal, remBoundsArea);
 
       if (nextWorst <= currentWorst) {
         currentRow = nextRow;
@@ -185,9 +169,95 @@ export function squarify<T>(items: TreemapItem<T>[], bounds: Rect): PlacedNode<T
       }
     }
 
-    const rowArea = currentRow.reduce((sum, item) => sum + item.value, 0);
-    currentBounds = layoutRow(currentRow, rowArea, currentBounds, isHorizontal);
-    remainingItems = remainingItems.slice(currentRow.length);
+    const rowValSum = currentRow.reduce((sum, item) => sum + item.value, 0);
+    const isLastRow = currentRow.length === remItems.length;
+
+    // Calculate row thickness strictly within remaining bounds
+    let rowThickness: number;
+    if (isHorizontal) {
+      rowThickness = isLastRow
+        ? remBounds.w
+        : Math.min(remBounds.w, (rowValSum / remTotalVal) * remBounds.w);
+    } else {
+      rowThickness = isLastRow
+        ? remBounds.h
+        : Math.min(remBounds.h, (rowValSum / remTotalVal) * remBounds.h);
+    }
+
+    // Lay out items within this row
+    let offset = 0;
+    const availableSide = isHorizontal ? remBounds.h : remBounds.w;
+
+    currentRow.forEach((item, idx) => {
+      const isLastItemInRow = idx === currentRow.length - 1;
+      const itemFraction = item.value / rowValSum;
+
+      let itemSize: number;
+      if (isLastItemInRow) {
+        itemSize = Math.max(0, availableSide - offset);
+      } else {
+        itemSize = Math.max(0, Math.min(availableSide - offset, itemFraction * availableSide));
+      }
+
+      let rawX: number;
+      let rawY: number;
+      let rawW: number;
+      let rawH: number;
+
+      if (isHorizontal) {
+        rawX = remBounds.x;
+        rawY = remBounds.y + offset;
+        rawW = rowThickness;
+        rawH = itemSize;
+      } else {
+        rawX = remBounds.x + offset;
+        rawY = remBounds.y;
+        rawW = itemSize;
+        rawH = rowThickness;
+      }
+
+      offset += itemSize;
+
+      // Strictly clamp coordinates to parent bounds with 2-decimal precision
+      const clampedX = Math.floor(Math.max(bounds.x, Math.min(rawX, boundsRight)) * 100) / 100;
+      const clampedY = Math.floor(Math.max(bounds.y, Math.min(rawY, boundsBottom)) * 100) / 100;
+      const maxW = Math.max(0, boundsRight - clampedX);
+      const maxH = Math.max(0, boundsBottom - clampedY);
+      const clampedW = Math.max(0, Math.min(Math.floor(rawW * 100) / 100, maxW));
+      const clampedH = Math.max(0, Math.min(Math.floor(rawH * 100) / 100, maxH));
+
+      results.push({
+        data: item.data,
+        rect: {
+          x: clampedX,
+          y: clampedY,
+          w: clampedW,
+          h: clampedH,
+        },
+      });
+    });
+
+    // Advance remaining bounds
+    if (isHorizontal) {
+      const nextX = remBounds.x + rowThickness;
+      remBounds = {
+        x: nextX,
+        y: remBounds.y,
+        w: Math.max(0, boundsRight - nextX),
+        h: remBounds.h,
+      };
+    } else {
+      const nextY = remBounds.y + rowThickness;
+      remBounds = {
+        x: remBounds.x,
+        y: nextY,
+        w: remBounds.w,
+        h: Math.max(0, boundsBottom - nextY),
+      };
+    }
+
+    remItems = remItems.slice(currentRow.length);
+    remTotalVal = Math.max(0, remTotalVal - rowValSum);
   }
 
   return results;
@@ -243,6 +313,25 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
     height: 680,
   });
 
+  // Callback ref to capture element mounting immediately after loading completes
+  const setContainerRef = useCallback((node: HTMLDivElement | null) => {
+    containerRef.current = node;
+    if (node) {
+      const clientW = node.clientWidth > 0 ? node.clientWidth : Math.floor(node.getBoundingClientRect().width);
+      if (clientW > 0) {
+        let calcHeight = 680;
+        if (clientW >= 1024) {
+          calcHeight = Math.max(560, Math.min(850, Math.floor(clientW * 0.52)));
+        } else if (clientW >= 640) {
+          calcHeight = Math.max(520, Math.floor(clientW * 0.65));
+        } else {
+          calcHeight = Math.max(550, Math.floor(clientW * 0.9));
+        }
+        setDimensions({ width: clientW, height: calcHeight });
+      }
+    }
+  }, []);
+
   // Keep ref values in sync for native wheel listener
   const zoomRef = useRef(zoom);
   const panRef = useRef(pan);
@@ -251,23 +340,25 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
 
   // Measure container dimensions with ResizeObserver and calculate responsive height curve
   useEffect(() => {
-    if (!containerRef.current) return;
+    const el = containerRef.current;
+    if (!el) return;
 
     const updateSize = () => {
       if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        if (rect.width > 0) {
-          const w = Math.floor(rect.width);
+        const target = containerRef.current;
+        const rect = target.getBoundingClientRect();
+        const clientW = target.clientWidth > 0 ? target.clientWidth : Math.floor(rect.width);
+        if (clientW > 0) {
           let calcHeight = 680;
-          if (w >= 1024) {
-            calcHeight = Math.max(560, Math.min(800, Math.floor(w * 0.54)));
-          } else if (w >= 640) {
-            calcHeight = Math.max(520, Math.floor(w * 0.65));
+          if (clientW >= 1024) {
+            calcHeight = Math.max(560, Math.min(850, Math.floor(clientW * 0.52)));
+          } else if (clientW >= 640) {
+            calcHeight = Math.max(520, Math.floor(clientW * 0.65));
           } else {
-            calcHeight = Math.max(550, Math.floor(w * 0.9));
+            calcHeight = Math.max(550, Math.floor(clientW * 0.9));
           }
 
-          setDimensions({ width: w, height: calcHeight });
+          setDimensions({ width: clientW, height: calcHeight });
         }
       }
     };
@@ -275,13 +366,13 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
     updateSize();
 
     const observer = new ResizeObserver(updateSize);
-    observer.observe(containerRef.current);
+    observer.observe(el);
     window.addEventListener("resize", updateSize);
     return () => {
       observer.disconnect();
       window.removeEventListener("resize", updateSize);
     };
-  }, []);
+  }, [loading, Boolean(data)]);
 
   // Native non-passive wheel event listener to lock broader page scrolling while mouse is over the chart
   useEffect(() => {
@@ -329,7 +420,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
     return () => {
       el.removeEventListener("wheel", onNativeWheel);
     };
-  }, []);
+  }, [loading, Boolean(data)]);
 
   const fetchData = async (forceRefresh: boolean = false) => {
     setLoading(true);
@@ -400,16 +491,25 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
       return { placedSectors: [], placedCompanies: [] };
     }
 
-    const { width, height } = dimensions;
+    const { width: containerWidth, height: containerHeight } = dimensions;
 
-    // Safe inset layout bounds matching 28px container inner margin to guarantee all treemap data fits completely
-    const canvasBounds: Rect = {
-      x: CANVAS_MARGIN,
-      y: CANVAS_MARGIN,
-      w: Math.max(100, width - CANVAS_MARGIN * 2),
-      h: Math.max(100, height - CANVAS_MARGIN * 2),
+    // Establish ONE authoritative inner drawing rectangle before performing any treemap calculations
+    const padding = ROOT_PADDING;
+    const innerX = padding.left;
+    const innerY = padding.top;
+    const innerWidth = Math.max(0, containerWidth - padding.left - padding.right);
+    const innerHeight = Math.max(0, containerHeight - padding.top - padding.bottom);
+
+    const rootBounds: Rect = {
+      x: innerX,
+      y: innerY,
+      w: innerWidth,
+      h: innerHeight,
     };
-    const padding = 2;
+
+    const rootRight = innerX + innerWidth;
+    const rootBottom = innerY + innerHeight;
+    const sectorPadding = 2;
 
     // Group companies into sectors
     const sectorMap = new Map<string, Top500Company[]>();
@@ -428,57 +528,105 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
       .filter((s) => s.value > 0)
       .sort((a, b) => b.value - a.value);
 
-    // Lay out sector bounding boxes strictly clamped to canvasBounds
-    const placedSectors = squarify(sectorItems, canvasBounds).map((sNode) => ({
+    // Lay out sector bounding boxes strictly clamped to rootBounds (innerWidth x innerHeight)
+    const placedSectors = squarify(sectorItems, rootBounds).map((sNode) => ({
       ...sNode,
-      rect: clampRect(sNode.rect, canvasBounds),
+      rect: clampRect(sNode.rect, rootBounds),
     }));
 
     const placedCompanies: { company: Top500Company; rect: Rect; sector: string }[] = [];
 
-    // Within each sector box, lay out company rectangles strictly clamped to innerRect
+    // Within each sector box, lay out company rectangles strictly clamped to sector inner bounds and root bounds
     placedSectors.forEach((secNode) => {
       const { sector, comps } = secNode.data;
       const sRect = secNode.rect;
 
-      const headerHeight = sRect.h < 28 ? 0 : Math.min(22, Math.max(12, Math.floor(sRect.h * 0.12)));
-      let innerRect: Rect = clampRect(
+      const hasHeader = sRect.h >= 24;
+      const headerHeight = hasHeader ? Math.min(20, Math.max(15, Math.floor(sRect.h * 0.12))) : 0;
+      const innerXSec = sRect.x + sectorPadding;
+      const innerYSec = sRect.y + headerHeight + sectorPadding;
+      const innerWSec = Math.max(0, sRect.w - sectorPadding * 2);
+      const innerHSec = Math.max(0, sRect.h - headerHeight - sectorPadding * 2);
+
+      const sectorInnerRect: Rect = clampRect(
         {
-          x: sRect.x + padding,
-          y: sRect.y + headerHeight + padding,
-          w: Math.max(0, sRect.w - padding * 2),
-          h: Math.max(0, sRect.h - headerHeight - padding * 2),
+          x: innerXSec,
+          y: innerYSec,
+          w: innerWSec,
+          h: innerHSec,
         },
         sRect
       );
-
-      // Fallback for extremely small sector boxes to guarantee all company tiles receive valid rects
-      if (innerRect.w <= 0 || innerRect.h <= 0) {
-        innerRect = clampRect(
-          {
-            x: sRect.x + 1,
-            y: sRect.y + 1,
-            w: Math.max(1, sRect.w - 2),
-            h: Math.max(1, sRect.h - 2),
-          },
-          sRect
-        );
-      }
 
       const compItems = comps
         .map((c) => ({ data: c, value: c.marketCap }))
         .filter((c) => c.value > 0)
         .sort((a, b) => b.value - a.value);
 
-      const placedComps = squarify(compItems, innerRect);
+      if (sectorInnerRect.w > 0 && sectorInnerRect.h > 0) {
+        const placedComps = squarify(compItems, sectorInnerRect);
 
-      placedComps.forEach((cNode) => {
-        placedCompanies.push({
-          company: cNode.data,
-          rect: clampRect(cNode.rect, innerRect),
-          sector,
+        placedComps.forEach((cNode) => {
+          let cRect = clampRect(cNode.rect, sectorInnerRect);
+
+          // Add boundary protection: strictly enforce root bounds
+          cRect = {
+            x: Math.max(innerX, Math.min(cRect.x, rootRight)),
+            y: Math.max(innerY, Math.min(cRect.y, rootBottom)),
+            w: Math.max(0, Math.min(cRect.w, rootRight - cRect.x)),
+            h: Math.max(0, Math.min(cRect.h, rootBottom - cRect.y)),
+          };
+
+          placedCompanies.push({
+            company: cNode.data,
+            rect: cRect,
+            sector,
+          });
         });
-      });
+      }
+    });
+
+    // Development-time validation: ensure no rectangle escapes root bounds
+    const EPSILON = 0.5;
+    placedSectors.forEach((sNode) => {
+      const rect = sNode.rect;
+      if (
+        rect.x < innerX - EPSILON ||
+        rect.y < innerY - EPSILON ||
+        rect.x + rect.w > rootRight + EPSILON ||
+        rect.y + rect.h > rootBottom + EPSILON
+      ) {
+        console.warn("Treemap sector rectangle escaped root bounds", {
+          sector: sNode.data.sector,
+          rect,
+          innerX,
+          innerY,
+          innerWidth,
+          innerHeight,
+          rootRight,
+          rootBottom,
+        });
+      }
+    });
+
+    placedCompanies.forEach(({ company, rect }) => {
+      if (
+        rect.x < innerX - EPSILON ||
+        rect.y < innerY - EPSILON ||
+        rect.x + rect.w > rootRight + EPSILON ||
+        rect.y + rect.h > rootBottom + EPSILON
+      ) {
+        console.warn("Treemap stock rectangle escaped root bounds", {
+          symbol: company.symbol,
+          rect,
+          innerX,
+          innerY,
+          innerWidth,
+          innerHeight,
+          rootRight,
+          rootBottom,
+        });
+      }
     });
 
     return {
@@ -489,7 +637,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
 
   if (loading && !data) {
     return (
-      <div className="w-full max-w-7xl mx-auto space-y-4">
+      <div className="w-full space-y-4">
         <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 shadow-xl flex items-center justify-between">
           <div className="space-y-2">
             <div className="h-6 w-48 bg-slate-800 rounded animate-pulse"></div>
@@ -550,7 +698,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
     : Math.max(10, mouseClientPos.y - tooltipHeight);
 
   return (
-    <div className="w-full max-w-[1400px] mx-auto space-y-4 overflow-hidden">
+    <div className="w-full space-y-4 overflow-hidden">
       {/* Treemap Header & Controls */}
       <div className="bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800 p-4 sm:p-5 shadow-xl transition-all">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -655,7 +803,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
 
       {/* Main Interactive Finviz Treemap Canvas Container */}
       <div
-        ref={containerRef}
+        ref={setContainerRef}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -695,7 +843,12 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
                   }}
                 >
                   {r.h >= 24 && (
-                    <div className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-slate-400/90 truncate flex items-center justify-between border-b border-slate-800/40 bg-slate-900/80 leading-none">
+                    <div
+                      className="px-2 text-[10px] font-black uppercase tracking-wider text-slate-400/90 truncate flex items-center justify-between border-b border-slate-800/40 bg-slate-900/80 leading-none box-border"
+                      style={{
+                        height: `${Math.min(20, Math.max(15, Math.floor(r.h * 0.12)))}px`,
+                      }}
+                    >
                       <span className="truncate max-w-[70%]">{sector}</span>
                       {secSummary && r.w > 110 && (
                         <span

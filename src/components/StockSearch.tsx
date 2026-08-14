@@ -94,7 +94,7 @@ export const StockSearch: React.FC<StockSearchProps> = ({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-100/90 to-slate-200/70 dark:from-slate-900 dark:to-slate-950 flex flex-col items-center justify-start p-4 md:p-8 transition-colors duration-300">
-      <div className="w-full max-w-6xl mx-auto py-8">
+      <div className="w-full max-w-7xl mx-auto py-8">
         <div className="text-center mb-10">
           <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 dark:text-white mb-3 tracking-tight">
             Investor's Edge
@@ -201,7 +201,9 @@ export const StockSearch: React.FC<StockSearchProps> = ({
         </div>
 
         {/* Interactive Top 100 U.S. Companies Market Cap Treemap */}
-        <SP500Treemap onSelectStock={onSearch} />
+        <div className="w-full flex justify-center">
+          <SP500Treemap onSelectStock={onSearch} />
+        </div>
       </div>
     </div>
   );
