@@ -515,3 +515,23 @@ export interface FutureOutlookData {
   revenueTrendStatus: "Accelerating" | "Stable" | "Decelerating" | "N/A";
   lastUpdated: string;
 }
+
+export interface NewsItem {
+  id: string;
+  ticker: string;
+  title: string;
+  source: string;
+  url: string;
+  publishedAt: string;
+  summary?: string;
+  imageUrl?: string;
+}
+
+export interface StockNewsResponse {
+  ticker: string;
+  news: NewsItem[];
+  source: "fmp" | "cache" | "stale_cache" | "fallback";
+  isStale?: boolean;
+  timestamp: string;
+}
+

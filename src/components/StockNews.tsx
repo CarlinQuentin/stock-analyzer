@@ -1,146 +1,76 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { NewsItem } from "../types";
+import { newsService } from "../services/newsService";
 
-interface NewsItem {
-  title: string;
-  link: string;
-  pubDate: string;
-  source: string;
-}
-
-interface StockNewsProps {
+export interface StockNewsProps {
   ticker: string;
   companyName?: string;
+}
+
+/**
+ * Formats ISO or raw date strings into human-friendly relative time
+ */
+export function formatRelativeNewsTime(rawDateStr?: string): string {
+  if (!rawDateStr) return "Recent";
+  try {
+    const date = new Date(rawDateStr);
+    if (isNaN(date.getTime())) return "Recent";
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMinutes < 5) return "Just now";
+    if (diffHours < 1) return `${diffMinutes}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  } catch {
+    return "Recent";
+  }
 }
 
 export const StockNews: React.FC<StockNewsProps> = ({ ticker, companyName }) => {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchNews = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Clean company name (strip legal suffixes & punctuation like ", Inc.", "Group, Inc.", etc.)
-      const cleanName = (companyName || "")
-        .replace(/,?\s*(Inc\.?|Corp\.?|Corporation|Co\.?|Group|Ltd\.?|LLC)/gi, "")
-        .replace(/[^a-zA-Z0-9\s]/g, "")
-        .trim();
-
-      const queries = [
-        `${ticker} ${cleanName}`.trim(),
-        `${ticker} stock`,
-      ];
-
-      let xmlText = "";
-
-      for (const query of queries) {
-        if (xmlText && xmlText.includes("<item>")) break;
-
-        const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
-        const proxyUrls = [
-          `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`,
-          `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rssUrl)}`,
-        ];
-
-        for (const proxyUrl of proxyUrls) {
-          try {
-            const response = await fetch(proxyUrl);
-            if (response.ok) {
-              const text = await response.text();
-              if (text && text.includes("<item>")) {
-                xmlText = text;
-                break;
-              }
-            }
-          } catch {
-            // Ignore single proxy failure & try next fallback
-          }
-        }
-      }
-
-      if (!xmlText) {
-        throw new Error("Unable to fetch news data");
-      }
-
-      // Parse XML items
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(xmlText, "text/xml");
-      const items = Array.from(xmlDoc.querySelectorAll("item"));
-
-      const parsedNews: NewsItem[] = items.slice(0, 5).map((item) => {
-        const titleFull = item.querySelector("title")?.textContent || "Stock Headline";
-        const link = item.querySelector("link")?.textContent || "#";
-        const pubDateRaw = item.querySelector("pubDate")?.textContent || "";
-        const sourceText = item.querySelector("source")?.textContent;
-
-        let title = titleFull;
-        let source = sourceText || "News";
-
-        if (titleFull.includes(" - ")) {
-          const parts = titleFull.split(" - ");
-          if (!sourceText) {
-            source = parts.pop() || "News";
-          } else {
-            parts.pop();
-          }
-          title = parts.join(" - ");
-        }
-
-        return {
-          title,
-          link,
-          pubDate: formatRelativeTime(pubDateRaw),
-          source,
-        };
-      });
-
-      if (parsedNews.length === 0) {
-        setNews([
-          {
-            title: `${companyName || ticker} Releases Recent Financial & Operational Updates`,
-            link: `https://finance.yahoo.com/quote/${ticker}/news`,
-            pubDate: "Today",
-            source: "Yahoo Finance",
-          },
-        ]);
+  const fetchNews = useCallback(
+    async (forceRefresh = false) => {
+      if (forceRefresh) {
+        setIsRefreshing(true);
       } else {
-        setNews(parsedNews);
+        setIsLoading(true);
       }
-    } catch (err) {
-      console.warn("Failed to fetch live stock news:", err);
-      setError("Unable to load latest news");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      setError(null);
+
+      try {
+        const articles = await newsService.getStockNews(ticker, companyName, forceRefresh);
+        if (articles && articles.length > 0) {
+          setNews(articles.slice(0, 5));
+        } else {
+          setNews([]);
+        }
+      } catch (err) {
+        console.warn("[StockNews] Failed to load news:", err);
+        setError("Unable to load latest news");
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [ticker, companyName],
+  );
 
   useEffect(() => {
-    fetchNews();
-  }, [ticker, companyName]);
-
-  const formatRelativeTime = (rawDateStr: string): string => {
-    if (!rawDateStr) return "Recent";
-    try {
-      const date = new Date(rawDateStr);
-      if (isNaN(date.getTime())) return "Recent";
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-      const diffDays = Math.floor(diffHours / 24);
-
-      if (diffHours < 1) return "Just now";
-      if (diffHours < 24) return `${diffHours}h ago`;
-      if (diffDays === 1) return "Yesterday";
-      if (diffDays < 7) return `${diffDays}d ago`;
-      return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    } catch {
-      return "Recent";
-    }
-  };
+    fetchNews(false);
+  }, [fetchNews]);
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 border border-transparent dark:border-slate-700/50 transition-colors duration-300 flex flex-col justify-between h-full min-h-[220px]">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 border border-transparent dark:border-slate-700/50 transition-colors duration-300 flex flex-col justify-between h-full min-h-[220px]">
       <div>
         {/* Header */}
         <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 dark:border-slate-700/60">
@@ -156,14 +86,26 @@ export const StockNews: React.FC<StockNewsProps> = ({ ticker, companyName }) => 
             </div>
           </div>
           <button
-            onClick={fetchNews}
-            className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center gap-1"
+            onClick={() => fetchNews(true)}
+            disabled={isRefreshing || isLoading}
+            className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center gap-1.5 disabled:opacity-60"
             title="Refresh news"
+            aria-label="Refresh stock news"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            <svg
+              className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-blue-600 dark:text-blue-400" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
             </svg>
-            <span className="hidden sm:inline">Refresh</span>
+            <span className="hidden sm:inline">{isRefreshing ? "Refreshing..." : "Refresh"}</span>
           </button>
         </div>
 
@@ -178,12 +120,16 @@ export const StockNews: React.FC<StockNewsProps> = ({ ticker, companyName }) => 
           <div className="text-center py-6 text-xs text-slate-400">
             {error}
           </div>
+        ) : news.length === 0 ? (
+          <div className="text-center py-6 text-xs text-slate-400">
+            No recent news stories found for {ticker}.
+          </div>
         ) : (
           <div className="space-y-2.5 overflow-y-auto max-h-[220px] pr-1">
-            {news.map((item, idx) => (
+            {news.map((item) => (
               <a
-                key={idx}
-                href={item.link}
+                key={item.id}
+                href={item.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group block p-2.5 rounded-xl bg-slate-50/70 hover:bg-blue-50/60 dark:bg-slate-900/40 dark:hover:bg-blue-950/30 border border-slate-100 dark:border-slate-800/80 hover:border-blue-300/60 dark:hover:border-blue-800/50 transition-all duration-200"
@@ -193,7 +139,7 @@ export const StockNews: React.FC<StockNewsProps> = ({ ticker, companyName }) => 
                     {item.title}
                   </h3>
                   <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium flex-shrink-0 ml-1">
-                    {item.pubDate}
+                    {formatRelativeNewsTime(item.publishedAt)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-[10px]">

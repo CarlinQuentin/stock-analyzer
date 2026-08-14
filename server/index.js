@@ -125,6 +125,35 @@ app.get("/api/auth/me", authenticateToken, (req, res) => {
   }
 });
 
+import { getStockNewsServer } from "./newsService.js";
+
+// GET /api/stocks/:ticker/news
+app.get("/api/stocks/:ticker/news", async (req, res) => {
+  try {
+    const { ticker } = req.params;
+    const { companyName, refresh, limit } = req.query;
+
+    if (!ticker) {
+      return res.status(400).json({ message: "Stock ticker is required" });
+    }
+
+    const isForceRefresh = refresh === "true";
+    const limitNum = parseInt(limit, 10) || 8;
+
+    const result = await getStockNewsServer(ticker, companyName, isForceRefresh, limitNum);
+    res.json(result);
+  } catch (error) {
+    console.error("[News API Error]:", error);
+    res.status(500).json({
+      ticker: req.params.ticker || "",
+      news: [],
+      source: "error",
+      message: "Server error fetching stock news",
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
 // Health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
