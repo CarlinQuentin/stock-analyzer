@@ -45,11 +45,13 @@ export interface SecurityExclusionCounts {
   totalExcluded: number;
 }
 
-export const SNAPSHOT_DB_KEY = "investors_edge_top100_snapshot_v10";
+export const SNAPSHOT_DB_KEY = "investors_edge_top100_snapshot_v11";
 export const SNAPSHOT_DB_TABLE = "top100_market_snapshots";
 export const LEASE_LOCK_KEY = "investors_edge_top100_lease_v1";
 export const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache TTL
 export const LEASE_DURATION_MS = 60 * 1000; // 60 seconds lease duration
+export const MIN_TOP100_COMPANIES = 50; // Minimum company threshold required for a valid Top 100 market snapshot
+export const TARGET_TOP100_COMPANIES = 100;
 
 const SECTOR_NAME_MAP: Record<string, string> = {
   Technology: "Information Technology",
@@ -68,6 +70,30 @@ const SECTOR_NAME_MAP: Record<string, string> = {
 export function normalizeSectorName(rawSector: string): string {
   if (!rawSector) return "Other";
   return SECTOR_NAME_MAP[rawSector] || rawSector;
+}
+
+/**
+ * Validates whether a given snapshot contains a complete, robust, non-corrupted Top 100 market dataset.
+ * Rejects any partial, empty, or single-stock datasets (< MIN_TOP100_COMPANIES).
+ */
+export function isValidTop100Snapshot(snapshot: any): snapshot is MarketDataSnapshot {
+  if (!snapshot || typeof snapshot !== "object") return false;
+  if (!Array.isArray(snapshot.companies)) return false;
+  if (snapshot.companies.length < MIN_TOP100_COMPANIES) return false;
+  if (typeof snapshot.fetchedAt !== "number" || isNaN(snapshot.fetchedAt) || snapshot.fetchedAt <= 0) return false;
+  if (typeof snapshot.totalMarketCap !== "number" || isNaN(snapshot.totalMarketCap) || snapshot.totalMarketCap <= 0) return false;
+
+  const allEntriesValid = snapshot.companies.every(
+    (c: any) =>
+      c &&
+      typeof c.symbol === "string" &&
+      c.symbol.trim().length > 0 &&
+      typeof c.marketCap === "number" &&
+      !isNaN(c.marketCap) &&
+      c.marketCap > 0
+  );
+
+  return allEntriesValid;
 }
 
 /**
@@ -177,37 +203,32 @@ export function getCompanyDedupKey(companyName: string, symbol: string): string 
 
   const cleanSym = symbol.toUpperCase().trim();
 
-  // Known multi-class symbol pairs (GOOG/GOOGL, BRK.A/BRK.B, FOX/FOXA, NWS/NWSA, Z/ZG)
+  // 1. Known multi-class symbol pairs
   if (cleanSym === "GOOG" || cleanSym === "GOOGL") return "alphabet_google";
   if (cleanSym.startsWith("BRK")) return "berkshire_hathaway";
   if (cleanSym === "FOX" || cleanSym === "FOXA") return "fox_corp";
   if (cleanSym === "NWS" || cleanSym === "NWSA") return "news_corp";
   if (cleanSym === "Z" || cleanSym === "ZG") return "zillow_group";
 
-  // Generic symbol base matching (e.g. BRK-A -> BRK, UHAL-B -> UHAL)
+  // 2. Generic symbol base matching (e.g. BRK-A -> BRK, UHAL-B -> UHAL)
   const baseSymMatch = cleanSym.match(/^([A-Z]{1,4})[-.][A-Z0-9]$/);
   if (baseSymMatch) return `base_sym_${baseSymMatch[1]}`;
 
-  // Generic company name normalization
-  let normName = (companyName || "").toLowerCase();
+  // 3. Share class designations in company name (e.g. "Under Armour Class A" vs "Under Armour Class C")
+  const rawName = (companyName || "").toLowerCase();
+  const hasShareClassIndicator =
+    /\b(class\s+[a-z0-9]|series\s+[a-z0-9]|cl\s+[a-z0-9]|type\s+[a-z0-9])\b/i.test(rawName);
 
-  // Strip corporate suffixes
-  normName = normName.replace(
-    /,?\s*(inc|incorporated|corp|corporation|co|company|ltd|limited|plc|nv|sa|holdings|group)\b.*$/g,
-    ""
-  );
+  if (hasShareClassIndicator) {
+    const normName = rawName
+      .replace(/,?\s*\b(class\s+[a-z0-9]|series\s+[a-z0-9]|cl\s+[a-z0-9]|type\s+[a-z0-9]|common\s+stock|ordinary\s+shares)\b.*$/gi, "")
+      .replace(/,?\s*\b(inc|incorporated|corp|corporation|co|company|ltd|limited|plc|nv|sa|holdings|group)\b.*$/gi, "")
+      .replace(/[-.\s,]+$/g, "")
+      .trim();
 
-  // Strip share class designations
-  normName = normName
-    .replace(
-      /,?\s*(class\s+[a-z0-9]|series\s+[a-z0-9]|cl\s+[a-z0-9]|type\s+[a-z0-9]|common\s+stock|ordinary\s+shares).*$/g,
-      ""
-    )
-    .replace(/[-.\s]+$/g, "")
-    .trim();
-
-  if (normName.length >= 3) {
-    return normName;
+    if (normName.length >= 3) {
+      return `share_class_${normName}`;
+    }
   }
 
   return cleanSym;
@@ -255,7 +276,7 @@ export function getSnapshotFreshness(snapshot: MarketDataSnapshot | null): {
   isStale: boolean;
   ageMs: number;
 } {
-  if (!snapshot || typeof snapshot.fetchedAt !== "number") {
+  if (!snapshot || typeof snapshot.fetchedAt !== "number" || !isValidTop100Snapshot(snapshot)) {
     return { isFresh: false, isStale: false, ageMs: Infinity };
   }
   const ageMs = Date.now() - snapshot.fetchedAt;
@@ -282,23 +303,33 @@ export function loadSnapshotFromLocalStorage(): MarketDataSnapshot | null {
     const raw = ls.getItem(SNAPSHOT_DB_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (parsed && parsed.companies && parsed.companies.length > 0) {
-      return parsed as MarketDataSnapshot;
+    if (isValidTop100Snapshot(parsed)) {
+      return parsed;
     }
+    // Discard any corrupt or partial dataset (< MIN_TOP100_COMPANIES) immediately
+    ls.removeItem(SNAPSHOT_DB_KEY);
     return null;
   } catch {
     return null;
   }
 }
 
-export function saveSnapshotToLocalStorage(snapshot: MarketDataSnapshot): void {
+export function saveSnapshotToLocalStorage(snapshot: MarketDataSnapshot): boolean {
+  if (!isValidTop100Snapshot(snapshot)) {
+    console.warn(`[Top100Db] Refusing to save incomplete snapshot (${snapshot?.companies?.length ?? 0} companies) to local storage.`);
+    return false;
+  }
+
   try {
     const ls = typeof window !== "undefined" && window.localStorage ? window.localStorage : (typeof globalThis !== "undefined" ? (globalThis as any).localStorage : null);
     if (ls) {
       ls.setItem(SNAPSHOT_DB_KEY, JSON.stringify(snapshot));
+      return true;
     }
+    return false;
   } catch (e) {
     console.warn("Failed to save snapshot to local storage:", e);
+    return false;
   }
 }
 
@@ -315,9 +346,11 @@ export async function loadSnapshotFromDb(): Promise<MarketDataSnapshot | null> {
       if (!error && data && data.length > 0) {
         const row = data[0];
         const snapshot: MarketDataSnapshot = typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
-        if (snapshot && snapshot.companies && snapshot.companies.length > 0) {
+        if (isValidTop100Snapshot(snapshot)) {
           saveSnapshotToLocalStorage(snapshot);
           return snapshot;
+        } else {
+          console.warn(`[Top100Db] Remote Supabase snapshot row contains incomplete dataset (${snapshot?.companies?.length ?? 0} companies), rejecting.`);
         }
       }
     } catch (e) {
@@ -329,7 +362,12 @@ export async function loadSnapshotFromDb(): Promise<MarketDataSnapshot | null> {
   return loadSnapshotFromLocalStorage();
 }
 
-export async function saveSnapshotToDb(snapshot: MarketDataSnapshot): Promise<void> {
+export async function saveSnapshotToDb(snapshot: MarketDataSnapshot): Promise<boolean> {
+  if (!isValidTop100Snapshot(snapshot)) {
+    console.warn(`[Top100Db] Refusing to save incomplete snapshot (${snapshot?.companies?.length ?? 0} companies) to database.`);
+    return false;
+  }
+
   saveSnapshotToLocalStorage(snapshot);
   releaseLocalLease();
 
@@ -348,6 +386,8 @@ export async function saveSnapshotToDb(snapshot: MarketDataSnapshot): Promise<vo
       console.warn("[Top100Db] Supabase snapshot save warning:", e);
     }
   }
+
+  return true;
 }
 
 /**
@@ -451,11 +491,32 @@ export function releaseLocalLease(): void {
   } catch {}
 }
 
+export type SnapshotListener = (data: Top500MarketData) => void;
+
 class Top500Service {
   private inFlightRefreshPromise: Promise<MarketDataSnapshot> | null = null;
+  private listeners: Set<SnapshotListener> = new Set();
 
   public resetService(): void {
     this.inFlightRefreshPromise = null;
+    this.listeners.clear();
+  }
+
+  public subscribe(listener: SnapshotListener): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  public notifyListeners(data: Top500MarketData): void {
+    this.listeners.forEach((fn) => {
+      try {
+        fn(data);
+      } catch (e) {
+        console.error("[Top100Db] Listener notification error:", e);
+      }
+    });
   }
 
   constructor() {
@@ -476,6 +537,7 @@ class Top500Service {
       "investors_edge_top100_operating_companies_v7",
       "investors_edge_top100_operating_companies_v8",
       "investors_edge_top100_operating_companies_v9",
+      "investors_edge_top100_snapshot_v10",
     ];
     legacyKeys.forEach((key) => {
       try {
@@ -508,9 +570,9 @@ class Top500Service {
 
   /**
    * Fetch largest 100 U.S. Operating Companies using DB-Cached Stale-While-Revalidate Architecture.
-   * - 0-5 mins old: Fresh DB snapshot returned immediately. 0 FMP API calls!
-   * - 5+ mins old: Return existing DB snapshot immediately + 1 global single-flight background FMP refresh.
-   * - Empty DB / First Load: Execute initial FMP refresh & save DB snapshot.
+   * - 0-5 mins old & complete: Fresh DB snapshot returned immediately. 0 FMP API calls!
+   * - 5+ mins old & complete: Return existing DB snapshot immediately + 1 global single-flight background FMP refresh.
+   * - Incomplete (< 50 companies) / Empty DB / First Load: Execute initial FMP refresh & save valid DB snapshot.
    */
   async getTop500MarketData(forceRefresh: boolean = false): Promise<Top500MarketData> {
     if (forceRefresh && this.inFlightRefreshPromise) {
@@ -518,27 +580,30 @@ class Top500Service {
     }
 
     const dbSnapshot = await loadSnapshotFromDb();
-    const { isFresh, isStale } = getSnapshotFreshness(dbSnapshot);
+    const isSnapshotValid = isValidTop100Snapshot(dbSnapshot);
+    const { isFresh, isStale } = isSnapshotValid
+      ? getSnapshotFreshness(dbSnapshot)
+      : { isFresh: false, isStale: false, ageMs: Infinity };
 
-    // Scenario A: DB snapshot is FRESH (0 - 5 minutes old)
-    if (isFresh && dbSnapshot && !forceRefresh) {
-      console.log(`[Top100Db] Snapshot is FRESH (age: ${Math.round((Date.now() - dbSnapshot.fetchedAt) / 1000)}s). 0 FMP API calls made.`);
+    // Scenario A: DB snapshot is VALID & FRESH (0 - 5 minutes old)
+    if (isFresh && isSnapshotValid && dbSnapshot && !forceRefresh) {
+      console.log(`[Top100Db] Snapshot is FRESH (${dbSnapshot.companies.length} companies, age: ${Math.round((Date.now() - dbSnapshot.fetchedAt) / 1000)}s). 0 FMP API calls made.`);
       return dbSnapshot;
     }
 
-    // Scenario B: DB snapshot is STALE (> 5 minutes old) -> Return cached snapshot immediately + trigger single-flight background refresh
-    if (isStale && dbSnapshot && !forceRefresh) {
-      console.log(`[Top100Db] Snapshot is STALE (age: ${Math.round((Date.now() - dbSnapshot.fetchedAt) / 1000)}s). Returning DB snapshot immediately & attempting global DB refresh lease.`);
+    // Scenario B: DB snapshot is VALID & STALE (> 5 minutes old) -> Return cached snapshot immediately + trigger single-flight background refresh
+    if (isStale && isSnapshotValid && dbSnapshot && !forceRefresh) {
+      console.log(`[Top100Db] Snapshot is STALE (${dbSnapshot.companies.length} companies, age: ${Math.round((Date.now() - dbSnapshot.fetchedAt) / 1000)}s). Returning DB snapshot immediately & attempting global DB refresh lease.`);
       this.triggerSingleFlightBackgroundRefresh();
       return dbSnapshot;
     }
 
-    // Scenario C: No DB snapshot exists at all OR explicit forceRefresh requested
+    // Scenario C: No VALID DB snapshot exists (empty, corrupted, or single-stock) OR explicit forceRefresh requested
     if (!this.inFlightRefreshPromise) {
       this.inFlightRefreshPromise = (async () => {
         const leaseAcquired = await tryAcquireSnapshotLease();
-        if (!leaseAcquired && dbSnapshot) {
-          console.log("[Top100Db] Global DB refresh lease DENIED during forceRefresh/initial load. Returning existing DB snapshot.");
+        if (!leaseAcquired && isSnapshotValid && dbSnapshot) {
+          console.log("[Top100Db] Global DB refresh lease DENIED during forceRefresh/initial load. Returning existing valid DB snapshot.");
           return dbSnapshot;
         }
 
@@ -557,7 +622,7 @@ class Top500Service {
 
   /**
    * Single-flight background refresh lock mechanism:
-   * Guarantees only ONE FMP refresh runs worldwide even if 10 users or tabs load stale cache concurrently.
+   * Guarantees only ONE FMP refresh runs worldwide even if multiple tabs/users load stale cache concurrently.
    */
   private triggerSingleFlightBackgroundRefresh(): void {
     if (this.inFlightRefreshPromise) {
@@ -571,7 +636,7 @@ class Top500Service {
       if (!leaseAcquired) {
         console.log("[Top100Db] Global DB refresh lease DENIED: Another browser/client is currently refreshing. 0 FMP calls made.");
         const existing = await loadSnapshotFromDb();
-        return existing || (loadSnapshotFromLocalStorage() as any);
+        return (isValidTop100Snapshot(existing) ? existing : null) as any;
       }
 
       console.log("[Top100Db] Global DB refresh lease ACQUIRED! Launching ONE FMP refresh...");
@@ -582,7 +647,7 @@ class Top500Service {
       } catch (err) {
         console.warn("[Top100Db] Background FMP refresh failed. Preserving existing DB snapshot intact.", err);
         const existing = await loadSnapshotFromDb();
-        return existing || (loadSnapshotFromLocalStorage() as any);
+        return (isValidTop100Snapshot(existing) ? existing : null) as any;
       } finally {
         await releaseSnapshotLease();
       }
@@ -599,7 +664,7 @@ class Top500Service {
       // 1. Fetch Top 100 candidate pool from FMP screener
       const screenerData = await fmpService.getCompanyScreenerPool();
       if (!screenerData || !Array.isArray(screenerData) || screenerData.length === 0) {
-        throw new Error("Failed to retrieve Top 100 company market data.");
+        throw new Error("Failed to retrieve Top 100 company market data from FMP.");
       }
 
       // Exclude invalid market caps
@@ -694,6 +759,11 @@ class Top500Service {
         sectorMap.set(sector, secStats);
       });
 
+      // Validation guard: Ensure at least MIN_TOP100_COMPANIES were produced
+      if (companies.length < MIN_TOP100_COMPANIES) {
+        throw new Error(`FMP Refresh generated only ${companies.length} valid companies, which is below the minimum threshold of ${MIN_TOP100_COMPANIES}.`);
+      }
+
       const sectorSummaries: SectorSummary[] = Array.from(sectorMap.entries())
         .map(([sector, stats]) => ({
           sector,
@@ -723,12 +793,13 @@ class Top500Service {
       };
 
       await saveSnapshotToDb(snapshot);
+      this.notifyListeners(snapshot);
       return snapshot;
     } catch (error) {
       console.error("[Top100Db] FMP Refresh error:", error);
       const existingSnapshot = await loadSnapshotFromDb();
-      if (existingSnapshot && existingSnapshot.companies && existingSnapshot.companies.length > 0) {
-        console.warn("[Top100Db] Preserving last successful DB snapshot following FMP refresh error.");
+      if (isValidTop100Snapshot(existingSnapshot)) {
+        console.warn("[Top100Db] Preserving last successful valid DB snapshot following FMP refresh error.");
         return existingSnapshot;
       }
       throw error;

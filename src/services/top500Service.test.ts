@@ -5,16 +5,64 @@ import {
   getAuthoritativeDailyChange,
   saveSnapshotToDb,
   loadSnapshotFromDb,
+  loadSnapshotFromLocalStorage,
+  saveSnapshotToLocalStorage,
   clearSnapshotDb,
   tryAcquireLocalLease,
   releaseLocalLease,
+  isValidTop100Snapshot,
   CACHE_TTL_MS,
   LEASE_LOCK_KEY,
+  SNAPSHOT_DB_KEY,
+  MIN_TOP100_COMPANIES,
   MarketDataSnapshot,
+  Top500Company,
 } from "./top500Service";
 import { fmpService } from "./financialModelingPrep";
 import { squarify, CANVAS_MARGIN } from "../components/SP500Treemap";
 import { supabase } from "./supabaseClient";
+
+function generateMockCompanies(count = 100, prefix = "SYM"): Top500Company[] {
+  return Array.from({ length: count }, (_, i) => ({
+    symbol: `${prefix}_${i}`,
+    name: `${prefix} Corporation ${i}`,
+    sector: "Technology",
+    industry: "Software",
+    price: 100 + i,
+    change: 1.0,
+    changesPercentage: 1.0,
+    marketCap: (count - i) * 10_000_000_000,
+    qualityScore: 90,
+  }));
+}
+
+function generateMockSnapshot(
+  count = 100,
+  prefix = "SYM",
+  overrides: Partial<MarketDataSnapshot> = {}
+): MarketDataSnapshot {
+  const companies = generateMockCompanies(count, prefix);
+  const totalMarketCap = companies.reduce((sum, c) => sum + c.marketCap, 0);
+  return {
+    id: "top100_latest",
+    fetchedAt: Date.now(),
+    companies,
+    totalMarketCap,
+    averageChangePercent: 1.0,
+    weightedChangePercent: 1.0,
+    sectorSummaries: [
+      {
+        sector: "Technology",
+        marketCap: totalMarketCap,
+        companyCount: count,
+        weightedChangePercent: 1.0,
+      },
+    ],
+    marketStatus: "Open",
+    lastUpdated: "12:00 PM",
+    ...overrides,
+  };
+}
 
 describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () => {
   const store: Record<string, string> = {};
@@ -24,6 +72,7 @@ describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () =
     Object.keys(store).forEach((k) => delete store[k]);
     releaseLocalLease();
     clearSnapshotDb();
+
     vi.stubGlobal("window", {
       localStorage: {
         getItem: (k: string) => store[k] || null,
@@ -39,22 +88,24 @@ describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () =
       },
     });
     vi.stubGlobal("localStorage", window.localStorage);
+
+    // Default safe Supabase mocks to ensure isolated unit test execution
+    vi.spyOn(supabase, "from").mockReturnValue({
+      select: () => ({
+        eq: () => ({
+          limit: () => Promise.resolve({ data: [], error: null }),
+        }),
+      }),
+      upsert: () => Promise.resolve({ data: [{ id: "top100_latest" }], error: null }),
+      update: () => ({ eq: () => ({ or: () => ({ select: () => Promise.resolve({ data: [], error: null }) }) }) }),
+    } as any);
+    vi.spyOn(supabase, "rpc").mockResolvedValue({ data: true, error: null } as any);
   });
 
   it("Scenario A — Fresh cache (<= 5 mins): 10 clients result in 0 FMP refreshes", async () => {
-    const freshSnapshot: MarketDataSnapshot = {
-      id: "top100_latest",
+    const freshSnapshot = generateMockSnapshot(100, "AAPL", {
       fetchedAt: Date.now() - 60 * 1000, // 1 minute old
-      companies: [
-        { symbol: "AAPL", name: "Apple Inc.", sector: "Technology", industry: "Consumer Electronics", price: 220, change: 2.2, changesPercentage: 1.0, marketCap: 3300000000000, qualityScore: 98 },
-      ],
-      totalMarketCap: 3300000000000,
-      averageChangePercent: 1.0,
-      weightedChangePercent: 1.0,
-      sectorSummaries: [],
-      marketStatus: "Open",
-      lastUpdated: "12:00 PM",
-    };
+    });
 
     await saveSnapshotToDb(freshSnapshot);
 
@@ -67,7 +118,8 @@ describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () =
 
     expect(results.length).toBe(10);
     results.forEach((res) => {
-      expect(res.companies[0].symbol).toBe("AAPL");
+      expect(res.companies.length).toBe(100);
+      expect(res.companies[0].symbol).toBe("AAPL_0");
     });
 
     // 0 FMP API calls executed!
@@ -76,19 +128,9 @@ describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () =
   });
 
   it("Scenario B — Stale cache (> 5 mins): 10 clients result in EXACTLY 1 FMP refresh worldwide", async () => {
-    const staleSnapshot: MarketDataSnapshot = {
-      id: "top100_latest",
+    const staleSnapshot = generateMockSnapshot(100, "STALE", {
       fetchedAt: Date.now() - (CACHE_TTL_MS + 60 * 1000), // 6 minutes old
-      companies: [
-        { symbol: "STALE_SYM", name: "Stale Corp", sector: "Technology", industry: "General", price: 50, change: 0.5, changesPercentage: 1.0, marketCap: 500000000, qualityScore: 80 },
-      ],
-      totalMarketCap: 500000000,
-      averageChangePercent: 1.0,
-      weightedChangePercent: 1.0,
-      sectorSummaries: [],
-      marketStatus: "Closed",
-      lastUpdated: "11:00 AM",
-    };
+    });
 
     await saveSnapshotToDb(staleSnapshot);
 
@@ -103,12 +145,24 @@ describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () =
       update: () => ({ eq: () => ({ or: () => ({ select: () => Promise.resolve({ data: [], error: null }) }) }) }),
     } as any);
 
-    const screenerSpy = vi.spyOn(fmpService, "getCompanyScreenerPool").mockResolvedValue([
-      { symbol: "FRESH_SYM", companyName: "Fresh Corp", sector: "Technology", price: 100, marketCap: 1000000000 },
-    ]);
-    const batchQuotesSpy = vi.spyOn(fmpService, "getBatchQuotes").mockResolvedValue([
-      { symbol: "FRESH_SYM", price: 100, change: 2.0, changesPercentage: 2.0, marketCap: 1000000000 },
-    ]);
+    const mockPool = Array.from({ length: 100 }, (_, i) => ({
+      symbol: `FRESH_${i}`,
+      companyName: `Fresh Corp ${i}`,
+      sector: "Technology",
+      price: 100 + i,
+      marketCap: (100 - i) * 10_000_000_000,
+    }));
+
+    const mockQuotes = Array.from({ length: 100 }, (_, i) => ({
+      symbol: `FRESH_${i}`,
+      price: 100 + i,
+      change: 2.0,
+      changesPercentage: 2.0,
+      marketCap: (100 - i) * 10_000_000_000,
+    }));
+
+    const screenerSpy = vi.spyOn(fmpService, "getCompanyScreenerPool").mockResolvedValue(mockPool);
+    const batchQuotesSpy = vi.spyOn(fmpService, "getBatchQuotes").mockResolvedValue(mockQuotes);
 
     // 10 concurrent requests while cache is stale
     const promises = Array.from({ length: 10 }, () => top500Service.getTop500MarketData(false));
@@ -117,7 +171,8 @@ describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () =
     expect(results.length).toBe(10);
     // All 10 clients receive immediate cached response
     results.forEach((res) => {
-      expect(res.companies[0].symbol).toBe("STALE_SYM");
+      expect(res.companies.length).toBe(100);
+      expect(res.companies[0].symbol).toBe("STALE_0");
     });
 
     // Settle background promises
@@ -129,7 +184,8 @@ describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () =
 
     // Verify DB snapshot updated
     const updated = await loadSnapshotFromDb();
-    expect(updated?.companies[0].symbol).toBe("FRESH_SYM");
+    expect(updated?.companies.length).toBe(100);
+    expect(updated?.companies[0].symbol).toBe("FRESH_0");
   });
 
   it("Scenario C — Empty cache (initial load): 10 clients result in EXACTLY 1 initial FMP refresh", async () => {
@@ -147,18 +203,34 @@ describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () =
       update: () => Promise.resolve({ data: [{ id: "top100_latest" }], error: null }),
     } as any);
 
-    const screenerSpy = vi.spyOn(fmpService, "getCompanyScreenerPool").mockResolvedValue([
-      { symbol: "INIT_SYM", companyName: "Initial Corp", sector: "Technology", price: 150, marketCap: 2000000000 },
-    ]);
-    const batchQuotesSpy = vi.spyOn(fmpService, "getBatchQuotes").mockResolvedValue([
-      { symbol: "INIT_SYM", price: 150, change: 3.0, changesPercentage: 2.0, marketCap: 2000000000 },
-    ]);
+    const mockPool = Array.from({ length: 100 }, (_, i) => ({
+      symbol: `INIT_${i}`,
+      companyName: `Initial Corp ${i}`,
+      sector: "Technology",
+      price: 150 + i,
+      marketCap: (100 - i) * 10_000_000_000,
+    }));
+
+    const mockQuotes = Array.from({ length: 100 }, (_, i) => ({
+      symbol: `INIT_${i}`,
+      price: 150 + i,
+      change: 3.0,
+      changesPercentage: 2.0,
+      marketCap: (100 - i) * 10_000_000_000,
+    }));
+
+    const screenerSpy = vi.spyOn(fmpService, "getCompanyScreenerPool").mockResolvedValue(mockPool);
+    const batchQuotesSpy = vi.spyOn(fmpService, "getBatchQuotes").mockResolvedValue(mockQuotes);
 
     // 10 concurrent requests when DB is empty
     const promises = Array.from({ length: 10 }, () => top500Service.getTop500MarketData(false));
     const results = await Promise.all(promises);
 
     expect(results.length).toBe(10);
+    results.forEach((res) => {
+      expect(res.companies.length).toBe(100);
+      expect(res.companies[0].symbol).toBe("INIT_0");
+    });
 
     // EXACTLY 1 FMP refresh executed!
     expect(screenerSpy).toHaveBeenCalledTimes(1);
@@ -179,21 +251,13 @@ describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () =
     expect(lockVal).toBeGreaterThan(Date.now());
   });
 
-  it("Scenario E — FMP failure: preserves DB snapshot intact, fetchedAt unchanged, releases lease", async () => {
+  it("Scenario E — FMP failure: preserves valid DB snapshot intact, fetchedAt unchanged, releases lease", async () => {
     const originalFetchedAt = Date.now() - (CACHE_TTL_MS + 300 * 1000);
-    const validSnapshot: MarketDataSnapshot = {
-      id: "top100_latest",
+    const validSnapshot = generateMockSnapshot(100, "MSFT", {
       fetchedAt: originalFetchedAt,
-      companies: [
-        { symbol: "MSFT", name: "Microsoft Corp", sector: "Technology", industry: "Software", price: 420, change: 4.2, changesPercentage: 1.0, marketCap: 3100000000000, qualityScore: 97 },
-      ],
-      totalMarketCap: 3100000000000,
-      averageChangePercent: 1.0,
-      weightedChangePercent: 1.0,
-      sectorSummaries: [],
       marketStatus: "Closed",
       lastUpdated: "4:00 PM",
-    };
+    });
 
     await saveSnapshotToDb(validSnapshot);
 
@@ -203,14 +267,16 @@ describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () =
     const result = await top500Service.getTop500MarketData(false);
 
     // Immediate result returns intact snapshot
-    expect(result.companies[0].symbol).toBe("MSFT");
+    expect(result.companies.length).toBe(100);
+    expect(result.companies[0].symbol).toBe("MSFT_0");
 
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     // Verify DB snapshot fetchedAt remained UNCHANGED
     const dbSnapshot = await loadSnapshotFromDb();
     expect(dbSnapshot?.fetchedAt).toBe(originalFetchedAt);
-    expect(dbSnapshot?.companies[0].symbol).toBe("MSFT");
+    expect(dbSnapshot?.companies.length).toBe(100);
+    expect(dbSnapshot?.companies[0].symbol).toBe("MSFT_0");
 
     // Verify lease was released
     expect(store[LEASE_LOCK_KEY]).toBeUndefined();
@@ -218,19 +284,9 @@ describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () =
 
   it("Scenario F — Lease Denied: non-lease holding client makes 0 FMP calls and returns existing DB snapshot", async () => {
     clearSnapshotDb();
-    const existingSnapshot: MarketDataSnapshot = {
-      id: "top100_latest",
+    const existingSnapshot = generateMockSnapshot(100, "VALID_HOLD", {
       fetchedAt: Date.now() - (CACHE_TTL_MS + 60 * 1000),
-      companies: [
-        { symbol: "AMZN", name: "Amazon.com Inc", sector: "Consumer Discretionary", industry: "Retail", price: 180, change: 1.8, changesPercentage: 1.0, marketCap: 1900000000000, qualityScore: 92 },
-      ],
-      totalMarketCap: 1900000000000,
-      averageChangePercent: 1.0,
-      weightedChangePercent: 1.0,
-      sectorSummaries: [],
-      marketStatus: "Open",
-      lastUpdated: "10:00 AM",
-    };
+    });
 
     await saveSnapshotToDb(existingSnapshot);
 
@@ -249,13 +305,180 @@ describe("Top500Service Unit Tests & Global DB Refresh Lease Architecture", () =
     // Client B attempts request
     const result = await top500Service.getTop500MarketData(false);
 
-    expect(result.companies[0].symbol).toBe("AMZN");
+    expect(result.companies.length).toBe(100);
+    expect(result.companies[0].symbol).toBe("VALID_HOLD_0");
 
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     // Client B made 0 FMP calls!
     expect(screenerSpy).toHaveBeenCalledTimes(0);
     expect(batchQuotesSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it("Scenario G — Single-stock and partial datasets (< MIN_TOP100_COMPANIES) are rejected and purged", async () => {
+    clearSnapshotDb();
+
+    // 1. Single stock (e.g. AMZN only)
+    const singleStockSnapshot: any = {
+      id: "top100_latest",
+      fetchedAt: Date.now(),
+      companies: [
+        { symbol: "AMZN", name: "Amazon.com Inc", sector: "Consumer Discretionary", industry: "Retail", price: 180, change: 1.8, changesPercentage: 1.0, marketCap: 1900000000000, qualityScore: 92 },
+      ],
+      totalMarketCap: 1900000000000,
+      averageChangePercent: 1.0,
+      weightedChangePercent: 1.0,
+      sectorSummaries: [],
+      marketStatus: "Open",
+      lastUpdated: "10:00 AM",
+    };
+
+    expect(isValidTop100Snapshot(singleStockSnapshot)).toBe(false);
+
+    // saveSnapshotToLocalStorage refuses to save single stock
+    const savedLs = saveSnapshotToLocalStorage(singleStockSnapshot);
+    expect(savedLs).toBe(false);
+    expect(store[SNAPSHOT_DB_KEY]).toBeUndefined();
+
+    // saveSnapshotToDb refuses to save single stock
+    const savedDb = await saveSnapshotToDb(singleStockSnapshot);
+    expect(savedDb).toBe(false);
+
+    // If corrupted row exists in localStorage, loadSnapshotFromLocalStorage discards it and purges key
+    store[SNAPSHOT_DB_KEY] = JSON.stringify(singleStockSnapshot);
+    const loaded = loadSnapshotFromLocalStorage();
+    expect(loaded).toBeNull();
+    expect(store[SNAPSHOT_DB_KEY]).toBeUndefined();
+
+    // If corrupted row exists in Supabase, loadSnapshotFromDb rejects it
+    vi.spyOn(supabase, "from").mockReturnValue({
+      select: () => ({
+        eq: () => ({
+          limit: () => Promise.resolve({ data: [{ id: "top100_latest", payload: singleStockSnapshot }], error: null }),
+        }),
+      }),
+    } as any);
+
+    const loadedDb = await loadSnapshotFromDb();
+    expect(loadedDb).toBeNull();
+  });
+
+  it("Scenario H — FMP returning partial/single-stock response rejects and preserves existing valid snapshot", async () => {
+    clearSnapshotDb();
+
+    const healthySnapshot = generateMockSnapshot(100, "HEALTHY", {
+      fetchedAt: Date.now() - 60000,
+    });
+    await saveSnapshotToDb(healthySnapshot);
+
+    // FMP returns only 1 stock (AMZN)
+    vi.spyOn(fmpService, "getCompanyScreenerPool").mockResolvedValue([
+      { symbol: "AMZN", companyName: "Amazon.com Inc", sector: "Consumer Cyclical", price: 180, marketCap: 1900000000000 },
+    ]);
+    vi.spyOn(fmpService, "getBatchQuotes").mockResolvedValue([
+      { symbol: "AMZN", price: 180, change: 1.8, changesPercentage: 1.0, marketCap: 1900000000000 },
+    ]);
+
+    // Force refresh triggers executeFmpRefreshAndSaveDb
+    const result = await top500Service.executeFmpRefreshAndSaveDb();
+
+    // Result preserves healthy 100-stock snapshot
+    expect(result.companies.length).toBe(100);
+    expect(result.companies[0].symbol).toBe("HEALTHY_0");
+
+    // Local storage snapshot remained intact
+    const lsSnapshot = loadSnapshotFromLocalStorage();
+    expect(lsSnapshot?.companies.length).toBe(100);
+    expect(lsSnapshot?.companies[0].symbol).toBe("HEALTHY_0");
+  });
+
+  it("Scenario I — SWR background refresh notification subscription", async () => {
+    clearSnapshotDb();
+
+    const staleSnapshot = generateMockSnapshot(100, "STALE_NOTIF", {
+      fetchedAt: Date.now() - (CACHE_TTL_MS + 60 * 1000),
+    });
+    await saveSnapshotToDb(staleSnapshot);
+
+    const mockPool = Array.from({ length: 100 }, (_, i) => ({
+      symbol: `NOTIF_FRESH_${i}`,
+      companyName: `Fresh Corp ${i}`,
+      sector: "Technology",
+      price: 100 + i,
+      marketCap: (100 - i) * 10_000_000_000,
+    }));
+    const mockQuotes = Array.from({ length: 100 }, (_, i) => ({
+      symbol: `NOTIF_FRESH_${i}`,
+      price: 100 + i,
+      change: 2.0,
+      changesPercentage: 2.0,
+      marketCap: (100 - i) * 10_000_000_000,
+    }));
+
+    vi.spyOn(fmpService, "getCompanyScreenerPool").mockResolvedValue(mockPool);
+    vi.spyOn(fmpService, "getBatchQuotes").mockResolvedValue(mockQuotes);
+
+    let notifiedData: any = null;
+    const unsubscribe = top500Service.subscribe((freshData) => {
+      notifiedData = freshData;
+    });
+
+    // Client requests market data
+    const immediateData = await top500Service.getTop500MarketData(false);
+    expect(immediateData.companies[0].symbol).toBe("STALE_NOTIF_0");
+
+    // Wait for background refresh to complete
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(notifiedData).not.toBeNull();
+    expect(notifiedData.companies.length).toBe(100);
+    expect(notifiedData.companies[0].symbol).toBe("NOTIF_FRESH_0");
+
+    unsubscribe();
+  });
+
+  it("Scenario J — Navigation race protection: Stale request resolving after newer request", async () => {
+    clearSnapshotDb();
+
+    let slowResolve: (val: any) => void = () => {};
+    const slowPromise = new Promise((resolve) => {
+      slowResolve = resolve;
+    });
+
+    let fastResolve: (val: any) => void = () => {};
+    const fastPromise = new Promise((resolve) => {
+      fastResolve = resolve;
+    });
+
+    const snapshot1 = generateMockSnapshot(100, "REQUEST_1");
+    const snapshot2 = generateMockSnapshot(100, "REQUEST_2");
+
+    let currentReqId = 0;
+    let activeData: any = null;
+
+    const simulateFetch = async (promiseToAwait: Promise<any>) => {
+      const myId = ++currentReqId;
+      const data = await promiseToAwait;
+      if (myId === currentReqId) {
+        activeData = data;
+      }
+    };
+
+    // User triggers request 1, then quickly navigates and triggers request 2
+    simulateFetch(slowPromise);
+    simulateFetch(fastPromise);
+
+    // Request 2 finishes first
+    fastResolve(snapshot2);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(activeData.companies[0].symbol).toBe("REQUEST_2_0");
+
+    // Request 1 finishes later (stale request)
+    slowResolve(snapshot1);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    // Active data MUST remain REQUEST_2 and not be overwritten by stale REQUEST_1!
+    expect(activeData.companies[0].symbol).toBe("REQUEST_2_0");
   });
 
   it("7. Verifies getAuthoritativeDailyChange extracts empirical FMP quote data and returns null for missing values", () => {

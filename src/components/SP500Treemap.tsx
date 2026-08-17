@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { top500Service, Top500Company, Top500MarketData } from "../services/top500Service";
+import { top500Service, Top500Company, Top500MarketData, isValidTop100Snapshot, MIN_TOP100_COMPANIES } from "../services/top500Service";
 import { formatMarketCap } from "../utils/scoring";
 
 interface Top500TreemapProps {
@@ -422,21 +422,51 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
     };
   }, [loading, Boolean(data)]);
 
+  const requestIdRef = useRef<number>(0);
+  const isMountedRef = useRef<boolean>(true);
+
   const fetchData = async (forceRefresh: boolean = false) => {
+    const currentReqId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
     try {
       const marketData = await top500Service.getTop500MarketData(forceRefresh);
-      setData(marketData);
+      if (!isMountedRef.current || currentReqId !== requestIdRef.current) {
+        // Obsolete or unmounted request — ignore
+        return;
+      }
+      if (isValidTop100Snapshot(marketData)) {
+        setData(marketData);
+      } else {
+        setError("Market dataset is incomplete. Please refresh.");
+      }
     } catch (err: any) {
+      if (!isMountedRef.current || currentReqId !== requestIdRef.current) return;
       setError(err?.message || "Failed to load Top 100 market data.");
     } finally {
-      setLoading(false);
+      if (isMountedRef.current && currentReqId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     fetchData();
+
+    // Subscribe to background SWR refreshes
+    const unsubscribe = top500Service.subscribe((freshData) => {
+      if (isMountedRef.current && isValidTop100Snapshot(freshData)) {
+        setData(freshData);
+        setLoading(false);
+        setError(null);
+      }
+    });
+
+    return () => {
+      isMountedRef.current = false;
+      unsubscribe();
+    };
   }, []);
 
   // Finviz Interactive Map: Drag-to-Pan (active when zoomed > 1.0)
