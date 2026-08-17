@@ -18,77 +18,140 @@
 }
 
 /* ==========================================================================
-   GOLD THEME (Executive Obsidian Charcoal & Rich Metallic Gold)
+   SUNSET GOLD THEME (Warm Amber, Radiant Gold & Sunset Glow)
    ========================================================================== */
 html.theme-gold {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html.theme-gold body,
 html.theme-gold .min-h-screen {
-  background-color: #0d0e12 !important;
-  background-image: radial-gradient(at 15% 15%, rgba(234, 179, 8, 0.08) 0px, transparent 50%),
-                    radial-gradient(at 85% 85%, rgba(202, 138, 4, 0.06) 0px, transparent 50%) !important;
-  color: #fef08a !important;
+  background-color: #fef5e7 !important;
+  background-image: radial-gradient(at 0% 0%, rgba(245, 158, 11, 0.32) 0px, transparent 50%),
+                    radial-gradient(at 100% 0%, rgba(234, 88, 12, 0.22) 0px, transparent 50%),
+                    radial-gradient(at 50% 100%, rgba(251, 191, 36, 0.4) 0px, transparent 60%) !important;
+  color: #3d1a04 !important;
 }
 
+/* Surfaces, Cards, and Modals */
 html.theme-gold .bg-white,
 html.theme-gold .bg-white\/95,
 html.theme-gold .bg-white\/90,
-html.theme-gold .bg-white\/80,
-html.theme-gold .bg-slate-50,
-html.theme-gold .bg-slate-50\/70,
-html.theme-gold .dark\:bg-slate-800,
-html.theme-gold .dark\:bg-slate-800\/90,
-html.theme-gold .dark\:bg-slate-800\/80,
-html.theme-gold .dark\:bg-slate-900,
-html.theme-gold .dark\:bg-slate-900\/90,
-html.theme-gold .dark\:bg-slate-900\/60,
-html.theme-gold .dark\:bg-slate-950 {
-  background-color: #161820 !important;
-  border-color: rgba(234, 179, 8, 0.25) !important;
+html.theme-gold .bg-white\/80 {
+  background-color: rgba(255, 253, 248, 0.96) !important;
+  border-color: rgba(217, 119, 6, 0.38) !important;
+  box-shadow: 0 4px 20px -2px rgba(217, 119, 6, 0.12), 0 2px 6px -1px rgba(245, 158, 11, 0.06) !important;
 }
 
+html.theme-gold .bg-slate-50,
+html.theme-gold .bg-slate-50\/70,
+html.theme-gold .bg-slate-100,
+html.theme-gold .bg-slate-100\/90,
+html.theme-gold .bg-slate-100\/80 {
+  background-color: #fef0cd !important;
+  border-color: rgba(217, 119, 6, 0.4) !important;
+}
+
+/* Borders */
 html.theme-gold .border-slate-200,
 html.theme-gold .border-slate-200\/80,
 html.theme-gold .border-slate-200\/90,
-html.theme-gold .dark\:border-slate-800,
-html.theme-gold .dark\:border-slate-700,
-html.theme-gold .dark\:border-slate-700\/50,
-html.theme-gold .dark\:border-slate-700\/60,
-html.theme-gold .dark\:border-slate-800\/80 {
-  border-color: rgba(234, 179, 8, 0.22) !important;
+html.theme-gold .border-slate-300 {
+  border-color: rgba(217, 119, 6, 0.38) !important;
 }
 
+/* Typography Hierarchy */
 html.theme-gold .text-slate-900,
-html.theme-gold .text-slate-800,
-html.theme-gold .dark\:text-white,
-html.theme-gold .dark\:text-slate-100 {
-  color: #fef08a !important;
+html.theme-gold .text-slate-800 {
+  color: #3d1a04 !important;
+}
+
+html.theme-gold .text-slate-700 {
+  color: #78350f !important;
 }
 
 html.theme-gold .text-slate-600,
-html.theme-gold .text-slate-500,
-html.theme-gold .dark\:text-slate-400,
-html.theme-gold .dark\:text-slate-300 {
-  color: #eab308 !important;
+html.theme-gold .text-slate-500 {
+  color: #853808 !important;
 }
 
+html.theme-gold .text-slate-400 {
+  color: #a14b10 !important;
+}
+
+/* Accents & Sunset Amber Buttons */
 html.theme-gold .text-blue-600,
 html.theme-gold .text-blue-500,
-html.theme-gold .dark\:text-blue-400,
-html.theme-gold .dark\:text-blue-300 {
-  color: #facc15 !important;
+html.theme-gold .text-blue-700 {
+  color: #d97706 !important;
+}
+
+html.theme-gold .bg-blue-50,
+html.theme-gold .bg-blue-50\/80 {
+  background-color: #fef0cd !important;
+  color: #78350f !important;
+  border-color: rgba(217, 119, 6, 0.45) !important;
 }
 
 html.theme-gold .bg-blue-600,
-html.theme-gold .dark\:bg-blue-600 {
-  background-color: #ca8a04 !important;
+html.theme-gold .hover\:bg-blue-700:hover,
+html.theme-gold .hover\:bg-blue-600:hover {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 45%, #c2410c 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 16px rgba(217, 119, 6, 0.35) !important;
 }
 
 html.theme-gold .border-blue-650,
-html.theme-gold .dark\:border-blue-400 {
-  border-color: #eab308 !important;
+html.theme-gold .border-blue-200,
+html.theme-gold .border-blue-100 {
+  border-color: rgba(217, 119, 6, 0.45) !important;
+}
+
+/* Treemap Sunset Gold Aesthetic */
+html.theme-gold .treemap-canvas-container {
+  background-color: #170e06 !important;
+  border-color: rgba(217, 119, 6, 0.48) !important;
+  box-shadow: 0 20px 25px -5px rgba(217, 119, 6, 0.16), 0 8px 10px -6px rgba(0, 0, 0, 0.12) !important;
+}
+
+html.theme-gold .treemap-sector-box {
+  border-color: rgba(217, 119, 6, 0.35) !important;
+  background-color: rgba(55, 28, 10, 0.45) !important;
+}
+
+html.theme-gold .treemap-sector-header {
+  background-color: rgba(55, 28, 10, 0.95) !important;
+  border-bottom-color: rgba(217, 119, 6, 0.4) !important;
+  color: #fef3c7 !important;
+}
+
+html.theme-gold .treemap-pill-active {
+  background: linear-gradient(135deg, #f59e0b, #c2410c) !important;
+  color: #ffffff !important;
+  box-shadow: 0 3px 10px rgba(217, 119, 6, 0.35) !important;
+}
+
+html.theme-gold .treemap-pill-inactive {
+  background-color: #fef0cd !important;
+  color: #78350f !important;
+  border-color: rgba(217, 119, 6, 0.4) !important;
+}
+
+html.theme-gold .treemap-pill-inactive:hover {
+  background-color: #fde68a !important;
+  color: #3d1a04 !important;
+  border-color: #b45309 !important;
+}
+
+html.theme-gold .treemap-tile-hovered {
+  --tw-ring-color: #f59e0b !important;
+}
+
+html.theme-gold .treemap-tooltip {
+  background-color: rgba(255, 252, 245, 0.98) !important;
+  border-color: rgba(217, 119, 6, 0.5) !important;
+  color: #3d1a04 !important;
+  box-shadow: 0 20px 25px -5px rgba(180, 83, 9, 0.22), 0 8px 10px -6px rgba(0, 0, 0, 0.08) !important;
 }
 
 /* ==========================================================================
@@ -163,6 +226,51 @@ html.theme-oak .dark\:bg-blue-600 {
 html.theme-oak .border-blue-650,
 html.theme-oak .dark\:border-blue-400 {
   border-color: #f59e0b !important;
+}
+
+/* Treemap Oak Reserve Aesthetic */
+html.theme-oak .treemap-canvas-container {
+  background-color: #150e09 !important;
+  border-color: rgba(180, 83, 9, 0.35) !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(180, 83, 9, 0.15) !important;
+}
+
+html.theme-oak .treemap-sector-box {
+  border-color: rgba(180, 83, 9, 0.3) !important;
+  background-color: rgba(36, 25, 17, 0.5) !important;
+}
+
+html.theme-oak .treemap-sector-header {
+  background-color: rgba(42, 29, 20, 0.95) !important;
+  border-bottom-color: rgba(180, 83, 9, 0.35) !important;
+  color: #fef3c7 !important;
+}
+
+html.theme-oak .treemap-pill-active {
+  background-color: #d97706 !important;
+  color: #18110c !important;
+}
+
+html.theme-oak .treemap-pill-inactive {
+  background-color: rgba(36, 25, 17, 0.85) !important;
+  color: #fef3c7 !important;
+  border-color: rgba(87, 58, 38, 0.6) !important;
+}
+
+html.theme-oak .treemap-pill-inactive:hover {
+  background-color: rgba(58, 40, 27, 0.95) !important;
+  color: #ffffff !important;
+  border-color: #d97706 !important;
+}
+
+html.theme-oak .treemap-tile-hovered {
+  --tw-ring-color: #f59e0b !important;
+}
+
+html.theme-oak .treemap-tooltip {
+  background-color: rgba(36, 25, 17, 0.96) !important;
+  border-color: rgba(180, 83, 9, 0.4) !important;
+  color: #fef3c7 !important;
 }
 
 .counter {

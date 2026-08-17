@@ -638,20 +638,20 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
   if (loading && !data) {
     return (
       <div className="w-full space-y-4">
-        <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 shadow-xl flex items-center justify-between">
+        <div className="bg-white/90 dark:bg-slate-900/90 rounded-2xl p-6 border border-slate-200/90 dark:border-slate-800 shadow-lg dark:shadow-xl flex items-center justify-between transition-colors">
           <div className="space-y-2">
-            <div className="h-6 w-48 bg-slate-800 rounded animate-pulse"></div>
-            <div className="h-4 w-72 bg-slate-800/60 rounded animate-pulse"></div>
+            <div className="h-6 w-48 bg-slate-200 dark:bg-slate-800 rounded animate-pulse"></div>
+            <div className="h-4 w-72 bg-slate-100 dark:bg-slate-800/60 rounded animate-pulse"></div>
           </div>
-          <div className="h-8 w-32 bg-slate-800 rounded-lg animate-pulse"></div>
+          <div className="h-8 w-32 bg-slate-200 dark:bg-slate-800 rounded-lg animate-pulse"></div>
         </div>
-        <div className="bg-slate-950 rounded-2xl border border-slate-800 p-4 min-h-[600px] grid grid-cols-4 gap-3 animate-pulse">
-          <div className="col-span-2 row-span-2 bg-slate-900/80 rounded-xl p-4 border border-slate-800"></div>
-          <div className="bg-slate-900/60 rounded-xl p-4 border border-slate-800"></div>
-          <div className="bg-slate-900/60 rounded-xl p-4 border border-slate-800"></div>
-          <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-800"></div>
-          <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-800"></div>
-          <div className="col-span-2 bg-slate-900/70 rounded-xl p-4 border border-slate-800"></div>
+        <div className="bg-slate-900/95 dark:bg-slate-950 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-4 min-h-[600px] grid grid-cols-4 gap-3 animate-pulse transition-colors">
+          <div className="col-span-2 row-span-2 bg-slate-800/80 dark:bg-slate-900/80 rounded-xl p-4 border border-slate-700/60 dark:border-slate-800"></div>
+          <div className="bg-slate-800/60 dark:bg-slate-900/60 rounded-xl p-4 border border-slate-700/60 dark:border-slate-800"></div>
+          <div className="bg-slate-800/60 dark:bg-slate-900/60 rounded-xl p-4 border border-slate-700/60 dark:border-slate-800"></div>
+          <div className="bg-slate-800/50 dark:bg-slate-900/50 rounded-xl p-4 border border-slate-700/60 dark:border-slate-800"></div>
+          <div className="bg-slate-800/50 dark:bg-slate-900/50 rounded-xl p-4 border border-slate-700/60 dark:border-slate-800"></div>
+          <div className="col-span-2 bg-slate-800/70 dark:bg-slate-900/70 rounded-xl p-4 border border-slate-700/60 dark:border-slate-800"></div>
         </div>
       </div>
     );
@@ -659,13 +659,13 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
 
   if (error && !data) {
     return (
-      <div className="w-full max-w-4xl mx-auto bg-slate-900 rounded-2xl border border-slate-800 p-8 text-center shadow-xl my-8">
+      <div className="w-full max-w-4xl mx-auto bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-8 text-center shadow-lg dark:shadow-xl my-8 transition-colors">
         <div className="text-3xl mb-3">⚠️</div>
-        <h3 className="text-xl font-bold text-white mb-2">Market Data Unavailable</h3>
-        <p className="text-slate-400 text-sm max-w-md mx-auto mb-6">{error}</p>
+        <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Market Data Unavailable</h3>
+        <p className="text-slate-600 dark:text-slate-400 text-sm max-w-md mx-auto mb-6">{error}</p>
         <button
           onClick={() => fetchData(true)}
-          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition-all shadow-lg"
+          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition-all shadow-md"
         >
           Retry Loading Treemap
         </button>
@@ -700,34 +700,34 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
   return (
     <div className="w-full space-y-4 overflow-hidden">
       {/* Treemap Header & Controls */}
-      <div className="bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800 p-4 sm:p-5 shadow-xl transition-all">
+      <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/90 dark:border-slate-800 p-4 sm:p-5 shadow-lg dark:shadow-xl transition-all">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 flex-wrap">
-              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
                 <span>🗺️</span> Top 100 U.S. Companies Market Map
               </h2>
               <div className="flex items-center gap-2">
                 <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-colors ${
                     marketStatus === "Open"
-                      ? "bg-emerald-950/80 text-emerald-300 border-emerald-800/60"
-                      : "bg-slate-800 text-slate-300 border-slate-700"
+                      ? "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
                   }`}
                 >
                   <span
                     className={`w-2 h-2 rounded-full ${
-                      marketStatus === "Open" ? "bg-emerald-400 animate-pulse" : "bg-slate-400"
+                      marketStatus === "Open" ? "bg-emerald-500 dark:bg-emerald-400 animate-pulse" : "bg-slate-400"
                     }`}
                   ></span>
                   Market {marketStatus} {marketStatus === "Closed" ? "(Latest Session)" : ""}
                 </span>
-                <span className="text-xs text-slate-400 font-mono hidden sm:inline">
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-mono hidden sm:inline">
                   Updated {lastUpdated}
                 </span>
               </div>
             </div>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
               Finviz-style Market Map • Area weighted by Market Cap • Heatmap colored by Performance
             </p>
           </div>
@@ -735,15 +735,15 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
           {/* Stats Badges & Sector Filter */}
           <div className="flex items-center gap-3 flex-wrap justify-between md:justify-end">
             <div className="flex items-center gap-2 text-xs font-mono">
-              <div className="bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700/60">
-                <span className="text-slate-400 block text-[10px] uppercase font-sans">Total Cap</span>
-                <span className="font-extrabold text-white">{formatMarketCap(totalMarketCap)}</span>
+              <div className="bg-slate-100/90 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700/60 shadow-xs">
+                <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-sans font-semibold">Total Cap</span>
+                <span className="font-extrabold text-slate-900 dark:text-white">{formatMarketCap(totalMarketCap)}</span>
               </div>
-              <div className="bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700/60">
-                <span className="text-slate-400 block text-[10px] uppercase font-sans">Top 100 Day</span>
+              <div className="bg-slate-100/90 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700/60 shadow-xs">
+                <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-sans font-semibold">Top 100 Day</span>
                 <span
                   className={`font-extrabold ${
-                    weightedChangePercent >= 0 ? "text-emerald-400" : "text-rose-400"
+                    weightedChangePercent >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
                   }`}
                 >
                   {weightedChangePercent >= 0 ? "+" : ""}
@@ -756,7 +756,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
             <button
               onClick={() => fetchData(true)}
               disabled={loading}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl border border-slate-700 text-xs font-semibold transition-all flex items-center gap-1.5 disabled:opacity-50"
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-white rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold transition-all flex items-center gap-1.5 disabled:opacity-50 shadow-xs"
               title="Refresh Top 100 quotes"
             >
               <span className={loading ? "animate-spin" : ""}>🔄</span>
@@ -766,13 +766,13 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
         </div>
 
         {/* Sector Quick Filter Pills */}
-        <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs">
+        <div className="mt-4 pt-3 border-t border-slate-200/90 dark:border-slate-800/60 flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs">
           <button
             onClick={() => setSelectedSectorFilter("ALL")}
             className={`px-2.5 py-1 rounded-lg font-bold transition-all whitespace-nowrap ${
               selectedSectorFilter === "ALL"
-                ? "bg-blue-600 text-white shadow-md"
-                : "bg-slate-800/70 text-slate-400 hover:text-white hover:bg-slate-800"
+                ? "treemap-pill-active bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                : "treemap-pill-inactive bg-slate-100 hover:bg-slate-200/80 text-slate-700 hover:text-slate-900 border border-slate-200/80 dark:bg-slate-800/70 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800 dark:border-transparent"
             }`}
           >
             All Sectors (100)
@@ -783,14 +783,14 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
               onClick={() => setSelectedSectorFilter(sec.sector)}
               className={`px-2.5 py-1 rounded-lg font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 ${
                 selectedSectorFilter === sec.sector
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "bg-slate-800/70 text-slate-400 hover:text-white hover:bg-slate-800"
+                  ? "treemap-pill-active bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                  : "treemap-pill-inactive bg-slate-100 hover:bg-slate-200/80 text-slate-700 hover:text-slate-900 border border-slate-200/80 dark:bg-slate-800/70 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800 dark:border-transparent"
               }`}
             >
               <span>{sec.sector}</span>
               <span
                 className={`text-[10px] font-mono font-extrabold px-1 rounded ${
-                  sec.weightedChangePercent >= 0 ? "text-emerald-300" : "text-rose-300"
+                  sec.weightedChangePercent >= 0 ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300"
                 }`}
               >
                 {sec.weightedChangePercent >= 0 ? "+" : ""}
@@ -812,7 +812,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
           setHoveredCompany(null);
         }}
         onDoubleClick={handleDoubleClick}
-        className={`relative w-full max-w-full bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl min-h-[500px] select-none box-border overflow-hidden ${
+        className={`treemap-canvas-container relative w-full max-w-full bg-slate-900/95 dark:bg-slate-950 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xl dark:shadow-2xl min-h-[500px] select-none box-border overflow-hidden transition-colors ${
           zoom > 1.001 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default"
         }`}
         style={{ height: `${dimensions.height}px` }}
@@ -834,7 +834,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
               return (
                 <div
                   key={sector}
-                  className="absolute border border-slate-800/70 bg-slate-900/30 pointer-events-none rounded-md overflow-hidden box-border"
+                  className="treemap-sector-box absolute border border-slate-700/60 dark:border-slate-800/70 bg-slate-800/30 dark:bg-slate-900/30 pointer-events-none rounded-md overflow-hidden box-border transition-colors"
                   style={{
                     left: `${r.x}px`,
                     top: `${r.y}px`,
@@ -844,7 +844,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
                 >
                   {r.h >= 24 && (
                     <div
-                      className="px-2 text-[10px] font-black uppercase tracking-wider text-slate-400/90 truncate flex items-center justify-between border-b border-slate-800/40 bg-slate-900/80 leading-none box-border"
+                      className="treemap-sector-header px-2 text-[10px] font-black uppercase tracking-wider text-slate-200/90 dark:text-slate-400/90 truncate flex items-center justify-between border-b border-slate-700/50 dark:border-slate-800/40 bg-slate-800/95 dark:bg-slate-900/80 leading-none box-border transition-colors"
                       style={{
                         height: `${Math.min(20, Math.max(15, Math.floor(r.h * 0.12)))}px`,
                       }}
@@ -878,8 +878,8 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
                   key={company.symbol}
                   onClick={() => onSelectStock(company.symbol)}
                   onMouseEnter={() => setHoveredCompany(company)}
-                  className={`absolute transition-all duration-150 cursor-pointer overflow-hidden flex flex-col items-center justify-center p-0.5 rounded-sm box-border select-none ${
-                    isHovered ? "z-30 ring-2 ring-white scale-[1.005] shadow-2xl" : "z-10 hover:z-20"
+                  className={`treemap-tile absolute transition-all duration-150 cursor-pointer overflow-hidden flex flex-col items-center justify-center p-0.5 rounded-sm box-border select-none ${
+                    isHovered ? "treemap-tile-hovered z-30 ring-2 ring-white dark:ring-white scale-[1.005] shadow-2xl" : "z-10 hover:z-20"
                   }`}
                   style={{
                     left: `${rect.x}px`,
@@ -902,7 +902,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
                     </div>
 
                     {config.showName && (
-                      <div className="text-[9px] text-slate-200/90 font-medium truncate max-w-full leading-none mt-0.5 hidden sm:block">
+                      <div className="text-[9px] text-slate-100/90 font-medium truncate max-w-full leading-none mt-0.5 hidden sm:block">
                         {company.name}
                       </div>
                     )}
@@ -929,37 +929,37 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
         {/* Polished Side-Shifted Floating Hover Tooltip */}
         {hoveredCompany && (
           <div
-            className="pointer-events-none fixed z-50 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-xl p-3.5 shadow-2xl text-xs w-64 space-y-2 animate-in fade-in zoom-in-95 duration-100"
+            className="treemap-tooltip pointer-events-none fixed z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/90 dark:border-slate-700/80 rounded-xl p-3.5 shadow-2xl text-xs w-64 space-y-2 animate-in fade-in zoom-in-95 duration-100 text-slate-800 dark:text-slate-100"
             style={{
               left: `${tooltipLeft}px`,
               top: `${tooltipTop}px`,
             }}
           >
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800 pb-2">
               <div>
-                <div className="font-black text-sm text-white flex items-center gap-2">
+                <div className="font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
                   <span className="truncate max-w-[130px]">{hoveredCompany.name}</span>
-                  <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800 flex-shrink-0">
+                  <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-800 flex-shrink-0">
                     {hoveredCompany.symbol}
                   </span>
                 </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">{hoveredCompany.sector}</div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{hoveredCompany.sector}</div>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2 pt-1 font-mono text-xs">
               <div>
-                <span className="text-slate-400 text-[10px] block font-sans">Price</span>
-                <span className="font-bold text-white">${hoveredCompany.price.toFixed(2)}</span>
+                <span className="text-slate-500 dark:text-slate-400 text-[10px] block font-sans">Price</span>
+                <span className="font-bold text-slate-900 dark:text-white">${hoveredCompany.price.toFixed(2)}</span>
               </div>
               <div>
-                <span className="text-slate-400 text-[10px] block font-sans">Today's Change</span>
+                <span className="text-slate-500 dark:text-slate-400 text-[10px] block font-sans">Today's Change</span>
                 <span
                   className={`font-bold ${
                     hoveredCompany.changesPercentage !== null
                       ? hoveredCompany.changesPercentage >= 0
-                        ? "text-emerald-400"
-                        : "text-rose-400"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-rose-600 dark:text-rose-400"
                       : "text-slate-400"
                   }`}
                 >
@@ -972,18 +972,18 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
                 </span>
               </div>
               <div className="col-span-2">
-                <span className="text-slate-400 text-[10px] block font-sans">Industry</span>
-                <span className="font-bold text-slate-200 text-[11px] truncate block">
+                <span className="text-slate-500 dark:text-slate-400 text-[10px] block font-sans">Industry</span>
+                <span className="font-bold text-slate-700 dark:text-slate-200 text-[11px] truncate block">
                   {hoveredCompany.industry}
                 </span>
               </div>
-              <div className="col-span-2 pt-1 border-t border-slate-800/60 flex items-center justify-between">
-                <span className="text-slate-400 text-[10px] font-sans">Market Capitalization</span>
-                <span className="font-bold text-white">{formatMarketCap(hoveredCompany.marketCap)}</span>
+              <div className="col-span-2 pt-1 border-t border-slate-200/80 dark:border-slate-800/60 flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400 text-[10px] font-sans">Market Capitalization</span>
+                <span className="font-bold text-slate-900 dark:text-white">{formatMarketCap(hoveredCompany.marketCap)}</span>
               </div>
             </div>
 
-            <div className="text-[10px] text-blue-400 font-sans text-center pt-1 border-t border-slate-800/60 font-semibold">
+            <div className="text-[10px] text-blue-600 dark:text-blue-400 font-sans text-center pt-1 border-t border-slate-200/80 dark:border-slate-800/60 font-semibold">
               Click to analyze {hoveredCompany.symbol} ➔
             </div>
           </div>

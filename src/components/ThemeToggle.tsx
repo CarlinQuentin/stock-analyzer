@@ -39,13 +39,13 @@ export const THEME_OPTIONS: ThemeOption[] = [
   },
   {
     id: "gold",
-    name: "Gold",
-    subtitle: "Executive charcoal & rich gold",
-    icon: "👑",
+    name: "Sunset Gold",
+    subtitle: "Warm amber, gold & sunset glow",
+    icon: "🌅",
     preview: {
-      bg: "#0d0e12",
-      card: "#161820",
-      accent: "#eab308",
+      bg: "#fef5e7",
+      card: "#fffdf8",
+      accent: "#d97706",
     },
   },
   {
@@ -107,7 +107,7 @@ export const ThemeToggle: React.FC = () => {
     } else if (theme === "dark") {
       root.classList.add("dark", "theme-dark");
     } else if (theme === "gold") {
-      root.classList.add("dark", "theme-gold");
+      root.classList.add("theme-gold");
     } else if (theme === "oak") {
       root.classList.add("dark", "theme-oak");
     }
