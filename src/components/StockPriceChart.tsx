@@ -211,10 +211,10 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
   // Chart dimensions & scaling
   const width = 800;
   const height = 300;
-  const paddingLeft = 15;
-  const paddingRight = 65;
+  const paddingLeft = 28;
+  const paddingRight = 72;
   const paddingTop = 25;
-  const paddingBottom = 40;
+  const paddingBottom = 42;
   const chartWidth = width - paddingLeft - paddingRight;
   const chartHeight = height - paddingTop - paddingBottom;
 
@@ -832,71 +832,93 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
           Price data unavailable for this timeframe.
         </div>
       ) : (
-        <div className="relative w-full overflow-hidden pt-2 select-none">
+        <div className="relative w-full pt-2 select-none">
           {/* Tooltip Callout when hovering (and not selecting range) */}
-          {!rangeStats && hoveredIndex !== null && points[activeIndex] && (
-            <div
-              className="absolute z-20 pointer-events-none bg-slate-900/90 text-white text-xs rounded-xl p-3 shadow-2xl border border-slate-700 backdrop-blur-md transition-all duration-75"
-              style={{
-                left: `${Math.min(Math.max(points[activeIndex].x, 80), width - 140)}px`,
-                top: "10px",
-                transform: "translateX(-50%)",
-              }}
-            >
-              <div className="font-semibold text-slate-300 mb-1 border-b border-slate-700/80 pb-1">
-                {timeframe === "1D"
-                  ? parseDateString(activePoint.date).toLocaleString("en-US", {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })
-                  : parseDateString(activePoint.date).toLocaleDateString("en-US", {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-              </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-1">
-                <div>
-                  <span className="text-slate-400">Close:</span>{" "}
-                  <span className="font-bold text-white">{formatCurrency(activePoint.close)}</span>
-                </div>
-                {activePoint.open && (
-                  <div>
-                    <span className="text-slate-400">Open:</span>{" "}
-                    <span className="font-medium text-slate-200">
-                      {formatCurrency(activePoint.open)}
-                    </span>
-                  </div>
-                )}
-                {activePoint.high && (
-                  <div>
-                    <span className="text-slate-400">High:</span>{" "}
-                    <span className="font-medium text-emerald-400">
-                      {formatCurrency(activePoint.high)}
-                    </span>
-                  </div>
-                )}
-                {activePoint.low && (
-                  <div>
-                    <span className="text-slate-400">Low:</span>{" "}
-                    <span className="font-medium text-rose-400">
-                      {formatCurrency(activePoint.low)}
-                    </span>
-                  </div>
-                )}
-                <div className="col-span-2 pt-1 border-t border-slate-800 flex justify-between">
-                  <span className="text-slate-400">Volume:</span>
-                  <span className="font-medium text-slate-200">
-                    {formatVolume(activePoint.volume || 0)}
+          {!rangeStats && hoveredIndex !== null && points[activeIndex] && (() => {
+            const leftPercent = (points[activeIndex].x / width) * 100;
+            let leftStyle: string = `${leftPercent}%`;
+            let rightStyle: string = "auto";
+            let transformStyle: string = "translateX(-50%)";
+
+            if (leftPercent < 22) {
+              leftStyle = "8px";
+              rightStyle = "auto";
+              transformStyle = "none";
+            } else if (leftPercent > 78) {
+              leftStyle = "auto";
+              rightStyle = "8px";
+              transformStyle = "none";
+            }
+
+            return (
+              <div
+                className="absolute z-30 pointer-events-none bg-slate-900/95 dark:bg-slate-900/95 text-white text-xs rounded-xl p-3 shadow-2xl border border-slate-700/80 backdrop-blur-md transition-all duration-75 min-w-[180px] max-w-[280px]"
+                style={{
+                  left: leftStyle,
+                  right: rightStyle,
+                  top: "10px",
+                  transform: transformStyle,
+                }}
+              >
+                <div className="font-semibold text-slate-200 text-xs mb-1.5 border-b border-slate-700/80 pb-1 flex items-center justify-between gap-2">
+                  <span>
+                    {timeframe === "1D"
+                      ? parseDateString(activePoint.date).toLocaleString("en-US", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })
+                      : parseDateString(activePoint.date).toLocaleDateString("en-US", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
                   </span>
                 </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-1 text-xs">
+                  <div>
+                    <span className="text-slate-400">Close:</span>{" "}
+                    <span className="font-bold text-white font-mono whitespace-nowrap">
+                      {formatCurrency(activePoint.close)}
+                    </span>
+                  </div>
+                  {activePoint.open !== undefined && activePoint.open !== null && (
+                    <div>
+                      <span className="text-slate-400">Open:</span>{" "}
+                      <span className="font-medium text-slate-200 font-mono whitespace-nowrap">
+                        {formatCurrency(activePoint.open)}
+                      </span>
+                    </div>
+                  )}
+                  {activePoint.high !== undefined && activePoint.high !== null && (
+                    <div>
+                      <span className="text-slate-400">High:</span>{" "}
+                      <span className="font-medium text-emerald-400 font-mono whitespace-nowrap">
+                        {formatCurrency(activePoint.high)}
+                      </span>
+                    </div>
+                  )}
+                  {activePoint.low !== undefined && activePoint.low !== null && (
+                    <div>
+                      <span className="text-slate-400">Low:</span>{" "}
+                      <span className="font-medium text-rose-400 font-mono whitespace-nowrap">
+                        {formatCurrency(activePoint.low)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="col-span-2 pt-1 border-t border-slate-800 flex justify-between items-center text-[11px]">
+                    <span className="text-slate-400">Volume:</span>
+                    <span className="font-medium text-slate-200 font-mono whitespace-nowrap">
+                      {formatVolume(activePoint.volume || 0)}
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           <svg
             className="w-full h-auto cursor-crosshair touch-none select-none"
@@ -1103,28 +1125,40 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
             )}
 
             {/* X Axis Date Labels */}
-            {xTicks.map((tick, i) => (
-              <g key={`x-${i}`}>
-                <line
-                  x1={tick.x}
-                  y1={height - paddingBottom}
-                  x2={tick.x}
-                  y2={height - paddingBottom + 5}
-                  stroke="currentColor"
-                  className="text-slate-300 dark:text-slate-600"
-                  strokeWidth="1"
-                />
-                <text
-                  x={tick.x}
-                  y={height - paddingBottom + 20}
-                  textAnchor="middle"
-                  fill="currentColor"
-                  className="text-[10px] font-medium text-slate-400 dark:text-slate-500 fill-current"
-                >
-                  {tick.label}
-                </text>
-              </g>
-            ))}
+            {xTicks.map((tick, i) => {
+              let textAnchor: "start" | "middle" | "end" = "middle";
+              let xPos = tick.x;
+              if (i === 0) {
+                textAnchor = "start";
+                xPos = Math.max(paddingLeft, tick.x);
+              } else if (i === xTicks.length - 1) {
+                textAnchor = "end";
+                xPos = Math.min(width - paddingRight, tick.x);
+              }
+
+              return (
+                <g key={`x-${i}`}>
+                  <line
+                    x1={tick.x}
+                    y1={height - paddingBottom}
+                    x2={tick.x}
+                    y2={height - paddingBottom + 5}
+                    stroke="currentColor"
+                    className="text-slate-300 dark:text-slate-600"
+                    strokeWidth="1"
+                  />
+                  <text
+                    x={xPos}
+                    y={height - paddingBottom + 20}
+                    textAnchor={textAnchor}
+                    fill="currentColor"
+                    className="text-[10px] font-medium text-slate-400 dark:text-slate-500 fill-current font-mono"
+                  >
+                    {tick.label}
+                  </text>
+                </g>
+              );
+            })}
 
             {/* Active Hover Crosshair Line & Point (when not range selecting) */}
             {!rangeStats && hoveredIndex !== null && points[activeIndex] && (
