@@ -1,7 +1,16 @@
 import React, { useState } from "react";
-import { FinancialStatement } from "../types";
+import { FinancialStatement, DividendMetrics } from "../types";
 import { calculateFCF } from "../utils/financialCalculations";
 import { formatShortenedShareCount } from "../utils/scoring";
+import {
+  determineDividendFrequency,
+  calculateAnnualRegularDPS,
+  calculateSinglePaymentDPS,
+  calculateTTMAnnualDPS,
+  calculateDividendPayoutRatio,
+  calculateDividendFCFCoverage,
+  calculateSpecialDPS,
+} from "../utils/dividendCalculations";
 
 export interface RawFinancialsSectionProps {
   incomeStatements?: FinancialStatement[] | null;
@@ -11,6 +20,8 @@ export interface RawFinancialsSectionProps {
   financialRatios?: any[] | null;
   keyMetricsTTM?: any | null;
   ratiosTTM?: any | null;
+  dividendHistory?: any[] | null;
+  dividendMetrics?: DividendMetrics | null;
   symbol: string;
   companyName: string;
   currentPrice?: number | null;
@@ -27,17 +38,23 @@ export function getMetricDirection(metricId: string, label?: string): MetricDire
   const id = metricId.toLowerCase();
   const name = (label || "").toLowerCase();
 
-  // Neutral / Directionless (Market Cap, Enterprise Value)
+  // Neutral / Directionless
   if (
     id.includes("marketcapitalization") ||
     name.includes("market cap") ||
     id.includes("enterprisevalue") ||
-    name.includes("enterprise value")
+    name.includes("enterprise value") ||
+    id.includes("frequency") ||
+    name.includes("frequency") ||
+    id.includes("special") ||
+    name.includes("special") ||
+    id === "dividendspaid" ||
+    name === "total dividends paid"
   ) {
     return "neutral";
   }
 
-  // Lower is Better (Debt, Leverage, CapEx, Solvency multiples, Valuation multiples)
+  // Lower is Better (Debt, Leverage, CapEx, Solvency multiples, Valuation multiples, Payout Ratios)
   if (
     id.includes("debt") ||
     name.includes("debt") ||
@@ -55,12 +72,16 @@ export function getMetricDirection(metricId: string, label?: string): MetricDire
     name.includes("price / sales") ||
     id.includes("evtoebitda") ||
     id.includes("ev / ebitda") ||
-    name.includes("ev / ebitda")
+    name.includes("ev / ebitda") ||
+    id.includes("payoutratio") ||
+    name.includes("payout ratio") ||
+    id.includes("dividendfcfcoverage") ||
+    name.includes("dividend / fcf")
   ) {
     return "lower_is_better";
   }
 
-  // Higher is Better (Revenues, Profits, Cash Flows, Margins, Compounding Returns)
+  // Higher is Better (Revenues, Profits, Cash Flows, Margins, Compounding Returns, Dividends & Dividend Growth)
   if (
     id.includes("revenue") ||
     name.includes("revenue") ||
@@ -89,7 +110,9 @@ export function getMetricDirection(metricId: string, label?: string): MetricDire
     id.includes("conversion") ||
     name.includes("conversion") ||
     id.includes("growth") ||
-    name.includes("growth")
+    name.includes("growth") ||
+    id.includes("dividend") ||
+    name.includes("dividend")
   ) {
     return "higher_is_better";
   }
@@ -101,23 +124,25 @@ export function getMetricDirection(metricId: string, label?: string): MetricDire
  * Computes text color class for a metric value compared to its prior period value
  */
 export function getMetricComparisonColor(
-  currentVal: number | null | undefined,
-  priorVal: number | null | undefined,
+  currentVal: any,
+  priorVal: any,
   direction: MetricDirection,
 ): string {
   if (
     currentVal === null ||
     currentVal === undefined ||
-    isNaN(currentVal) ||
+    typeof currentVal === "string" ||
+    (typeof currentVal === "number" && isNaN(currentVal)) ||
     priorVal === null ||
     priorVal === undefined ||
-    isNaN(priorVal) ||
+    typeof priorVal === "string" ||
+    (typeof priorVal === "number" && isNaN(priorVal)) ||
     direction === "neutral"
   ) {
     return "text-slate-900 dark:text-slate-100"; // default neutral text color
   }
 
-  const diff = currentVal - priorVal;
+  const diff = Number(currentVal) - Number(priorVal);
   if (diff === 0) {
     return "text-slate-900 dark:text-slate-100"; // no change
   }
@@ -170,7 +195,7 @@ export function formatRawCurrency(val: number | null | undefined): string {
 }
 
 /**
- * Format per-share earnings ($8.42, -$1.20)
+ * Format per-share earnings or dividend per share ($8.42, -$1.20, $0.25)
  */
 export function formatRawEPS(val: number | null | undefined): string {
   if (val === null || val === undefined || isNaN(val)) return "—";
@@ -185,7 +210,7 @@ export function formatRawEPS(val: number | null | undefined): string {
 export function formatPercentage(val: number | null | undefined, isDecimalRatio: boolean = true): string {
   if (val === null || val === undefined || isNaN(val)) return "—";
   const num = isDecimalRatio ? val * 100 : val;
-  return `${num >= 0 ? "" : ""}${num.toFixed(1)}%`;
+  return `${num.toFixed(1)}%`;
 }
 
 /**
@@ -248,7 +273,11 @@ export interface MetricRowDef {
     priorCf?: FinancialStatement,
     priorKm?: any,
     priorFr?: any,
-  ) => number | null | undefined;
+    year?: number,
+    dividendHistory?: any[] | null,
+    dividendMetrics?: DividendMetrics | null,
+    currentPrice?: number | null,
+  ) => any;
   getTTMValue?: (
     inc?: FinancialStatement,
     bal?: FinancialStatement,
@@ -260,8 +289,10 @@ export interface MetricRowDef {
     latestInc?: FinancialStatement,
     latestBal?: FinancialStatement,
     latestCf?: FinancialStatement,
-  ) => number | null | undefined;
-  format: (val: number | null | undefined) => string;
+    dividendHistory?: any[] | null,
+    dividendMetrics?: DividendMetrics | null,
+  ) => any;
+  format: (val: any) => string;
 }
 
 export interface MetricSectionDef {
@@ -661,6 +692,134 @@ export const METRIC_SECTIONS: MetricSectionDef[] = [
       },
     ],
   },
+  {
+    id: "dividends",
+    title: "DIVIDENDS",
+    icon: "💰",
+    description: "Historical dividend distributions, payment frequency, yield, cash coverage, and growth trajectory",
+    rows: [
+      {
+        id: "dividendFrequency",
+        label: "Dividend Frequency",
+        description: "Standard payment schedule determined from actual historical distributions (e.g. Quarterly, Monthly, Annual)",
+        direction: "neutral",
+        getValue: (_inc, _bal, _cf, _km, _fr, _priorInc, _priorBal, _priorCf, _priorKm, _priorFr, year, divHist) =>
+          determineDividendFrequency(divHist, year),
+        getTTMValue: (_inc, _bal, _cf, _kmTTM, _frTTM, _currentPrice, _marketCap, _latestInc, _latestBal, _latestCf, divHist) =>
+          determineDividendFrequency(divHist),
+        format: (v) => (typeof v === "string" ? v : "—"),
+      },
+      {
+        id: "dividendYield",
+        label: "Dividend Yield",
+        description: "Annualized dividend payout relative to current stock price or fiscal year valuation",
+        direction: "higher_is_better",
+        getValue: (_inc, _bal, _cf, km, fr, _priorInc, _priorBal, _priorCf, _priorKm, _priorFr, year, divHist, _divMetrics, price) => {
+          const annualDPS = calculateAnnualRegularDPS(divHist, year, undefined, undefined, km, fr);
+          return fr?.dividendYield ?? km?.dividendYield ?? (price && annualDPS ? annualDPS / price : null);
+        },
+        getTTMValue: (_inc, _bal, _cf, _kmTTM, frTTM, price, _marketCap, _latestInc, _latestBal, _latestCf, divHist, divMetrics) => {
+          const annualDPS = calculateTTMAnnualDPS(divHist, frTTM, divMetrics);
+          return frTTM?.dividendYieldTTM ?? divMetrics?.dividendYield ?? (price && annualDPS ? annualDPS / price : null);
+        },
+        format: (v) => formatPercentage(v, true),
+      },
+      {
+        id: "dividendPerShare",
+        label: "Dividend Per Share (DPS)",
+        description: "Regular dividend distribution amount per payment per share",
+        direction: "higher_is_better",
+        getValue: (_inc, _bal, _cf, km, fr, _priorInc, _priorBal, _priorCf, _priorKm, _priorFr, year, divHist) =>
+          calculateSinglePaymentDPS(divHist, year, fr, km),
+        getTTMValue: (_inc, _bal, _cf, _kmTTM, frTTM, _price, _marketCap, _latestInc, _latestBal, _latestCf, divHist, divMetrics) =>
+          calculateSinglePaymentDPS(divHist, undefined, frTTM, divMetrics),
+        format: formatRawEPS,
+      },
+      {
+        id: "annualDividendPerShare",
+        label: "Annual Dividend Per Share",
+        description: "Total regular dividend distributed across the full 12-month period",
+        direction: "higher_is_better",
+        isKeyHighlight: true,
+        getValue: (inc, _bal, cf, km, fr, _priorInc, _priorBal, _priorCf, _priorKm, _priorFr, year, divHist) =>
+          calculateAnnualRegularDPS(divHist, year, cf, inc, km, fr),
+        getTTMValue: (_inc, _bal, _cf, kmTTM, frTTM, _price, _marketCap, latestInc, _latestBal, latestCf, divHist, divMetrics) =>
+          calculateTTMAnnualDPS(
+            divHist,
+            frTTM,
+            divMetrics,
+            calculateAnnualRegularDPS(divHist, undefined, latestCf, latestInc, kmTTM, frTTM),
+          ),
+        format: formatRawEPS,
+      },
+      {
+        id: "dividendGrowth",
+        label: "Dividend Growth",
+        description: "Year-over-year percentage growth rate in regular annual dividend per share",
+        direction: "higher_is_better",
+        getValue: (inc, _bal, cf, km, fr, priorInc, _priorBal, priorCf, priorKm, priorFr, year, divHist) => {
+          const curr = calculateAnnualRegularDPS(divHist, year, cf, inc, km, fr);
+          const priorYear = year !== undefined ? year - 1 : undefined;
+          const prior = calculateAnnualRegularDPS(divHist, priorYear, priorCf, priorInc, priorKm, priorFr);
+          return computeYoYGrowth(curr, prior);
+        },
+        getTTMValue: (_inc, _bal, _cf, _kmTTM, frTTM, _price, _marketCap, latestInc, _latestBal, latestCf, divHist, divMetrics) => {
+          const curr = calculateTTMAnnualDPS(divHist, frTTM, divMetrics);
+          const prior = calculateAnnualRegularDPS(
+            divHist,
+            latestInc?.date ? parseInt(latestInc.date.split("-")[0], 10) : undefined,
+            latestCf,
+            latestInc,
+          );
+          return computeYoYGrowth(curr, prior);
+        },
+        format: (v) => formatPercentage(v, true),
+      },
+      {
+        id: "dividendsPaid",
+        label: "Total Dividends Paid",
+        description: "Total cash distributed to shareholders for dividends from Cash Flow Statement",
+        direction: "neutral",
+        getValue: (_inc, _bal, cf) =>
+          cf?.dividendsPaid !== undefined && cf?.dividendsPaid !== null ? Math.abs(cf.dividendsPaid) : undefined,
+        getTTMValue: (_inc, _bal, cf) =>
+          cf?.dividendsPaid !== undefined && cf?.dividendsPaid !== null ? Math.abs(cf.dividendsPaid) : undefined,
+        format: formatRawCurrency,
+      },
+      {
+        id: "dividendPayoutRatio",
+        label: "Dividend Payout Ratio",
+        description: "Total dividends paid as a percentage of Net Income (safely omitted if unprofitable)",
+        direction: "lower_is_better",
+        getValue: (inc, _bal, cf, km, fr) => calculateDividendPayoutRatio(cf?.dividendsPaid, inc?.netIncome, fr, km),
+        getTTMValue: (inc, _bal, cf, kmTTM, frTTM) =>
+          frTTM?.dividendPayoutRatioTTM ?? calculateDividendPayoutRatio(cf?.dividendsPaid, inc?.netIncome, frTTM, kmTTM),
+        format: (v) => formatPercentage(v, true),
+      },
+      {
+        id: "dividendFcfCoverage",
+        label: "Dividend / FCF",
+        description: "Total dividends paid as a percentage of Free Cash Flow (cash generation coverage)",
+        direction: "lower_is_better",
+        getValue: (_inc, _bal, cf) =>
+          calculateDividendFCFCoverage(cf?.dividendsPaid, cf?.operatingCashFlow, cf?.capitalExpenditure),
+        getTTMValue: (_inc, _bal, cf) =>
+          calculateDividendFCFCoverage(cf?.dividendsPaid, cf?.operatingCashFlow, cf?.capitalExpenditure),
+        format: (v) => formatPercentage(v, true),
+      },
+      {
+        id: "specialDividend",
+        label: "Special Dividends",
+        description: "One-time or special non-recurring cash distributions per share (kept separate from regular dividend)",
+        direction: "neutral",
+        getValue: (_inc, _bal, _cf, _km, _fr, _priorInc, _priorBal, _priorCf, _priorKm, _priorFr, year, divHist) =>
+          calculateSpecialDPS(divHist, year),
+        getTTMValue: (_inc, _bal, _cf, _kmTTM, _frTTM, _price, _marketCap, _latestInc, _latestBal, _latestCf, divHist) =>
+          calculateSpecialDPS(divHist),
+        format: formatRawEPS,
+      },
+    ],
+  },
 ];
 
 export const RawFinancialsSection: React.FC<RawFinancialsSectionProps> = ({
@@ -671,6 +830,8 @@ export const RawFinancialsSection: React.FC<RawFinancialsSectionProps> = ({
   financialRatios,
   keyMetricsTTM,
   ratiosTTM,
+  dividendHistory,
+  dividendMetrics,
   symbol,
   companyName,
   currentPrice,
@@ -678,12 +839,12 @@ export const RawFinancialsSection: React.FC<RawFinancialsSectionProps> = ({
 }) => {
   const [periodView, setPeriodView] = useState<PeriodView>("10Y");
 
-  // Extract all unique historical fiscal years across statement sources
+  // Extract all unique historical fiscal years across statement sources and dividend history
   const yearSet = new Set<number>();
 
   const extractYear = (s?: FinancialStatement | any) => {
     if (!s || !s.date) return null;
-    const yearStr = s.date.split("-")[0];
+    const yearStr = String(s.date).split("-")[0];
     const yearNum = parseInt(yearStr, 10);
     return isNaN(yearNum) ? null : yearNum;
   };
@@ -705,6 +866,10 @@ export const RawFinancialsSection: React.FC<RawFinancialsSectionProps> = ({
     if (y) yearSet.add(y);
   });
   financialRatios?.forEach((s) => {
+    const y = extractYear(s);
+    if (y) yearSet.add(y);
+  });
+  dividendHistory?.forEach((s) => {
     const y = extractYear(s);
     if (y) yearSet.add(y);
   });
@@ -747,14 +912,14 @@ export const RawFinancialsSection: React.FC<RawFinancialsSectionProps> = ({
             <div className="flex items-center gap-2">
               <span className="text-xl sm:text-2xl">📋</span>
               <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
-                Raw Financials & Key Multiples
+                Raw Financials &amp; Key Multiples
               </h2>
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/50">
                 Core Metrics ({years.length}Y)
               </span>
             </div>
             <p className="mt-1.5 text-xs sm:text-sm text-slate-600 dark:text-slate-300 max-w-3xl">
-              High-signal financial trajectory for {companyName} ({symbol}) across growth, profitability, cash flow conversion, capital efficiency, leverage, and valuation multiples.
+              High-signal financial trajectory for {companyName} ({symbol}) across growth, profitability, cash flow conversion, capital efficiency, leverage, valuation multiples, and dividend distributions.
             </p>
           </div>
 
@@ -886,8 +1051,25 @@ export const RawFinancialsSection: React.FC<RawFinancialsSectionProps> = ({
                           latestInc,
                           latestBal,
                           latestCf,
+                          dividendHistory,
+                          dividendMetrics,
                         )
-                      : row.getValue(latestIncome, latestBalance, latestCashFlow, keyMetricsTTM, ratiosTTM);
+                      : row.getValue(
+                          latestIncome,
+                          latestBalance,
+                          latestCashFlow,
+                          keyMetricsTTM,
+                          ratiosTTM,
+                          undefined,
+                          undefined,
+                          undefined,
+                          undefined,
+                          undefined,
+                          undefined,
+                          dividendHistory,
+                          dividendMetrics,
+                          currentPrice,
+                        );
 
                     const ttmFormatted = row.format(ttmRawVal);
                     const isTTM_NA = ttmFormatted === "—";
@@ -896,7 +1078,22 @@ export const RawFinancialsSection: React.FC<RawFinancialsSectionProps> = ({
                     const latestKm = latestYr ? getKeyMetricsForYear(latestYr) : undefined;
                     const latestFr = latestYr ? getFinancialRatiosForYear(latestYr) : undefined;
                     const latestFYVal = latestYr
-                      ? row.getValue(latestInc, latestBal, latestCf, latestKm, latestFr)
+                      ? row.getValue(
+                          latestInc,
+                          latestBal,
+                          latestCf,
+                          latestKm,
+                          latestFr,
+                          undefined,
+                          undefined,
+                          undefined,
+                          undefined,
+                          undefined,
+                          latestYr,
+                          dividendHistory,
+                          dividendMetrics,
+                          currentPrice,
+                        )
                       : undefined;
 
                     const ttmColorClass = isTTM_NA
@@ -913,11 +1110,13 @@ export const RawFinancialsSection: React.FC<RawFinancialsSectionProps> = ({
                         {/* Metric Label Column (Sticky) */}
                         <td className="py-2.5 px-4 sm:px-6 sticky left-0 bg-white dark:bg-slate-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] z-10">
                           <div className="flex items-center gap-1.5">
-                            <span className={`font-semibold text-xs sm:text-sm ${
-                              row.isKeyHighlight
-                                ? "text-blue-700 dark:text-blue-400 font-bold"
-                                : "text-slate-900 dark:text-slate-100"
-                            }`}>
+                            <span
+                              className={`font-semibold text-xs sm:text-sm ${
+                                row.isKeyHighlight
+                                  ? "text-blue-700 dark:text-blue-400 font-bold"
+                                  : "text-slate-900 dark:text-slate-100"
+                              }`}
+                            >
                               {row.label}
                             </span>
                             {row.isKeyHighlight && (
@@ -965,12 +1164,31 @@ export const RawFinancialsSection: React.FC<RawFinancialsSectionProps> = ({
                             priorCf,
                             priorKm,
                             priorFr,
+                            yr,
+                            dividendHistory,
+                            dividendMetrics,
+                            currentPrice,
                           );
                           const formattedVal = row.format(rawVal);
                           const isNA = formattedVal === "—";
 
                           const priorVal = priorYr
-                            ? row.getValue(priorInc, priorBal, priorCf, priorKm, priorFr)
+                            ? row.getValue(
+                                priorInc,
+                                priorBal,
+                                priorCf,
+                                priorKm,
+                                priorFr,
+                                undefined,
+                                undefined,
+                                undefined,
+                                undefined,
+                                undefined,
+                                priorYr,
+                                dividendHistory,
+                                dividendMetrics,
+                                currentPrice,
+                              )
                             : undefined;
 
                           const colorClass = isNA

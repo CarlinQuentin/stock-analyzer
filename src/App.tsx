@@ -1525,6 +1525,8 @@ function App() {
             financialRatios={rawStatementData.statementData.financialRatios}
             keyMetricsTTM={(rawStatementData.statementData as any).keyMetricsTTM}
             ratiosTTM={(rawStatementData.statementData as any).ratiosTTM}
+            dividendHistory={rawStatementData.statementData.dividendHistory}
+            dividendMetrics={rawStatementData.statementData.dividendMetrics}
             symbol={result.companyProfile.symbol || result.ticker}
             companyName={result.companyProfile.companyName}
             currentPrice={result.companyProfile.price}

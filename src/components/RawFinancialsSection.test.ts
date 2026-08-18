@@ -151,6 +151,10 @@ describe("RawFinancialsSection Formatters & Data Mapping", () => {
       expect(getMetricDirection("ebitda")).toBe("higher_is_better");
       expect(getMetricDirection("ebitdaMargin")).toBe("higher_is_better");
       expect(getMetricDirection("cashAndEquivalents")).toBe("higher_is_better");
+      expect(getMetricDirection("dividendYield")).toBe("higher_is_better");
+      expect(getMetricDirection("dividendPerShare")).toBe("higher_is_better");
+      expect(getMetricDirection("annualDividendPerShare")).toBe("higher_is_better");
+      expect(getMetricDirection("dividendGrowth")).toBe("higher_is_better");
     });
 
     it("classifies Lower-is-Better metrics correctly", () => {
@@ -163,11 +167,16 @@ describe("RawFinancialsSection Formatters & Data Mapping", () => {
       expect(getMetricDirection("priceToFCF")).toBe("lower_is_better");
       expect(getMetricDirection("priceToSales")).toBe("lower_is_better");
       expect(getMetricDirection("evToEbitda")).toBe("lower_is_better");
+      expect(getMetricDirection("dividendPayoutRatio")).toBe("lower_is_better");
+      expect(getMetricDirection("dividendFcfCoverage")).toBe("lower_is_better");
     });
 
     it("classifies neutral metrics correctly", () => {
       expect(getMetricDirection("marketCapitalization")).toBe("neutral");
       expect(getMetricDirection("enterpriseValue")).toBe("neutral");
+      expect(getMetricDirection("dividendFrequency")).toBe("neutral");
+      expect(getMetricDirection("dividendsPaid")).toBe("neutral");
+      expect(getMetricDirection("specialDividend")).toBe("neutral");
     });
   });
 
@@ -227,6 +236,11 @@ describe("RawFinancialsSection Formatters & Data Mapping", () => {
         expect(color).toBe("text-slate-900 dark:text-slate-100");
       });
 
+      it("returns default neutral color for string values (e.g. Dividend Frequency)", () => {
+        const color = getMetricComparisonColor("Quarterly", "Quarterly", "neutral");
+        expect(color).toBe("text-slate-900 dark:text-slate-100");
+      });
+
       it("returns default neutral color for neutral/unclassified metrics", () => {
         const color = getMetricComparisonColor(100, 80, "neutral");
         expect(color).toBe("text-slate-900 dark:text-slate-100");
@@ -235,7 +249,7 @@ describe("RawFinancialsSection Formatters & Data Mapping", () => {
   });
 
   describe("METRIC_SECTIONS configuration", () => {
-    it("defines the 5 core financial sections in proper sequence", () => {
+    it("defines the 6 core financial sections in proper sequence including Dividends", () => {
       const sectionIds = METRIC_SECTIONS.map((s) => s.id);
       expect(sectionIds).toEqual([
         "growthAndProfitability",
@@ -243,12 +257,13 @@ describe("RawFinancialsSection Formatters & Data Mapping", () => {
         "capitalEfficiency",
         "balanceSheetAndDebt",
         "valuation",
+        "dividends",
       ]);
     });
 
-    it("contains exactly 32 high-signal financial metrics", () => {
+    it("contains exactly 41 high-signal financial metrics across all 6 sections", () => {
       const totalMetrics = METRIC_SECTIONS.reduce((sum, s) => sum + s.rows.length, 0);
-      expect(totalMetrics).toBe(32);
+      expect(totalMetrics).toBe(41);
     });
 
     it("Growth & Profitability contains the 10 required growth and margin metrics", () => {
@@ -314,6 +329,23 @@ describe("RawFinancialsSection Formatters & Data Mapping", () => {
         "Price / FCF",
         "Price / Sales",
         "EV / EBITDA",
+      ]);
+    });
+
+    it("Dividends section contains the 9 comprehensive dividend metrics", () => {
+      const divSec = METRIC_SECTIONS.find((s) => s.id === "dividends");
+      expect(divSec?.rows.length).toBe(9);
+      const labels = divSec?.rows.map((r) => r.label);
+      expect(labels).toEqual([
+        "Dividend Frequency",
+        "Dividend Yield",
+        "Dividend Per Share (DPS)",
+        "Annual Dividend Per Share",
+        "Dividend Growth",
+        "Total Dividends Paid",
+        "Dividend Payout Ratio",
+        "Dividend / FCF",
+        "Special Dividends",
       ]);
     });
   });
