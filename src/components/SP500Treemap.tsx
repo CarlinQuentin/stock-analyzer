@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { top500Service, Top500Company, Top500MarketData, isValidTop100Snapshot, MIN_TOP100_COMPANIES } from "../services/top500Service";
+import { top500Service, Top500Company, Top500MarketData, isValidTop100Snapshot } from "../services/top500Service";
 import { formatMarketCap } from "../utils/scoring";
 
 interface Top500TreemapProps {

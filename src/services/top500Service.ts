@@ -316,7 +316,7 @@ export function loadSnapshotFromLocalStorage(): MarketDataSnapshot | null {
 
 export function saveSnapshotToLocalStorage(snapshot: MarketDataSnapshot): boolean {
   if (!isValidTop100Snapshot(snapshot)) {
-    console.warn(`[Top100Db] Refusing to save incomplete snapshot (${snapshot?.companies?.length ?? 0} companies) to local storage.`);
+    console.warn(`[Top100Db] Refusing to save incomplete snapshot (${(snapshot as any)?.companies?.length ?? 0} companies) to local storage.`);
     return false;
   }
 
@@ -350,7 +350,7 @@ export async function loadSnapshotFromDb(): Promise<MarketDataSnapshot | null> {
           saveSnapshotToLocalStorage(snapshot);
           return snapshot;
         } else {
-          console.warn(`[Top100Db] Remote Supabase snapshot row contains incomplete dataset (${snapshot?.companies?.length ?? 0} companies), rejecting.`);
+          console.warn(`[Top100Db] Remote Supabase snapshot row contains incomplete dataset (${(snapshot as any)?.companies?.length ?? 0} companies), rejecting.`);
         }
       }
     } catch (e) {
@@ -364,7 +364,7 @@ export async function loadSnapshotFromDb(): Promise<MarketDataSnapshot | null> {
 
 export async function saveSnapshotToDb(snapshot: MarketDataSnapshot): Promise<boolean> {
   if (!isValidTop100Snapshot(snapshot)) {
-    console.warn(`[Top100Db] Refusing to save incomplete snapshot (${snapshot?.companies?.length ?? 0} companies) to database.`);
+    console.warn(`[Top100Db] Refusing to save incomplete snapshot (${(snapshot as any)?.companies?.length ?? 0} companies) to database.`);
     return false;
   }
 
@@ -581,9 +581,8 @@ class Top500Service {
 
     const dbSnapshot = await loadSnapshotFromDb();
     const isSnapshotValid = isValidTop100Snapshot(dbSnapshot);
-    const { isFresh, isStale } = isSnapshotValid
-      ? getSnapshotFreshness(dbSnapshot)
-      : { isFresh: false, isStale: false, ageMs: Infinity };
+    const freshness = getSnapshotFreshness(dbSnapshot);
+    const { isFresh, isStale } = freshness;
 
     // Scenario A: DB snapshot is VALID & FRESH (0 - 5 minutes old)
     if (isFresh && isSnapshotValid && dbSnapshot && !forceRefresh) {

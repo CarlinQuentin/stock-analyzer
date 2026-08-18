@@ -2,6 +2,11 @@ import React, { useState, useMemo, useEffect } from "react";
 import { HistoricalPricePoint, CompanyProfile, HistoricalPeriod } from "../types";
 import { calculateStockPriceCAGR, calculateTotalReturnCAGR } from "../utils/financialCalculations";
 import { fmpService } from "../services/financialModelingPrep";
+import {
+  calculateRangeSelection,
+  RangeSelectionStats,
+  parseDateString,
+} from "../utils/chartRangeSelection";
 
 interface StockPriceChartProps {
   priceHistory: HistoricalPricePoint[];
@@ -26,13 +31,43 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
   const [intradayData, setIntradayData] = useState<HistoricalPricePoint[]>([]);
   const [isLoadingIntraday, setIsLoadingIntraday] = useState<boolean>(false);
 
+  // Range Selection States
+  const [selection, setSelection] = useState<{ startIndex: number; endIndex: number } | null>(null);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [dragStartIndex, setDragStartIndex] = useState<number | null>(null);
+  const [dragCurrentIndex, setDragCurrentIndex] = useState<number | null>(null);
+
   // Sync timeframe with selectedPeriod when global selector changes
   useEffect(() => {
     if (selectedPeriod) {
       setTimeframe(mapPeriodToTimeframe(selectedPeriod));
       setHoveredIndex(null);
+      setSelection(null);
     }
   }, [selectedPeriod]);
+
+  // Reset range selection and hover on timeframe or symbol change
+  useEffect(() => {
+    setSelection(null);
+    setIsDragging(false);
+    setDragStartIndex(null);
+    setDragCurrentIndex(null);
+    setHoveredIndex(null);
+  }, [timeframe, profile.symbol]);
+
+  // Clear selection on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelection(null);
+        setIsDragging(false);
+        setDragStartIndex(null);
+        setDragCurrentIndex(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Fetch 1D 5-minute intraday prices when 1D timeframe is selected
   useEffect(() => {
@@ -61,7 +96,7 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
     if (!priceHistory || priceHistory.length === 0) return [];
 
     const latestDateStr = priceHistory[priceHistory.length - 1].date;
-    const latestDate = new Date(latestDateStr);
+    const latestDate = parseDateString(latestDateStr);
 
     let cutoffDate = new Date(latestDate);
 
@@ -90,11 +125,11 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
         break;
     }
 
-    const filtered = priceHistory.filter((pt) => new Date(pt.date) >= cutoffDate);
+    const filtered = priceHistory.filter((pt) => parseDateString(pt.date) >= cutoffDate);
     return filtered.length > 0 ? filtered : priceHistory;
   }, [priceHistory, intradayData, timeframe]);
 
-  // Statistics for the selected timeframe
+  // Statistics for the full selected timeframe
   const stats = useMemo(() => {
     if (filteredData.length === 0) {
       const currentPrice = profile.price || 0;
@@ -126,8 +161,8 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
 
     let years = 0;
     if (startDateStr && endDateStr) {
-      const startMs = new Date(startDateStr).getTime();
-      const endMs = new Date(endDateStr).getTime();
+      const startMs = parseDateString(startDateStr).getTime();
+      const endMs = parseDateString(endDateStr).getTime();
       const diffMs = endMs - startMs;
       years = diffMs / (1000 * 60 * 60 * 24 * 365.25);
     }
@@ -183,21 +218,24 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
   const chartWidth = width - paddingLeft - paddingRight;
   const chartHeight = height - paddingTop - paddingBottom;
 
-  const activePoint = hoveredIndex !== null && filteredData[hoveredIndex]
-    ? filteredData[hoveredIndex]
-    : filteredData[filteredData.length - 1];
+  // Active hover point (when not dragging)
+  const activePoint =
+    hoveredIndex !== null && filteredData[hoveredIndex]
+      ? filteredData[hoveredIndex]
+      : filteredData[filteredData.length - 1];
 
-  const activeIndex = hoveredIndex !== null && filteredData[hoveredIndex]
-    ? hoveredIndex
-    : filteredData.length - 1;
+  const activeIndex =
+    hoveredIndex !== null && filteredData[hoveredIndex]
+      ? hoveredIndex
+      : filteredData.length - 1;
 
   // Active point stats relative to start of period
-  const activeChange = activePoint && filteredData.length > 0
-    ? activePoint.close - filteredData[0].close
-    : 0;
-  const activeChangePercent = filteredData.length > 0 && filteredData[0].close > 0
-    ? (activeChange / filteredData[0].close) * 100
-    : 0;
+  const activeChange =
+    activePoint && filteredData.length > 0 ? activePoint.close - filteredData[0].close : 0;
+  const activeChangePercent =
+    filteredData.length > 0 && filteredData[0].close > 0
+      ? (activeChange / filteredData[0].close) * 100
+      : 0;
 
   // Min and Max prices for scaling Y axis
   const { yTicks, xTicks, points } = useMemo(() => {
@@ -223,8 +261,10 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
     // Map points to SVG coordinates
     const pts = filteredData.map((d, index) => {
       const x = paddingLeft + (index / (filteredData.length - 1 || 1)) * chartWidth;
-      const y = paddingTop + chartHeight - ((d.close - paddedMin) / (paddedMax - paddedMin)) * chartHeight;
-      const volY = height - paddingBottom - ((d.volume || 0) / (maxVol || 1)) * (chartHeight * 0.22);
+      const y =
+        paddingTop + chartHeight - ((d.close - paddedMin) / (paddedMax - paddedMin)) * chartHeight;
+      const volY =
+        height - paddingBottom - ((d.volume || 0) / (maxVol || 1)) * (chartHeight * 0.22);
       return { x, y, volY, data: d, index };
     });
 
@@ -243,7 +283,7 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
       const pt = pts[idx];
       let formattedDate = "";
       if (pt && pt.data.date) {
-        const d = new Date(pt.data.date);
+        const d = parseDateString(pt.data.date);
         if (timeframe === "1D") {
           formattedDate = d.toLocaleTimeString("en-US", {
             hour: "numeric",
@@ -253,7 +293,10 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
           formattedDate = d.toLocaleDateString("en-US", {
             month: "short",
             year: timeframe === "1M" || timeframe === "3M" ? undefined : "2-digit",
-            day: timeframe === "1M" || timeframe === "3M" || timeframe === "6M" ? "numeric" : undefined,
+            day:
+              timeframe === "1M" || timeframe === "3M" || timeframe === "6M"
+                ? "numeric"
+                : undefined,
           });
         }
       }
@@ -270,10 +313,39 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
     };
   }, [filteredData, chartWidth, chartHeight, paddingLeft, paddingTop, paddingBottom, height, timeframe]);
 
+  // Real-time Range Selection calculation (during drag or when selection is active)
+  const rangeStats: RangeSelectionStats | null = useMemo(() => {
+    if (filteredData.length === 0) return null;
+
+    if (isDragging && dragStartIndex !== null && dragCurrentIndex !== null) {
+      if (dragStartIndex === dragCurrentIndex) return null;
+      return calculateRangeSelection(
+        filteredData,
+        dragStartIndex,
+        dragCurrentIndex,
+        timeframe === "1D"
+      );
+    }
+
+    if (selection !== null) {
+      return calculateRangeSelection(
+        filteredData,
+        selection.startIndex,
+        selection.endIndex,
+        timeframe === "1D"
+      );
+    }
+
+    return null;
+  }, [filteredData, isDragging, dragStartIndex, dragCurrentIndex, selection, timeframe]);
+
   // Construct SVG path strings
   const linePath = useMemo(() => {
     if (points.length === 0) return "";
-    return points.reduce((acc, pt, i) => `${acc} ${i === 0 ? "M" : "L"} ${pt.x.toFixed(2)} ${pt.y.toFixed(2)}`, "");
+    return points.reduce(
+      (acc, pt, i) => `${acc} ${i === 0 ? "M" : "L"} ${pt.x.toFixed(2)} ${pt.y.toFixed(2)}`,
+      ""
+    );
   }, [points]);
 
   const areaPath = useMemo(() => {
@@ -284,43 +356,139 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
     return `${linePath} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`;
   }, [linePath, points, paddingTop, chartHeight]);
 
-  // Handle Mouse / Touch interactions
-  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (points.length === 0) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const touchX = e.clientX - rect.left;
+  // Highlighted path segment for the selected range
+  const rangeSegmentPath = useMemo(() => {
+    if (!rangeStats || points.length === 0) return "";
+    const slice = points.slice(rangeStats.startIndex, rangeStats.endIndex + 1);
+    if (slice.length === 0) return "";
+    return slice.reduce(
+      (acc, pt, i) => `${acc} ${i === 0 ? "M" : "L"} ${pt.x.toFixed(2)} ${pt.y.toFixed(2)}`,
+      ""
+    );
+  }, [points, rangeStats]);
+
+  // Helper to find closest data point index from clientX coordinate
+  const getNearestPointIndex = (clientX: number, target: SVGSVGElement): number => {
+    if (points.length === 0) return 0;
+    const rect = target.getBoundingClientRect();
+    if (rect.width <= 0) return 0;
+    const touchX = clientX - rect.left;
     const svgX = (touchX / rect.width) * width;
 
-    // Find nearest point
     let closestIdx = 0;
     let minDistance = Infinity;
 
-    points.forEach((pt, idx) => {
-      const dist = Math.abs(pt.x - svgX);
+    for (let i = 0; i < points.length; i++) {
+      const dist = Math.abs(points[i].x - svgX);
       if (dist < minDistance) {
         minDistance = dist;
-        closestIdx = idx;
+        closestIdx = i;
       }
-    });
+    }
 
-    setHoveredIndex(closestIdx);
+    return closestIdx;
   };
 
-  const handleMouseLeave = () => {
-    setHoveredIndex(null);
+  // Pointer event handlers (unified for mouse and touch gestures)
+  const handlePointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (points.length === 0) return;
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+
+    const idx = getNearestPointIndex(e.clientX, e.currentTarget);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // Ignore if pointer capture is not supported
+    }
+
+    setIsDragging(true);
+    setDragStartIndex(idx);
+    setDragCurrentIndex(idx);
   };
 
-  const isPositiveTrend = stats.isPositive;
-  const strokeColor = isPositiveTrend ? "#10b981" : "#f43f5e"; // Emerald-500 or Rose-500
-  const gradientStart = isPositiveTrend ? "rgba(16, 185, 129, 0.35)" : "rgba(244, 63, 94, 0.35)";
-  const gradientEnd = isPositiveTrend ? "rgba(16, 185, 129, 0.0)" : "rgba(244, 63, 94, 0.0)";
+  const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (points.length === 0) return;
+    const idx = getNearestPointIndex(e.clientX, e.currentTarget);
+
+    if (isDragging && dragStartIndex !== null) {
+      setDragCurrentIndex(idx);
+    } else {
+      setHoveredIndex(idx);
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (!isDragging) return;
+
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      // Ignore
+    }
+
+    if (
+      dragStartIndex !== null &&
+      dragCurrentIndex !== null &&
+      dragStartIndex !== dragCurrentIndex
+    ) {
+      // Valid range selected!
+      setSelection({
+        startIndex: Math.min(dragStartIndex, dragCurrentIndex),
+        endIndex: Math.max(dragStartIndex, dragCurrentIndex),
+      });
+    } else if (dragStartIndex === dragCurrentIndex) {
+      // Single click without drag: clear existing range selection if any
+      if (selection !== null) {
+        setSelection(null);
+      }
+      setHoveredIndex(dragStartIndex);
+    }
+
+    setIsDragging(false);
+    setDragStartIndex(null);
+    setDragCurrentIndex(null);
+  };
+
+  const handlePointerCancel = (e: React.PointerEvent<SVGSVGElement>) => {
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      // Ignore
+    }
+    setIsDragging(false);
+    setDragStartIndex(null);
+    setDragCurrentIndex(null);
+  };
+
+  const handlePointerLeave = () => {
+    if (!isDragging) {
+      setHoveredIndex(null);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelection(null);
+    setIsDragging(false);
+    setDragStartIndex(null);
+    setDragCurrentIndex(null);
+  };
+
+  const isPositiveTrend = rangeStats ? rangeStats.isPositive : stats.isPositive;
+  const strokeColor = stats.isPositive ? "#10b981" : "#f43f5e"; // Emerald-500 or Rose-500
+  const rangeStrokeColor = isPositiveTrend ? "#10b981" : "#f43f5e";
+  const gradientStart = stats.isPositive ? "rgba(16, 185, 129, 0.35)" : "rgba(244, 63, 94, 0.35)";
+  const gradientEnd = stats.isPositive ? "rgba(16, 185, 129, 0.0)" : "rgba(244, 63, 94, 0.0)";
 
   const formatCurrency = (num: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
-      minimumFractionDigits: num < 10 ? 3 : 2,
-      maximumFractionDigits: num < 10 ? 3 : 2,
+      minimumFractionDigits: Math.abs(num) < 10 ? 3 : 2,
+      maximumFractionDigits: Math.abs(num) < 10 ? 3 : 2,
     }).format(num);
   };
 
@@ -336,7 +504,7 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
   return (
     <div className="w-full bg-white dark:bg-slate-800/90 backdrop-blur-md rounded-2xl p-4 sm:p-6 shadow-xl border border-slate-200/80 dark:border-slate-700/60 transition-all duration-300 mb-8">
       {/* Header Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-700/60">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-700/60">
         <div>
           <div className="flex items-center gap-3 mb-1">
             <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -346,45 +514,92 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
               </span>
             </h2>
           </div>
+
           <div className="flex flex-wrap items-baseline gap-2 sm:gap-3">
+            {/* Main Price Display */}
             <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              {formatCurrency(activePoint ? activePoint.close : profile.price || 0)}
+              {rangeStats
+                ? formatCurrency(rangeStats.endPrice)
+                : formatCurrency(activePoint ? activePoint.close : profile.price || 0)}
             </span>
+
+            {/* Change Badge */}
             <div
               className={`inline-flex items-center gap-1 text-xs sm:text-sm font-bold px-2.5 py-1 rounded-full ${
-                (hoveredIndex !== null ? activeChange >= 0 : stats.isPositive)
+                (rangeStats
+                  ? rangeStats.isPositive
+                  : hoveredIndex !== null
+                  ? activeChange >= 0
+                  : stats.isPositive)
                   ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50"
                   : "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800/50"
               }`}
             >
               <span>
-                {(hoveredIndex !== null ? activeChange >= 0 : stats.isPositive) ? "▲" : "▼"}
+                {(rangeStats
+                  ? rangeStats.isPositive
+                  : hoveredIndex !== null
+                  ? activeChange >= 0
+                  : stats.isPositive)
+                  ? "▲"
+                  : "▼"}
               </span>
               <span>
-                {(hoveredIndex !== null ? activeChange >= 0 : stats.isPositive) ? "+" : ""}
-                {formatCurrency(hoveredIndex !== null ? activeChange : stats.change)}
+                {(rangeStats
+                  ? rangeStats.isPositive
+                  : hoveredIndex !== null
+                  ? activeChange >= 0
+                  : stats.isPositive)
+                  ? "+"
+                  : ""}
+                {formatCurrency(
+                  rangeStats
+                    ? rangeStats.dollarChange
+                    : hoveredIndex !== null
+                    ? activeChange
+                    : stats.change
+                )}
               </span>
               <span>
                 (
-                {(hoveredIndex !== null ? activeChangePercent >= 0 : stats.isPositive) ? "+" : ""}
-                {(hoveredIndex !== null ? activeChangePercent : stats.changePercent).toFixed(2)}%)
+                {(rangeStats
+                  ? rangeStats.isPositive
+                  : hoveredIndex !== null
+                  ? activeChangePercent >= 0
+                  : stats.isPositive)
+                  ? "+"
+                  : ""}
+                {(rangeStats
+                  ? rangeStats.percentChange
+                  : hoveredIndex !== null
+                  ? activeChangePercent
+                  : stats.changePercent
+                ).toFixed(2)}
+                %)
               </span>
             </div>
 
-            {stats.priceCAGR !== null && (
-              <span
-                title="Stock price appreciation only (excluding dividends)"
-                className={`text-xs sm:text-sm font-extrabold font-mono px-2.5 py-1 rounded-full border ${
-                  stats.priceCAGR > 0
-                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800"
-                    : stats.priceCAGR < 0
-                    ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border-rose-300 dark:border-rose-800"
-                    : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300"
-                }`}
-              >
-                Annualized Return: {stats.priceCAGR > 0 ? "+" : ""}
-                {stats.priceCAGR.toFixed(2)}% / yr
+            {/* Annualized Return / Duration Tag */}
+            {rangeStats ? (
+              <span className="text-xs sm:text-sm font-bold font-mono px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                Selected Period: {rangeStats.durationFormatted}
               </span>
+            ) : (
+              stats.priceCAGR !== null && (
+                <span
+                  title="Stock price appreciation only (excluding dividends)"
+                  className={`text-xs sm:text-sm font-extrabold font-mono px-2.5 py-1 rounded-full border ${
+                    stats.priceCAGR > 0
+                      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800"
+                      : stats.priceCAGR < 0
+                      ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border-rose-300 dark:border-rose-800"
+                      : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300"
+                  }`}
+                >
+                  Annualized Return: {stats.priceCAGR > 0 ? "+" : ""}
+                  {stats.priceCAGR.toFixed(2)}% / yr
+                </span>
+              )
             )}
           </div>
         </div>
@@ -396,6 +611,7 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
               key={tf}
               onClick={() => {
                 setTimeframe(tf);
+                clearSelection();
                 setHoveredIndex(null);
               }}
               className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 min-h-[36px] flex items-center justify-center ${
@@ -410,18 +626,102 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
         </div>
       </div>
 
+      {/* Google Finance Interactive Range Selection Banner */}
+      {rangeStats ? (
+        <div className="my-3 p-3.5 sm:p-4 rounded-xl bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-blue-50/90 dark:from-slate-800/90 dark:via-indigo-950/30 dark:to-slate-800/90 border border-blue-200/80 dark:border-blue-700/60 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-2">
+              <span
+                className={`w-2.5 h-2.5 rounded-full ${
+                  isDragging ? "bg-amber-500 animate-ping" : "bg-blue-600 dark:bg-blue-400"
+                }`}
+              />
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">
+                {isDragging ? "Selecting Range" : "Selected Range"}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-100">
+              <span
+                className={`font-extrabold ${
+                  rangeStats.isPositive
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-rose-600 dark:text-rose-400"
+                }`}
+              >
+                {rangeStats.isPositive ? "+" : ""}
+                {formatCurrency(rangeStats.dollarChange)} (
+                {rangeStats.isPositive ? "+" : ""}
+                {rangeStats.percentChange.toFixed(2)}%)
+              </span>
+              <span className="text-slate-400 dark:text-slate-500">·</span>
+              <span className="text-slate-700 dark:text-slate-200">
+                {rangeStats.dateRangeFormatted}
+              </span>
+              <span className="text-slate-400 dark:text-slate-500">·</span>
+              <span className="text-slate-600 dark:text-slate-300 font-mono">
+                {rangeStats.durationFormatted}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 self-end sm:self-auto">
+            <div className="text-right hidden md:block">
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                {formatCurrency(rangeStats.startPrice)} → {formatCurrency(rangeStats.endPrice)}
+              </div>
+            </div>
+
+            <button
+              onClick={clearSelection}
+              aria-label="Clear range selection"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white/90 dark:bg-slate-700/90 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 shadow-sm transition-all hover:scale-105 active:scale-95"
+            >
+              <span>✕</span>
+              <span>Clear Selection</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between my-2 text-[11px] text-slate-400 dark:text-slate-500">
+          <div className="flex items-center gap-1.5">
+            <svg
+              className="w-3.5 h-3.5 text-blue-500/80 dark:text-blue-400/80"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+              />
+            </svg>
+            <span>Click &amp; drag anywhere across chart to measure price changes &amp; date ranges</span>
+          </div>
+          {hoveredIndex !== null && (
+            <span className="hidden sm:inline font-mono">
+              {filteredData[activeIndex]?.date} · {formatCurrency(filteredData[activeIndex]?.close || 0)}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Range Quick Metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 py-4 my-2 border-b border-slate-100 dark:border-slate-700/60 text-xs">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 py-3 my-1 border-y border-slate-100 dark:border-slate-700/60 text-xs">
         <div>
           <span
-            title="Stock price appreciation only (excluding dividends)"
+            title="Starting price for the active period"
             className="text-slate-500 dark:text-slate-400 block mb-0.5 font-medium cursor-help"
           >
-            Annualized Return ({timeframe})
+            {rangeStats ? "Start Price" : `Annualized Return (${timeframe})`}
           </span>
           <span
             className={`font-extrabold text-sm font-mono ${
-              stats.priceCAGR === null
+              rangeStats
+                ? "text-slate-800 dark:text-slate-200"
+                : stats.priceCAGR === null
                 ? "text-slate-500"
                 : stats.priceCAGR > 0
                 ? "text-emerald-600 dark:text-emerald-400"
@@ -430,25 +730,31 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
                 : "text-slate-700 dark:text-slate-300"
             }`}
           >
-            {stats.priceCAGR !== null
+            {rangeStats
+              ? formatCurrency(rangeStats.startPrice)
+              : stats.priceCAGR !== null
               ? `${stats.priceCAGR > 0 ? "+" : ""}${stats.priceCAGR.toFixed(2)}% / yr`
               : "N/A"}
           </span>
           <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
-            Price Only
+            {rangeStats ? rangeStats.startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Price Only"}
           </span>
         </div>
+
         <div>
           <span
-            title="Includes dividends with reinvestment using adjusted closing prices"
-            className="text-slate-500 dark:text-slate-400 block mb-0.5 font-medium cursor-help flex items-center gap-1"
+            title="Ending price for the active period"
+            className="text-slate-500 dark:text-slate-400 block mb-0.5 font-medium cursor-help"
           >
-            <span>Total Return</span>
-            <span className="text-[10px] text-blue-500 font-bold">ℹ</span>
+            {rangeStats ? "End Price" : "Total Return"}
           </span>
           <span
             className={`font-extrabold text-sm font-mono ${
-              stats.totalReturnCAGR === null
+              rangeStats
+                ? rangeStats.isPositive
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-rose-600 dark:text-rose-400"
+                : stats.totalReturnCAGR === null
                 ? "text-slate-400 dark:text-slate-500"
                 : stats.totalReturnCAGR > 0
                 ? "text-blue-600 dark:text-blue-400"
@@ -457,38 +763,60 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
                 : "text-slate-700 dark:text-slate-300"
             }`}
           >
-            {stats.totalReturnCAGR !== null
+            {rangeStats
+              ? formatCurrency(rangeStats.endPrice)
+              : stats.totalReturnCAGR !== null
               ? `${stats.totalReturnCAGR > 0 ? "+" : ""}${stats.totalReturnCAGR.toFixed(2)}% / yr`
               : "N/A"}
           </span>
           <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
-            Incl. Dividends
+            {rangeStats ? rangeStats.endDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Incl. Dividends"}
           </span>
         </div>
-        <div>
-          <span className="text-slate-500 dark:text-slate-400 block mb-0.5">High ({timeframe})</span>
-          <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm">
-            {formatCurrency(stats.high)}
-          </span>
-        </div>
-        <div>
-          <span className="text-slate-500 dark:text-slate-400 block mb-0.5">Low ({timeframe})</span>
-          <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm">
-            {formatCurrency(stats.low)}
-          </span>
-        </div>
-        <div>
-          <span className="text-slate-500 dark:text-slate-400 block mb-0.5">Avg Volume ({timeframe})</span>
-          <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm">
-            {formatVolume(stats.avgVolume)}
-          </span>
-        </div>
+
         <div>
           <span className="text-slate-500 dark:text-slate-400 block mb-0.5">
-            {hoveredIndex !== null ? "Selected Volume" : "Latest Volume"}
+            {rangeStats ? "Range High" : `High (${timeframe})`}
           </span>
-          <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm">
-            {formatVolume(activePoint?.volume || 0)}
+          <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm font-mono">
+            {formatCurrency(rangeStats ? rangeStats.high : stats.high)}
+          </span>
+        </div>
+
+        <div>
+          <span className="text-slate-500 dark:text-slate-400 block mb-0.5">
+            {rangeStats ? "Range Low" : `Low (${timeframe})`}
+          </span>
+          <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm font-mono">
+            {formatCurrency(rangeStats ? rangeStats.low : stats.low)}
+          </span>
+        </div>
+
+        <div>
+          <span className="text-slate-500 dark:text-slate-400 block mb-0.5">
+            {rangeStats ? "Range Volume" : `Avg Volume (${timeframe})`}
+          </span>
+          <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm font-mono">
+            {formatVolume(rangeStats ? rangeStats.totalVolume : stats.avgVolume)}
+          </span>
+        </div>
+
+        <div>
+          <span className="text-slate-500 dark:text-slate-400 block mb-0.5">
+            {rangeStats
+              ? rangeStats.cagr !== null
+                ? "Range CAGR"
+                : "Range Data Points"
+              : hoveredIndex !== null
+              ? "Selected Volume"
+              : "Latest Volume"}
+          </span>
+          <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm font-mono">
+            {rangeStats
+              ? rangeStats.cagr !== null
+                ? `${rangeStats.cagr > 0 ? "+" : ""}${rangeStats.cagr.toFixed(2)}% / yr`
+                : `${rangeStats.pointCount} points`
+              : formatVolume(activePoint?.volume || 0)}
           </span>
         </div>
       </div>
@@ -504,9 +832,9 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
           Price data unavailable for this timeframe.
         </div>
       ) : (
-        <div className="relative w-full overflow-hidden pt-2">
-          {/* Interactive Tooltip Callout */}
-          {hoveredIndex !== null && points[activeIndex] && (
+        <div className="relative w-full overflow-hidden pt-2 select-none">
+          {/* Tooltip Callout when hovering (and not selecting range) */}
+          {!rangeStats && hoveredIndex !== null && points[activeIndex] && (
             <div
               className="absolute z-20 pointer-events-none bg-slate-900/90 text-white text-xs rounded-xl p-3 shadow-2xl border border-slate-700 backdrop-blur-md transition-all duration-75"
               style={{
@@ -517,14 +845,14 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
             >
               <div className="font-semibold text-slate-300 mb-1 border-b border-slate-700/80 pb-1">
                 {timeframe === "1D"
-                  ? new Date(activePoint.date).toLocaleString("en-US", {
+                  ? parseDateString(activePoint.date).toLocaleString("en-US", {
                       weekday: "short",
                       month: "short",
                       day: "numeric",
                       hour: "numeric",
                       minute: "2-digit",
                     })
-                  : new Date(activePoint.date).toLocaleDateString("en-US", {
+                  : parseDateString(activePoint.date).toLocaleDateString("en-US", {
                       weekday: "short",
                       month: "short",
                       day: "numeric",
@@ -539,24 +867,32 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
                 {activePoint.open && (
                   <div>
                     <span className="text-slate-400">Open:</span>{" "}
-                    <span className="font-medium text-slate-200">{formatCurrency(activePoint.open)}</span>
+                    <span className="font-medium text-slate-200">
+                      {formatCurrency(activePoint.open)}
+                    </span>
                   </div>
                 )}
                 {activePoint.high && (
                   <div>
                     <span className="text-slate-400">High:</span>{" "}
-                    <span className="font-medium text-emerald-400">{formatCurrency(activePoint.high)}</span>
+                    <span className="font-medium text-emerald-400">
+                      {formatCurrency(activePoint.high)}
+                    </span>
                   </div>
                 )}
                 {activePoint.low && (
                   <div>
                     <span className="text-slate-400">Low:</span>{" "}
-                    <span className="font-medium text-rose-400">{formatCurrency(activePoint.low)}</span>
+                    <span className="font-medium text-rose-400">
+                      {formatCurrency(activePoint.low)}
+                    </span>
                   </div>
                 )}
                 <div className="col-span-2 pt-1 border-t border-slate-800 flex justify-between">
                   <span className="text-slate-400">Volume:</span>
-                  <span className="font-medium text-slate-200">{formatVolume(activePoint.volume || 0)}</span>
+                  <span className="font-medium text-slate-200">
+                    {formatVolume(activePoint.volume || 0)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -565,46 +901,31 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
           <svg
             className="w-full h-auto cursor-crosshair touch-none select-none"
             viewBox={`0 0 ${width} ${height}`}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            onTouchStart={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const touchX = e.touches[0].clientX - rect.left;
-              const svgX = (touchX / rect.width) * width;
-              let closestIdx = 0;
-              let minDistance = Infinity;
-              points.forEach((pt, idx) => {
-                const dist = Math.abs(pt.x - svgX);
-                if (dist < minDistance) {
-                  minDistance = dist;
-                  closestIdx = idx;
-                }
-              });
-              setHoveredIndex(closestIdx);
-            }}
-            onTouchMove={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const touchX = e.touches[0].clientX - rect.left;
-              const svgX = (touchX / rect.width) * width;
-              let closestIdx = 0;
-              let minDistance = Infinity;
-              points.forEach((pt, idx) => {
-                const dist = Math.abs(pt.x - svgX);
-                if (dist < minDistance) {
-                  minDistance = dist;
-                  closestIdx = idx;
-                }
-              });
-              setHoveredIndex(closestIdx);
-            }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+            onPointerLeave={handlePointerLeave}
           >
             <defs>
               <linearGradient id="priceAreaGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={gradientStart} />
                 <stop offset="100%" stopColor={gradientEnd} />
               </linearGradient>
+              <linearGradient id="rangeGainGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="rgba(16, 185, 129, 0.28)" />
+                <stop offset="100%" stopColor="rgba(16, 185, 129, 0.05)" />
+              </linearGradient>
+              <linearGradient id="rangeLossGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="rgba(244, 63, 94, 0.28)" />
+                <stop offset="100%" stopColor="rgba(244, 63, 94, 0.05)" />
+              </linearGradient>
               <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
                 <feGaussianBlur stdDeviation="1" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+              <filter id="rangeGlow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="2" result="blur" />
                 <feComposite in="SourceGraphic" in2="blur" operator="over" />
               </filter>
             </defs>
@@ -626,7 +947,7 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
                   x={width - paddingRight + 8}
                   y={tick.y + 4}
                   fill="currentColor"
-                  className="text-[10px] font-medium text-slate-400 dark:text-slate-500 fill-current"
+                  className="text-[10px] font-medium text-slate-400 dark:text-slate-500 fill-current font-mono"
                 >
                   {formatCurrency(tick.val)}
                 </text>
@@ -635,9 +956,14 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
 
             {/* Volume Bars at Bottom */}
             {points.map((pt, i) => {
-              const barHeight = Math.max(2, (height - paddingBottom) - pt.volY);
+              const barHeight = Math.max(2, height - paddingBottom - pt.volY);
               const barWidth = Math.max(1, (chartWidth / points.length) * 0.65);
               const isUpDay = i > 0 ? pt.data.close >= points[i - 1].data.close : true;
+              const isInRange =
+                rangeStats &&
+                i >= rangeStats.startIndex &&
+                i <= rangeStats.endIndex;
+
               return (
                 <rect
                   key={`vol-${i}`}
@@ -645,7 +971,15 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
                   y={pt.volY}
                   width={barWidth}
                   height={barHeight}
-                  fill={isUpDay ? "rgba(16, 185, 129, 0.25)" : "rgba(244, 63, 94, 0.25)"}
+                  fill={
+                    isInRange
+                      ? rangeStats.isPositive
+                        ? "rgba(16, 185, 129, 0.6)"
+                        : "rgba(244, 63, 94, 0.6)"
+                      : isUpDay
+                      ? "rgba(16, 185, 129, 0.25)"
+                      : "rgba(244, 63, 94, 0.25)"
+                  }
                   rx="0.5"
                 />
               );
@@ -660,18 +994,112 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
               />
             )}
 
-            {/* Price Stroke Line */}
+            {/* Base Price Line */}
             {linePath && (
               <path
                 d={linePath}
                 fill="none"
                 stroke={strokeColor}
-                strokeWidth="1.5"
+                strokeWidth={rangeStats ? "1.2" : "1.5"}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                filter="url(#glow)"
-                className="transition-all duration-300"
+                opacity={rangeStats ? 0.45 : 1}
+                filter={rangeStats ? undefined : "url(#glow)"}
+                className="transition-all duration-200"
               />
+            )}
+
+            {/* Selected Range Visual Region */}
+            {rangeStats && points[rangeStats.startIndex] && points[rangeStats.endIndex] && (
+              <g>
+                {/* Highlighted Shaded Region */}
+                <rect
+                  x={points[rangeStats.startIndex].x}
+                  y={paddingTop}
+                  width={Math.max(
+                    2,
+                    points[rangeStats.endIndex].x - points[rangeStats.startIndex].x
+                  )}
+                  height={chartHeight}
+                  fill={
+                    rangeStats.isPositive
+                      ? "url(#rangeGainGradient)"
+                      : "url(#rangeLossGradient)"
+                  }
+                  className="transition-all duration-150"
+                />
+
+                {/* Highlighted Curve Segment within selected range */}
+                {rangeSegmentPath && (
+                  <path
+                    d={rangeSegmentPath}
+                    fill="none"
+                    stroke={rangeStrokeColor}
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    filter="url(#rangeGlow)"
+                  />
+                )}
+
+                {/* Left (Start) Boundary Line */}
+                <line
+                  x1={points[rangeStats.startIndex].x}
+                  y1={paddingTop}
+                  x2={points[rangeStats.startIndex].x}
+                  y2={height - paddingBottom}
+                  stroke={rangeStrokeColor}
+                  strokeWidth="1.5"
+                  strokeDasharray="3 3"
+                  opacity="0.9"
+                />
+
+                {/* Right (End) Boundary Line */}
+                <line
+                  x1={points[rangeStats.endIndex].x}
+                  y1={paddingTop}
+                  x2={points[rangeStats.endIndex].x}
+                  y2={height - paddingBottom}
+                  stroke={rangeStrokeColor}
+                  strokeWidth="1.5"
+                  strokeDasharray="3 3"
+                  opacity="0.9"
+                />
+
+                {/* Start Point Marker on Curve */}
+                <circle
+                  cx={points[rangeStats.startIndex].x}
+                  cy={points[rangeStats.startIndex].y}
+                  r="6"
+                  fill={rangeStrokeColor}
+                  opacity="0.35"
+                />
+                <circle
+                  cx={points[rangeStats.startIndex].x}
+                  cy={points[rangeStats.startIndex].y}
+                  r="3.5"
+                  fill="#ffffff"
+                  stroke={rangeStrokeColor}
+                  strokeWidth="2"
+                />
+
+                {/* End Point Marker on Curve */}
+                <circle
+                  cx={points[rangeStats.endIndex].x}
+                  cy={points[rangeStats.endIndex].y}
+                  r="6"
+                  fill={rangeStrokeColor}
+                  opacity="0.35"
+                />
+                <circle
+                  cx={points[rangeStats.endIndex].x}
+                  cy={points[rangeStats.endIndex].y}
+                  r="3.5"
+                  fill="#ffffff"
+                  stroke={rangeStrokeColor}
+                  strokeWidth="2"
+                />
+              </g>
             )}
 
             {/* X Axis Date Labels */}
@@ -698,8 +1126,8 @@ export const StockPriceChart: React.FC<StockPriceChartProps> = ({
               </g>
             ))}
 
-            {/* Active Hover Crosshair Line & Point */}
-            {hoveredIndex !== null && points[activeIndex] && (
+            {/* Active Hover Crosshair Line & Point (when not range selecting) */}
+            {!rangeStats && hoveredIndex !== null && points[activeIndex] && (
               <g>
                 {/* Vertical Crosshair Line */}
                 <line

@@ -14,7 +14,6 @@ import {
   CACHE_TTL_MS,
   LEASE_LOCK_KEY,
   SNAPSHOT_DB_KEY,
-  MIN_TOP100_COMPANIES,
   MarketDataSnapshot,
   Top500Company,
 } from "./top500Service";
