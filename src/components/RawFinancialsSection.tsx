@@ -4,12 +4,9 @@ import { calculateFCF } from "../utils/financialCalculations";
 import { formatShortenedShareCount } from "../utils/scoring";
 import {
   determineDividendFrequency,
-  calculateAnnualRegularDPS,
   calculateSinglePaymentDPS,
-  calculateTTMAnnualDPS,
-  calculateDividendPayoutRatio,
-  calculateDividendFCFCoverage,
-  calculateSpecialDPS,
+  calculateRegularDividendYield,
+  formatDividendAmount,
 } from "../utils/dividendCalculations";
 
 export interface RawFinancialsSectionProps {
@@ -43,18 +40,12 @@ export function getMetricDirection(metricId: string, label?: string): MetricDire
     id.includes("marketcapitalization") ||
     name.includes("market cap") ||
     id.includes("enterprisevalue") ||
-    name.includes("enterprise value") ||
-    id.includes("frequency") ||
-    name.includes("frequency") ||
-    id.includes("special") ||
-    name.includes("special") ||
-    id === "dividendspaid" ||
-    name === "total dividends paid"
+    name.includes("enterprise value")
   ) {
     return "neutral";
   }
 
-  // Lower is Better (Debt, Leverage, CapEx, Solvency multiples, Valuation multiples, Payout Ratios)
+  // Lower is Better (Debt, Leverage, CapEx, Solvency multiples, Valuation multiples)
   if (
     id.includes("debt") ||
     name.includes("debt") ||
@@ -72,16 +63,12 @@ export function getMetricDirection(metricId: string, label?: string): MetricDire
     name.includes("price / sales") ||
     id.includes("evtoebitda") ||
     id.includes("ev / ebitda") ||
-    name.includes("ev / ebitda") ||
-    id.includes("payoutratio") ||
-    name.includes("payout ratio") ||
-    id.includes("dividendfcfcoverage") ||
-    name.includes("dividend / fcf")
+    name.includes("ev / ebitda")
   ) {
     return "lower_is_better";
   }
 
-  // Higher is Better (Revenues, Profits, Cash Flows, Margins, Compounding Returns, Dividends & Dividend Growth)
+  // Higher is Better (Revenues, Profits, Cash Flows, Margins, Compounding Returns)
   if (
     id.includes("revenue") ||
     name.includes("revenue") ||
@@ -110,9 +97,7 @@ export function getMetricDirection(metricId: string, label?: string): MetricDire
     id.includes("conversion") ||
     name.includes("conversion") ||
     id.includes("growth") ||
-    name.includes("growth") ||
-    id.includes("dividend") ||
-    name.includes("dividend")
+    name.includes("growth")
   ) {
     return "higher_is_better";
   }
@@ -205,12 +190,12 @@ export function formatRawEPS(val: number | null | undefined): string {
 }
 
 /**
- * Format percentage (e.g. 24.5%, -5.2%)
+ * Format percentage (e.g. 24.50%, -5.20%, 0.11%)
  */
 export function formatPercentage(val: number | null | undefined, isDecimalRatio: boolean = true): string {
   if (val === null || val === undefined || isNaN(val)) return "—";
   const num = isDecimalRatio ? val * 100 : val;
-  return `${num.toFixed(1)}%`;
+  return `${num.toFixed(2)}%`;
 }
 
 /**
@@ -255,6 +240,8 @@ function computeYoYGrowth(current?: number | null, prior?: number | null): numbe
   }
   return (current - prior) / Math.abs(prior);
 }
+
+export { formatDividendAmount };
 
 export interface MetricRowDef {
   id: string;
@@ -692,134 +679,6 @@ export const METRIC_SECTIONS: MetricSectionDef[] = [
       },
     ],
   },
-  {
-    id: "dividends",
-    title: "DIVIDENDS",
-    icon: "💰",
-    description: "Historical dividend distributions, payment frequency, yield, cash coverage, and growth trajectory",
-    rows: [
-      {
-        id: "dividendFrequency",
-        label: "Dividend Frequency",
-        description: "Standard payment schedule determined from actual historical distributions (e.g. Quarterly, Monthly, Annual)",
-        direction: "neutral",
-        getValue: (_inc, _bal, _cf, _km, _fr, _priorInc, _priorBal, _priorCf, _priorKm, _priorFr, year, divHist) =>
-          determineDividendFrequency(divHist, year),
-        getTTMValue: (_inc, _bal, _cf, _kmTTM, _frTTM, _currentPrice, _marketCap, _latestInc, _latestBal, _latestCf, divHist) =>
-          determineDividendFrequency(divHist),
-        format: (v) => (typeof v === "string" ? v : "—"),
-      },
-      {
-        id: "dividendYield",
-        label: "Dividend Yield",
-        description: "Annualized dividend payout relative to current stock price or fiscal year valuation",
-        direction: "higher_is_better",
-        getValue: (_inc, _bal, _cf, km, fr, _priorInc, _priorBal, _priorCf, _priorKm, _priorFr, year, divHist, _divMetrics, price) => {
-          const annualDPS = calculateAnnualRegularDPS(divHist, year, undefined, undefined, km, fr);
-          return fr?.dividendYield ?? km?.dividendYield ?? (price && annualDPS ? annualDPS / price : null);
-        },
-        getTTMValue: (_inc, _bal, _cf, _kmTTM, frTTM, price, _marketCap, _latestInc, _latestBal, _latestCf, divHist, divMetrics) => {
-          const annualDPS = calculateTTMAnnualDPS(divHist, frTTM, divMetrics);
-          return frTTM?.dividendYieldTTM ?? divMetrics?.dividendYield ?? (price && annualDPS ? annualDPS / price : null);
-        },
-        format: (v) => formatPercentage(v, true),
-      },
-      {
-        id: "dividendPerShare",
-        label: "Dividend Per Share (DPS)",
-        description: "Regular dividend distribution amount per payment per share",
-        direction: "higher_is_better",
-        getValue: (_inc, _bal, _cf, km, fr, _priorInc, _priorBal, _priorCf, _priorKm, _priorFr, year, divHist) =>
-          calculateSinglePaymentDPS(divHist, year, fr, km),
-        getTTMValue: (_inc, _bal, _cf, _kmTTM, frTTM, _price, _marketCap, _latestInc, _latestBal, _latestCf, divHist, divMetrics) =>
-          calculateSinglePaymentDPS(divHist, undefined, frTTM, divMetrics),
-        format: formatRawEPS,
-      },
-      {
-        id: "annualDividendPerShare",
-        label: "Annual Dividend Per Share",
-        description: "Total regular dividend distributed across the full 12-month period",
-        direction: "higher_is_better",
-        isKeyHighlight: true,
-        getValue: (inc, _bal, cf, km, fr, _priorInc, _priorBal, _priorCf, _priorKm, _priorFr, year, divHist) =>
-          calculateAnnualRegularDPS(divHist, year, cf, inc, km, fr),
-        getTTMValue: (_inc, _bal, _cf, kmTTM, frTTM, _price, _marketCap, latestInc, _latestBal, latestCf, divHist, divMetrics) =>
-          calculateTTMAnnualDPS(
-            divHist,
-            frTTM,
-            divMetrics,
-            calculateAnnualRegularDPS(divHist, undefined, latestCf, latestInc, kmTTM, frTTM),
-          ),
-        format: formatRawEPS,
-      },
-      {
-        id: "dividendGrowth",
-        label: "Dividend Growth",
-        description: "Year-over-year percentage growth rate in regular annual dividend per share",
-        direction: "higher_is_better",
-        getValue: (inc, _bal, cf, km, fr, priorInc, _priorBal, priorCf, priorKm, priorFr, year, divHist) => {
-          const curr = calculateAnnualRegularDPS(divHist, year, cf, inc, km, fr);
-          const priorYear = year !== undefined ? year - 1 : undefined;
-          const prior = calculateAnnualRegularDPS(divHist, priorYear, priorCf, priorInc, priorKm, priorFr);
-          return computeYoYGrowth(curr, prior);
-        },
-        getTTMValue: (_inc, _bal, _cf, _kmTTM, frTTM, _price, _marketCap, latestInc, _latestBal, latestCf, divHist, divMetrics) => {
-          const curr = calculateTTMAnnualDPS(divHist, frTTM, divMetrics);
-          const prior = calculateAnnualRegularDPS(
-            divHist,
-            latestInc?.date ? parseInt(latestInc.date.split("-")[0], 10) : undefined,
-            latestCf,
-            latestInc,
-          );
-          return computeYoYGrowth(curr, prior);
-        },
-        format: (v) => formatPercentage(v, true),
-      },
-      {
-        id: "dividendsPaid",
-        label: "Total Dividends Paid",
-        description: "Total cash distributed to shareholders for dividends from Cash Flow Statement",
-        direction: "neutral",
-        getValue: (_inc, _bal, cf) =>
-          cf?.dividendsPaid !== undefined && cf?.dividendsPaid !== null ? Math.abs(cf.dividendsPaid) : undefined,
-        getTTMValue: (_inc, _bal, cf) =>
-          cf?.dividendsPaid !== undefined && cf?.dividendsPaid !== null ? Math.abs(cf.dividendsPaid) : undefined,
-        format: formatRawCurrency,
-      },
-      {
-        id: "dividendPayoutRatio",
-        label: "Dividend Payout Ratio",
-        description: "Total dividends paid as a percentage of Net Income (safely omitted if unprofitable)",
-        direction: "lower_is_better",
-        getValue: (inc, _bal, cf, km, fr) => calculateDividendPayoutRatio(cf?.dividendsPaid, inc?.netIncome, fr, km),
-        getTTMValue: (inc, _bal, cf, kmTTM, frTTM) =>
-          frTTM?.dividendPayoutRatioTTM ?? calculateDividendPayoutRatio(cf?.dividendsPaid, inc?.netIncome, frTTM, kmTTM),
-        format: (v) => formatPercentage(v, true),
-      },
-      {
-        id: "dividendFcfCoverage",
-        label: "Dividend / FCF",
-        description: "Total dividends paid as a percentage of Free Cash Flow (cash generation coverage)",
-        direction: "lower_is_better",
-        getValue: (_inc, _bal, cf) =>
-          calculateDividendFCFCoverage(cf?.dividendsPaid, cf?.operatingCashFlow, cf?.capitalExpenditure),
-        getTTMValue: (_inc, _bal, cf) =>
-          calculateDividendFCFCoverage(cf?.dividendsPaid, cf?.operatingCashFlow, cf?.capitalExpenditure),
-        format: (v) => formatPercentage(v, true),
-      },
-      {
-        id: "specialDividend",
-        label: "Special Dividends",
-        description: "One-time or special non-recurring cash distributions per share (kept separate from regular dividend)",
-        direction: "neutral",
-        getValue: (_inc, _bal, _cf, _km, _fr, _priorInc, _priorBal, _priorCf, _priorKm, _priorFr, year, divHist) =>
-          calculateSpecialDPS(divHist, year),
-        getTTMValue: (_inc, _bal, _cf, _kmTTM, _frTTM, _price, _marketCap, _latestInc, _latestBal, _latestCf, divHist) =>
-          calculateSpecialDPS(divHist),
-        format: formatRawEPS,
-      },
-    ],
-  },
 ];
 
 export const RawFinancialsSection: React.FC<RawFinancialsSectionProps> = ({
@@ -839,7 +698,7 @@ export const RawFinancialsSection: React.FC<RawFinancialsSectionProps> = ({
 }) => {
   const [periodView, setPeriodView] = useState<PeriodView>("10Y");
 
-  // Extract all unique historical fiscal years across statement sources and dividend history
+  // Extract all unique historical fiscal years across statement sources
   const yearSet = new Set<number>();
 
   const extractYear = (s?: FinancialStatement | any) => {
@@ -869,10 +728,6 @@ export const RawFinancialsSection: React.FC<RawFinancialsSectionProps> = ({
     const y = extractYear(s);
     if (y) yearSet.add(y);
   });
-  dividendHistory?.forEach((s) => {
-    const y = extractYear(s);
-    if (y) yearSet.add(y);
-  });
 
   // Sort descending (most recent fiscal year first)
   const allYears = Array.from(yearSet).sort((a, b) => b - a);
@@ -892,6 +747,30 @@ export const RawFinancialsSection: React.FC<RawFinancialsSectionProps> = ({
   const latestIncome = incomeStatements && incomeStatements.length > 0 ? incomeStatements[0] : undefined;
   const latestBalance = balanceSheets && balanceSheets.length > 0 ? balanceSheets[0] : undefined;
   const latestCashFlow = cashFlowStatements && cashFlowStatements.length > 0 ? cashFlowStatements[0] : undefined;
+
+  // Current Dividend Calculations (Snapshot)
+  const frequency = determineDividendFrequency(dividendHistory);
+  const singlePaymentDPS = calculateSinglePaymentDPS(
+    dividendHistory,
+    undefined,
+    ratiosTTM,
+    dividendMetrics,
+  );
+  const regularYield = calculateRegularDividendYield(
+    singlePaymentDPS,
+    frequency,
+    currentPrice,
+    ratiosTTM?.dividendYieldTTM ?? dividendMetrics?.dividendYield,
+  );
+
+  const formattedYield =
+    regularYield !== null && regularYield !== undefined
+      ? formatPercentage(regularYield, true)
+      : "—";
+  const formattedAmount =
+    singlePaymentDPS !== null && singlePaymentDPS !== undefined
+      ? formatDividendAmount(singlePaymentDPS)
+      : "—";
 
   if (years.length === 0) {
     return (
@@ -945,7 +824,7 @@ export const RawFinancialsSection: React.FC<RawFinancialsSectionProps> = ({
         </div>
       </div>
 
-      {/* Raw Financials Table Container */}
+      {/* Raw Financials Historical Statements Table */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm overflow-hidden">
         <div className="overflow-x-auto scrollbar-thin">
           <table className="w-full text-left border-collapse text-xs sm:text-sm">
@@ -1211,6 +1090,70 @@ export const RawFinancialsSection: React.FC<RawFinancialsSectionProps> = ({
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Dedicated Current Dividends Snapshot Section */}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 p-5 sm:p-6 shadow-sm">
+        {/* Section Header */}
+        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100 dark:border-slate-700/60">
+          <span className="text-xl sm:text-2xl">💰</span>
+          <div>
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+              Dividends
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+              Current dividend yield, regular per-payment amount, and payment frequency
+            </p>
+          </div>
+        </div>
+
+        {/* 3-Column Current Dividend Summary Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* 1. Dividend Yield */}
+          <div className="bg-slate-50/80 dark:bg-slate-900/60 rounded-xl p-4 border border-slate-200/60 dark:border-slate-700/50 flex flex-col justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Dividend Yield
+              </div>
+              <div className="mt-2 text-2xl font-bold font-mono text-slate-900 dark:text-white">
+                {formattedYield}
+              </div>
+            </div>
+            <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+              Annualized regular dividend as a percentage of current stock price
+            </div>
+          </div>
+
+          {/* 2. Dividend Amount */}
+          <div className="bg-slate-50/80 dark:bg-slate-900/60 rounded-xl p-4 border border-slate-200/60 dark:border-slate-700/50 flex flex-col justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Dividend Amount
+              </div>
+              <div className="mt-2 text-2xl font-bold font-mono text-slate-900 dark:text-white whitespace-nowrap">
+                {formattedAmount}
+              </div>
+            </div>
+            <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+              Regular dividend paid per share
+            </div>
+          </div>
+
+          {/* 3. Dividend Frequency */}
+          <div className="bg-slate-50/80 dark:bg-slate-900/60 rounded-xl p-4 border border-slate-200/60 dark:border-slate-700/50 flex flex-col justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Dividend Frequency
+              </div>
+              <div className="mt-2 text-2xl font-bold font-mono text-slate-900 dark:text-white">
+                {frequency}
+              </div>
+            </div>
+            <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+              How frequently the company pays its regular dividend
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -6,6 +6,7 @@ import {
   formatRatio,
   formatShareCount,
   formatPeriodDate,
+  formatDividendAmount,
   getMetricDirection,
   getMetricComparisonColor,
   METRIC_SECTIONS,
@@ -71,16 +72,33 @@ describe("RawFinancialsSection Formatters & Data Mapping", () => {
     });
   });
 
+  describe("formatDividendAmount", () => {
+    it("formats per-payment amount with / share suffix", () => {
+      expect(formatDividendAmount(0.52)).toBe("$0.52 / share");
+      expect(formatDividendAmount(0.17)).toBe("$0.17 / share");
+      expect(formatDividendAmount(2.00)).toBe("$2.00 / share");
+      expect(formatDividendAmount(0.06)).toBe("$0.06 / share");
+    });
+
+    it("formats zero and missing values", () => {
+      expect(formatDividendAmount(0)).toBe("$0.00 / share");
+      expect(formatDividendAmount(null)).toBe("—");
+      expect(formatDividendAmount(undefined)).toBe("—");
+    });
+  });
+
   describe("formatPercentage", () => {
-    it("formats decimal ratios as percentages", () => {
-      expect(formatPercentage(0.245, true)).toBe("24.5%");
-      expect(formatPercentage(-0.052, true)).toBe("-5.2%");
-      expect(formatPercentage(0, true)).toBe("0.0%");
+    it("formats decimal ratios as percentages with 2 decimal places (e.g. 0.11%, 2.84%)", () => {
+      expect(formatPercentage(0.0011, true)).toBe("0.11%");
+      expect(formatPercentage(0.0284, true)).toBe("2.84%");
+      expect(formatPercentage(0.245, true)).toBe("24.50%");
+      expect(formatPercentage(-0.052, true)).toBe("-5.20%");
+      expect(formatPercentage(0, true)).toBe("0.00%");
     });
 
     it("formats whole percentages directly", () => {
-      expect(formatPercentage(24.5, false)).toBe("24.5%");
-      expect(formatPercentage(100, false)).toBe("100.0%");
+      expect(formatPercentage(2.84, false)).toBe("2.84%");
+      expect(formatPercentage(100, false)).toBe("100.00%");
     });
 
     it("returns — for invalid values", () => {
@@ -151,10 +169,6 @@ describe("RawFinancialsSection Formatters & Data Mapping", () => {
       expect(getMetricDirection("ebitda")).toBe("higher_is_better");
       expect(getMetricDirection("ebitdaMargin")).toBe("higher_is_better");
       expect(getMetricDirection("cashAndEquivalents")).toBe("higher_is_better");
-      expect(getMetricDirection("dividendYield")).toBe("higher_is_better");
-      expect(getMetricDirection("dividendPerShare")).toBe("higher_is_better");
-      expect(getMetricDirection("annualDividendPerShare")).toBe("higher_is_better");
-      expect(getMetricDirection("dividendGrowth")).toBe("higher_is_better");
     });
 
     it("classifies Lower-is-Better metrics correctly", () => {
@@ -167,16 +181,11 @@ describe("RawFinancialsSection Formatters & Data Mapping", () => {
       expect(getMetricDirection("priceToFCF")).toBe("lower_is_better");
       expect(getMetricDirection("priceToSales")).toBe("lower_is_better");
       expect(getMetricDirection("evToEbitda")).toBe("lower_is_better");
-      expect(getMetricDirection("dividendPayoutRatio")).toBe("lower_is_better");
-      expect(getMetricDirection("dividendFcfCoverage")).toBe("lower_is_better");
     });
 
     it("classifies neutral metrics correctly", () => {
       expect(getMetricDirection("marketCapitalization")).toBe("neutral");
       expect(getMetricDirection("enterpriseValue")).toBe("neutral");
-      expect(getMetricDirection("dividendFrequency")).toBe("neutral");
-      expect(getMetricDirection("dividendsPaid")).toBe("neutral");
-      expect(getMetricDirection("specialDividend")).toBe("neutral");
     });
   });
 
@@ -236,7 +245,7 @@ describe("RawFinancialsSection Formatters & Data Mapping", () => {
         expect(color).toBe("text-slate-900 dark:text-slate-100");
       });
 
-      it("returns default neutral color for string values (e.g. Dividend Frequency)", () => {
+      it("returns default neutral color for string values", () => {
         const color = getMetricComparisonColor("Quarterly", "Quarterly", "neutral");
         expect(color).toBe("text-slate-900 dark:text-slate-100");
       });
@@ -249,7 +258,7 @@ describe("RawFinancialsSection Formatters & Data Mapping", () => {
   });
 
   describe("METRIC_SECTIONS configuration", () => {
-    it("defines the 6 core financial sections in proper sequence including Dividends", () => {
+    it("defines the 5 core financial statement sections in proper sequence", () => {
       const sectionIds = METRIC_SECTIONS.map((s) => s.id);
       expect(sectionIds).toEqual([
         "growthAndProfitability",
@@ -257,13 +266,12 @@ describe("RawFinancialsSection Formatters & Data Mapping", () => {
         "capitalEfficiency",
         "balanceSheetAndDebt",
         "valuation",
-        "dividends",
       ]);
     });
 
-    it("contains exactly 41 high-signal financial metrics across all 6 sections", () => {
+    it("contains exactly 32 high-signal financial metrics across the 5 historical sections", () => {
       const totalMetrics = METRIC_SECTIONS.reduce((sum, s) => sum + s.rows.length, 0);
-      expect(totalMetrics).toBe(41);
+      expect(totalMetrics).toBe(32);
     });
 
     it("Growth & Profitability contains the 10 required growth and margin metrics", () => {
@@ -329,23 +337,6 @@ describe("RawFinancialsSection Formatters & Data Mapping", () => {
         "Price / FCF",
         "Price / Sales",
         "EV / EBITDA",
-      ]);
-    });
-
-    it("Dividends section contains the 9 comprehensive dividend metrics", () => {
-      const divSec = METRIC_SECTIONS.find((s) => s.id === "dividends");
-      expect(divSec?.rows.length).toBe(9);
-      const labels = divSec?.rows.map((r) => r.label);
-      expect(labels).toEqual([
-        "Dividend Frequency",
-        "Dividend Yield",
-        "Dividend Per Share (DPS)",
-        "Annual Dividend Per Share",
-        "Dividend Growth",
-        "Total Dividends Paid",
-        "Dividend Payout Ratio",
-        "Dividend / FCF",
-        "Special Dividends",
       ]);
     });
   });

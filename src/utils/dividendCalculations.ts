@@ -1,5 +1,4 @@
-import { FinancialStatement, DividendMetrics } from "../types";
-import { calculateFCF } from "./financialCalculations";
+import { DividendMetrics } from "../types";
 
 /**
  * Checks if a dividend record is classified as a Special or One-time dividend.
@@ -20,33 +19,30 @@ export function isSpecialDividend(divEvent: any): boolean {
 }
 
 /**
- * Extracts and separates regular and special dividends for a specific calendar year.
+ * Extracts regular dividend payments for a specific calendar year.
  */
 export function filterDividendsForYear(
   dividendHistory: any[] | null | undefined,
   year: number,
-): { regular: any[]; special: any[] } {
+): any[] {
   if (!dividendHistory || !Array.isArray(dividendHistory) || dividendHistory.length === 0) {
-    return { regular: [], special: [] };
+    return [];
   }
 
   const regular: any[] = [];
-  const special: any[] = [];
 
   dividendHistory.forEach((d) => {
     if (!d || !d.date) return;
     const yrStr = String(d.date).split("-")[0];
     const yrNum = parseInt(yrStr, 10);
     if (yrNum === year) {
-      if (isSpecialDividend(d)) {
-        special.push(d);
-      } else {
+      if (!isSpecialDividend(d)) {
         regular.push(d);
       }
     }
   });
 
-  return { regular, special };
+  return regular;
 }
 
 /**
@@ -63,14 +59,16 @@ export function determineDividendFrequency(
   }
 
   // Filter out special dividends for frequency detection
-  const regularDivs = dividendHistory.filter((d) => !isSpecialDividend(d) && (d.dividend > 0 || d.adjDividend > 0));
+  const regularDivs = dividendHistory.filter(
+    (d) => !isSpecialDividend(d) && (d.dividend > 0 || d.adjDividend > 0),
+  );
   if (regularDivs.length === 0) {
     return "None";
   }
 
   if (targetYear !== undefined && targetYear !== null) {
-    const { regular } = filterDividendsForYear(dividendHistory, targetYear);
-    const count = regular.filter((d) => (d.dividend > 0 || d.adjDividend > 0)).length;
+    const regular = filterDividendsForYear(dividendHistory, targetYear);
+    const count = regular.filter((d) => d.dividend > 0 || d.adjDividend > 0).length;
     if (count === 0) {
       return "None";
     }
@@ -117,52 +115,8 @@ export function determineDividendFrequency(
 }
 
 /**
- * Calculates the total regular dividend paid per share for a specific fiscal/calendar year.
- * Prevents special dividends from inflating annual regular totals.
- */
-export function calculateAnnualRegularDPS(
-  dividendHistory: any[] | null | undefined,
-  year?: number | null,
-  cf?: FinancialStatement,
-  inc?: FinancialStatement,
-  km?: any,
-  fr?: any,
-): number | null {
-  if (dividendHistory && Array.isArray(dividendHistory) && dividendHistory.length > 0 && year !== undefined && year !== null) {
-    const { regular } = filterDividendsForYear(dividendHistory, year);
-    if (regular.length > 0) {
-      const sum = regular.reduce((acc, d) => {
-        const val = typeof d.dividend === "number" ? d.dividend : typeof d.adjDividend === "number" ? d.adjDividend : 0;
-        return acc + val;
-      }, 0);
-      return Math.round(sum * 10000) / 10000;
-    }
-    // If dividend history is active but had 0 payments this year, annual DPS is $0.00
-    const allRegular = dividendHistory.filter((d) => !isSpecialDividend(d));
-    if (allRegular.length > 0) {
-      return 0;
-    }
-  }
-
-  // Fallback to Statement / Key Metrics data
-  if (km?.dividendPerShare !== undefined && km?.dividendPerShare !== null) {
-    return km.dividendPerShare;
-  }
-  if (fr?.dividendPerShare !== undefined && fr?.dividendPerShare !== null) {
-    return fr.dividendPerShare;
-  }
-  if (cf?.dividendsPaid !== undefined && cf.dividendsPaid !== null && cf.dividendsPaid !== 0) {
-    const shares = inc?.weightedAverageShsOutDil || inc?.weightedAverageShsOut || inc?.shares;
-    if (shares && shares > 0) {
-      return Math.abs(cf.dividendsPaid) / shares;
-    }
-  }
-
-  return null;
-}
-
-/**
- * Calculates the latest single regular dividend payment amount per share.
+ * Calculates the regular dividend distribution amount paid per share per payment.
+ * e.g. $0.52 for a quarterly payer.
  */
 export function calculateSinglePaymentDPS(
   dividendHistory: any[] | null | undefined,
@@ -172,10 +126,12 @@ export function calculateSinglePaymentDPS(
 ): number | null {
   if (dividendHistory && Array.isArray(dividendHistory) && dividendHistory.length > 0) {
     if (year !== undefined && year !== null) {
-      const { regular } = filterDividendsForYear(dividendHistory, year);
+      const regular = filterDividendsForYear(dividendHistory, year);
       if (regular.length > 0) {
         // Take the latest regular payment in that year
-        const latestInYear = regular.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+        const latestInYear = regular.sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+        )[0];
         const val = typeof latestInYear.dividend === "number" ? latestInYear.dividend : latestInYear.adjDividend;
         return val !== undefined ? val : null;
       }
@@ -194,7 +150,7 @@ export function calculateSinglePaymentDPS(
     }
   }
 
-  // Fallback: if annual DPS is available and quarterly frequency assumed
+  // Fallback: if single per-share amount is provided in metrics
   if (dividendMetrics?.dividendPerShare !== undefined && dividendMetrics.dividendPerShare !== null) {
     return dividendMetrics.dividendPerShare;
   }
@@ -206,133 +162,59 @@ export function calculateSinglePaymentDPS(
 }
 
 /**
- * Calculates the TTM Annual Regular Dividend Per Share.
+ * Returns annual multiplier for payment frequency (Quarterly: 4, Monthly: 12, Semi-Annual: 2, Annual: 1).
  */
-export function calculateTTMAnnualDPS(
-  dividendHistory: any[] | null | undefined,
-  ratiosTTM?: any,
-  dividendMetrics?: DividendMetrics | null,
-  latestFY_DPS?: number | null,
-): number | null {
-  if (dividendHistory && Array.isArray(dividendHistory) && dividendHistory.length > 0) {
-    const regular = dividendHistory.filter((d) => !isSpecialDividend(d));
-    if (regular.length > 0) {
-      // Look at payments in the last 365 days from the latest payment date
-      const sorted = [...regular].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      const latestDate = new Date(sorted[0].date).getTime();
-      const oneYearAgo = latestDate - 365 * 24 * 60 * 60 * 1000;
-
-      const ttmPayments = sorted.filter((d) => new Date(d.date).getTime() >= oneYearAgo);
-      if (ttmPayments.length > 0) {
-        const sum = ttmPayments.reduce((acc, d) => {
-          const val = typeof d.dividend === "number" ? d.dividend : typeof d.adjDividend === "number" ? d.adjDividend : 0;
-          return acc + val;
-        }, 0);
-        return Math.round(sum * 10000) / 10000;
-      }
-    }
-  }
-
-  if (ratiosTTM?.dividendPerShareTTM !== undefined && ratiosTTM.dividendPerShareTTM !== null) {
-    return ratiosTTM.dividendPerShareTTM;
-  }
-  if (dividendMetrics?.dividendPerShare !== undefined && dividendMetrics.dividendPerShare !== null) {
-    return dividendMetrics.dividendPerShare;
-  }
-
-  return latestFY_DPS ?? null;
+export function getAnnualMultiplierForFrequency(frequency: string): number {
+  const f = frequency.toLowerCase();
+  if (f.includes("month")) return 12;
+  if (f.includes("quarter")) return 4;
+  if (f.includes("semi")) return 2;
+  if (f.includes("annual") && !f.includes("semi")) return 1;
+  return 4; // default to quarterly multiplier
 }
 
 /**
- * Calculates Dividend Payout Ratio relative to Net Income.
- * Safely returns null when Net Income is zero or negative (preventing misleading negative payout ratios).
+ * Calculates current regular annual dividend yield relative to current stock price.
+ * Annualizes the regular per-payment dividend based on frequency (e.g. Quarterly x 4, Monthly x 12).
  */
-export function calculateDividendPayoutRatio(
-  dividendsPaid: number | null | undefined,
-  netIncome: number | null | undefined,
-  fr?: any,
-  km?: any,
+export function calculateRegularDividendYield(
+  dividendAmountPerPayment: number | null | undefined,
+  frequency: string,
+  price: number | null | undefined,
+  fallbackYield?: number | null,
 ): number | null {
-  if (dividendsPaid === 0) return 0;
-
-  if (dividendsPaid !== undefined && dividendsPaid !== null && netIncome !== undefined && netIncome !== null) {
-    if (netIncome <= 0) {
-      return null; // Negative or zero net income: payout ratio is invalid / undefined
-    }
-    return Math.abs(dividendsPaid) / netIncome;
+  if (frequency === "None" || dividendAmountPerPayment === 0) {
+    return 0;
   }
 
-  if (fr?.dividendPayoutRatio !== undefined && fr?.dividendPayoutRatio !== null) {
-    return fr.dividendPayoutRatio;
+  if (
+    dividendAmountPerPayment !== null &&
+    dividendAmountPerPayment !== undefined &&
+    dividendAmountPerPayment > 0 &&
+    price !== null &&
+    price !== undefined &&
+    price > 0
+  ) {
+    const multiplier = getAnnualMultiplierForFrequency(frequency);
+    const annualizedDPS = dividendAmountPerPayment * multiplier;
+    return annualizedDPS / price;
   }
-  if (km?.payoutRatio !== undefined && km?.payoutRatio !== null) {
-    return km.payoutRatio;
-  }
-  if (fr?.payoutRatio !== undefined && fr?.payoutRatio !== null) {
-    return fr.payoutRatio;
+
+  if (fallbackYield !== undefined && fallbackYield !== null) {
+    return fallbackYield;
   }
 
   return null;
 }
 
 /**
- * Calculates Dividend / Free Cash Flow Coverage.
- * Safely returns null when Free Cash Flow is zero or negative.
+ * Formats per-share dividend amount per payment cleanly.
+ * e.g. "$0.52 / share", "$0.17 / share", "$2.00 / share"
  */
-export function calculateDividendFCFCoverage(
-  dividendsPaid: number | null | undefined,
-  operatingCashFlow: number | null | undefined,
-  capitalExpenditure: number | null | undefined,
-): number | null {
-  if (dividendsPaid === 0) return 0;
-  if (dividendsPaid === undefined || dividendsPaid === null) return null;
-
-  const fcf = calculateFCF(
-    operatingCashFlow ?? undefined,
-    capitalExpenditure ?? undefined,
-  );
-  if (fcf === null || fcf <= 0) {
-    return null; // Negative or zero FCF: dividends not covered by organic cash generation
-  }
-
-  return Math.abs(dividendsPaid) / fcf;
-}
-
-/**
- * Calculates Special / One-Time Dividend amount per share for a specific year or TTM.
- */
-export function calculateSpecialDPS(
-  dividendHistory: any[] | null | undefined,
-  year?: number | null,
-): number | null {
-  if (!dividendHistory || !Array.isArray(dividendHistory) || dividendHistory.length === 0) {
-    return null;
-  }
-
-  if (year !== undefined && year !== null) {
-    const { special } = filterDividendsForYear(dividendHistory, year);
-    if (special.length === 0) return null;
-    const sum = special.reduce((acc, d) => {
-      const val = typeof d.dividend === "number" ? d.dividend : typeof d.adjDividend === "number" ? d.adjDividend : 0;
-      return acc + val;
-    }, 0);
-    return Math.round(sum * 10000) / 10000;
-  }
-
-  // TTM Special dividends
-  const specialAll = dividendHistory.filter((d) => isSpecialDividend(d));
-  if (specialAll.length === 0) return null;
-
-  const sorted = [...specialAll].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const latestDate = new Date(sorted[0].date).getTime();
-  const oneYearAgo = latestDate - 365 * 24 * 60 * 60 * 1000;
-
-  const ttmSpecial = sorted.filter((d) => new Date(d.date).getTime() >= oneYearAgo);
-  if (ttmSpecial.length === 0) return null;
-
-  const sum = ttmSpecial.reduce((acc, d) => {
-    const val = typeof d.dividend === "number" ? d.dividend : typeof d.adjDividend === "number" ? d.adjDividend : 0;
-    return acc + val;
-  }, 0);
-  return Math.round(sum * 10000) / 10000;
+export function formatDividendAmount(val: number | null | undefined): string {
+  if (val === null || val === undefined || isNaN(val)) return "—";
+  if (val === 0) return "$0.00 / share";
+  const isNeg = val < 0;
+  const abs = Math.abs(val);
+  return `${isNeg ? "-$" : "$"}${abs.toFixed(2)} / share`;
 }
