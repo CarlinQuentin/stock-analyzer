@@ -66,13 +66,19 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     return "#ef4444"; // red-500
   };
 
-  const formatChartValue = (val: number): string => {
+  const formatChartValue = (val: number | null | undefined): string => {
+    if (val === null || val === undefined || isNaN(val)) {
+      return "N/A";
+    }
     if (chartValueType === "percent") {
       return formatPercentageMetric(val, true);
     }
     if (chartValueType === "number") {
       if (title.toLowerCase().includes("dilution") || title.toLowerCase().includes("share")) {
         return formatShortenedShareCount(val);
+      }
+      if (title.toLowerCase().includes("debt") || unit === "x") {
+        return `${val.toFixed(2)}x`;
       }
       return val.toFixed(2);
     }
@@ -130,9 +136,10 @@ export const MetricCard: React.FC<MetricCardProps> = ({
      * 3. Long-term operational consistency.
      */
     if (chartType === "bar") {
-      const values = chartData.map(d => d.value);
-      const minVal = Math.min(...values);
-      const maxVal = Math.max(...values);
+      const validBars = chartData.filter(d => typeof d.value === "number" && d.value !== null && isFinite(d.value));
+      const values = validBars.map(d => d.value as number);
+      const minVal = values.length > 0 ? Math.min(...values) : 0;
+      const maxVal = values.length > 0 ? Math.max(...values) : 0;
 
       const yMin = Math.min(0, minVal);
       const yMax = Math.max(0, maxVal);
@@ -175,8 +182,9 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           {chartData.map((item, i) => {
             const xCenter = paddingLeft + (i + 0.5) * step;
             const xLeft = xCenter - barWidth / 2;
-            const yVal = getY(item.value);
-            const isPositive = item.value > 0;
+            const val = item.value ?? 0;
+            const yVal = getY(val);
+            const isPositive = val > 0;
             const barY = isPositive ? yVal : yZero;
             const barH = Math.max(2, Math.abs(yVal - yZero));
             const barColor = isPositive ? "#10b981" : "#ef4444";
@@ -239,9 +247,12 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       );
     }
 
-    const values = chartData.map(d => d.value);
-    let minVal = Math.min(...values);
-    let maxVal = Math.max(...values);
+    const validPoints = chartData.filter(
+      (d) => typeof d.value === "number" && d.value !== null && isFinite(d.value)
+    );
+    const validValues = validPoints.map((d) => d.value as number);
+    let minVal = validValues.length > 0 ? Math.min(...validValues) : 0;
+    let maxVal = validValues.length > 0 ? Math.max(...validValues) : 5;
     if (referenceLineValue !== undefined) {
       minVal = Math.min(minVal, referenceLineValue);
       maxVal = Math.max(maxVal, referenceLineValue);
@@ -257,17 +268,23 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     const points = chartData.map((item, i) => {
       const divisor = chartData.length > 1 ? chartData.length - 1 : 1;
       const x = paddingLeft + (i / divisor) * plotWidth;
-      const val = item.value;
-      const y = height - paddingBottom - ((val - adjustedMin) / (adjustedMax - adjustedMin)) * plotHeight;
+      const isUnavailable = item.value === null || item.value === undefined || isNaN(item.value);
+      const val = isUnavailable ? null : item.value;
+      const y = isUnavailable
+        ? height - paddingBottom - 0.45 * plotHeight
+        : height - paddingBottom - ((val! - adjustedMin) / (adjustedMax - adjustedMin)) * plotHeight;
       return {
         x,
         y,
         label: item.label,
         value: item.value,
+        isUnavailable,
+        unavailableReason: item.unavailableReason,
         netIncome: item.netIncome,
         fcf: item.fcf,
         revenue: item.revenue,
         operatingIncome: item.operatingIncome,
+        netDebt: item.netDebt,
       };
     });
 
@@ -280,9 +297,10 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       strategy: "higherIsBetter" | "lowerIsBetter",
       defaultHex: string
     ): string => {
-      if (data.length < 2) return defaultHex;
-      const firstVal = data[0].value;
-      const lastVal = data[data.length - 1].value;
+      const valid = data.filter((d) => typeof d.value === "number" && d.value !== null && isFinite(d.value));
+      if (valid.length < 2) return defaultHex;
+      const firstVal = valid[0].value as number;
+      const lastVal = valid[valid.length - 1].value as number;
       if (lastVal === firstVal) return "#94a3b8"; // Neutral slate
       const isImprovement = strategy === "lowerIsBetter" 
         ? lastVal < firstVal 
@@ -296,13 +314,33 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       : defaultColorHex;
     const gradId = `chart-grad-${title.replace(/\s+/g, "")}`;
 
-    let linePath = "";
-    let areaPath = "";
-
-    if (points.length > 1) {
-      linePath = `M ${points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L ")}`;
-      areaPath = `${linePath} L ${points[points.length - 1].x.toFixed(1)},${(height - paddingBottom).toFixed(1)} L ${points[0].x.toFixed(1)},${(height - paddingBottom).toFixed(1)} Z`;
+    // Segment valid continuous points so N/A does not create spikes
+    const segments: { x: number; y: number }[][] = [];
+    let currentSegment: { x: number; y: number }[] = [];
+    points.forEach((p) => {
+      if (!p.isUnavailable && typeof p.value === "number") {
+        currentSegment.push({ x: p.x, y: p.y });
+      } else {
+        if (currentSegment.length > 0) {
+          segments.push(currentSegment);
+          currentSegment = [];
+        }
+      }
+    });
+    if (currentSegment.length > 0) {
+      segments.push(currentSegment);
     }
+
+    const linePaths = segments
+      .filter((seg) => seg.length > 1)
+      .map((seg) => `M ${seg.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L ")}`);
+
+    const areaPaths = segments
+      .filter((seg) => seg.length > 1)
+      .map((seg) => {
+        const line = `M ${seg.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L ")}`;
+        return `${line} L ${seg[seg.length - 1].x.toFixed(1)},${(height - paddingBottom).toFixed(1)} L ${seg[0].x.toFixed(1)},${(height - paddingBottom).toFixed(1)} Z`;
+      });
 
     const formatHelperCurrency = (v: number | undefined): string => {
       if (v === undefined || isNaN(v)) return "N/A";
@@ -367,45 +405,62 @@ export const MetricCard: React.FC<MetricCardProps> = ({
         )}
 
         {/* Filled Area */}
-        {points.length > 1 && <path d={areaPath} fill={`url(#${gradId})`} />}
+        {areaPaths.map((ap, idx) => (
+          <path key={idx} d={ap} fill={`url(#${gradId})`} />
+        ))}
 
         {/* Line */}
-        {points.length > 1 && (
+        {linePaths.map((lp, idx) => (
           <path 
-            d={linePath} 
+            key={idx}
+            d={lp} 
             fill="none" 
             stroke={colorHex} 
             strokeWidth="2.5" 
             strokeLinecap="round" 
             strokeLinejoin="round" 
           />
-        )}
+        ))}
 
         {/* Dots, Node Labels, and Interactive Tooltips */}
         {points.map((p, i) => {
           const hasFCFDetails = p.netIncome !== undefined && p.fcf !== undefined;
           const hasMarginDetails = p.revenue !== undefined && p.operatingIncome !== undefined;
+          const isNetDebtMetric = title.toLowerCase().includes("debt") || (p.netDebt !== undefined && p.fcf !== undefined);
 
           return (
             <g key={i} className="group/node cursor-pointer">
               {/* Direct Value Label above the dot */}
               <text 
                 x={p.x} 
-                y={p.y - 7} 
+                y={p.isUnavailable ? p.y - 8 : p.y - 7} 
                 textAnchor="middle" 
-                className="text-[9px] font-bold fill-slate-700 dark:fill-slate-200"
+                className={`text-[9px] font-bold ${p.isUnavailable ? "fill-slate-400 dark:fill-slate-500" : "fill-slate-700 dark:fill-slate-200"}`}
               >
-                {formatChartValue(p.value)}
+                {p.isUnavailable ? "N/A" : formatChartValue(p.value)}
               </text>
               
               {/* Dot */}
-              <circle 
-                cx={p.x} 
-                cy={p.y} 
-                r="4" 
-                fill={colorHex} 
-                className="stroke-white dark:stroke-slate-800 stroke-[2px] group-hover/node:r-6 transition-all"
-              />
+              {p.isUnavailable ? (
+                <circle 
+                  cx={p.x} 
+                  cy={p.y} 
+                  r="4" 
+                  fill="none" 
+                  stroke="#94a3b8" 
+                  strokeWidth="2" 
+                  strokeDasharray="2,2" 
+                  className="group-hover/node:r-6 transition-all"
+                />
+              ) : (
+                <circle 
+                  cx={p.x} 
+                  cy={p.y} 
+                  r="4" 
+                  fill={colorHex} 
+                  className="stroke-white dark:stroke-slate-800 stroke-[2px] group-hover/node:r-6 transition-all"
+                />
+              )}
               
               {/* Year Label below the plot area */}
               <text 
@@ -418,62 +473,150 @@ export const MetricCard: React.FC<MetricCardProps> = ({
               </text>
 
               {/* Enhanced Interactive Tooltip on Hover */}
-              {(hasFCFDetails || hasMarginDetails) && (
+              {(hasFCFDetails || hasMarginDetails || isNetDebtMetric || p.isUnavailable) && (
                 <g className="opacity-0 group-hover/node:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                  <rect
-                    x={Math.max(4, Math.min(width - 130, p.x - 65))}
-                    y={Math.max(2, p.y - 48)}
-                    width={130}
-                    height={42}
-                    rx={4}
-                    className="fill-slate-900/95 dark:fill-slate-950/95 stroke-slate-700/80 shadow-md"
-                  />
-                  <text
-                    x={Math.max(4, Math.min(width - 130, p.x - 65)) + 65}
-                    y={Math.max(2, p.y - 48) + 12}
-                    textAnchor="middle"
-                    className="text-[9px] font-bold fill-white"
-                  >
-                    {p.label}: {formatChartValue(p.value)}
-                  </text>
-                  {hasFCFDetails && (
+                  {isNetDebtMetric && p.isUnavailable ? (
                     <>
+                      <rect
+                        x={Math.max(4, Math.min(width - 200, p.x - 100))}
+                        y={Math.max(2, p.y - 58)}
+                        width={200}
+                        height={52}
+                        rx={4}
+                        className="fill-slate-900/95 dark:fill-slate-950/95 stroke-slate-700/80 shadow-md"
+                      />
                       <text
-                        x={Math.max(4, Math.min(width - 130, p.x - 65)) + 65}
+                        x={Math.max(4, Math.min(width - 200, p.x - 100)) + 100}
+                        y={Math.max(2, p.y - 58) + 12}
+                        textAnchor="middle"
+                        className="text-[9px] font-bold fill-white"
+                      >
+                        {p.label}: N/A
+                      </text>
+                      <text
+                        x={Math.max(4, Math.min(width - 200, p.x - 100)) + 100}
+                        y={Math.max(2, p.y - 58) + 24}
+                        textAnchor="middle"
+                        className="text-[8px] font-bold fill-amber-400"
+                      >
+                        ● {p.fcf === 0 ? "N/A — Zero FCF" : "N/A — Negative FCF"}
+                      </text>
+                      <text
+                        x={Math.max(4, Math.min(width - 200, p.x - 100)) + 100}
+                        y={Math.max(2, p.y - 58) + 35}
+                        textAnchor="middle"
+                        className="text-[7.5px] font-normal fill-slate-300"
+                      >
+                        {p.fcf === 0
+                          ? "Net Debt / FCF cannot be calculated when Free Cash Flow is zero."
+                          : "Net Debt / FCF cannot provide a meaningful ratio when Free Cash Flow is zero or negative."}
+                      </text>
+                      {p.fcf !== undefined && p.netDebt !== undefined && (
+                        <text
+                          x={Math.max(4, Math.min(width - 200, p.x - 100)) + 100}
+                          y={Math.max(2, p.y - 58) + 46}
+                          textAnchor="middle"
+                          className="text-[7.5px] font-medium fill-slate-400"
+                        >
+                          FCF: {formatHelperCurrency(p.fcf)} | Net Debt: {formatHelperCurrency(p.netDebt)}
+                        </text>
+                      )}
+                    </>
+                  ) : isNetDebtMetric && !p.isUnavailable ? (
+                    <>
+                      <rect
+                        x={Math.max(4, Math.min(width - 150, p.x - 75))}
+                        y={Math.max(2, p.y - 48)}
+                        width={150}
+                        height={42}
+                        rx={4}
+                        className="fill-slate-900/95 dark:fill-slate-950/95 stroke-slate-700/80 shadow-md"
+                      />
+                      <text
+                        x={Math.max(4, Math.min(width - 150, p.x - 75)) + 75}
+                        y={Math.max(2, p.y - 48) + 12}
+                        textAnchor="middle"
+                        className="text-[9px] font-bold fill-white"
+                      >
+                        {p.label}: {formatChartValue(p.value)}
+                      </text>
+                      <text
+                        x={Math.max(4, Math.min(width - 150, p.x - 75)) + 75}
                         y={Math.max(2, p.y - 48) + 24}
                         textAnchor="middle"
                         className="text-[8px] font-medium fill-slate-300"
                       >
-                        FCF: {formatHelperCurrency(p.fcf)} | Net Inc: {formatHelperCurrency(p.netIncome)}
+                        Net Debt: {formatHelperCurrency(p.netDebt)} | FCF: {formatHelperCurrency(p.fcf)}
                       </text>
                       <text
-                        x={Math.max(4, Math.min(width - 130, p.x - 65)) + 65}
+                        x={Math.max(4, Math.min(width - 150, p.x - 75)) + 75}
                         y={Math.max(2, p.y - 48) + 35}
                         textAnchor="middle"
-                        className={`text-[8px] font-semibold ${p.value >= 100 ? "fill-emerald-400" : "fill-amber-400"}`}
+                        className={`text-[8px] font-semibold ${
+                          (p.value ?? 0) <= 2.0 ? "fill-emerald-400" : (p.value ?? 0) <= 4.0 ? "fill-blue-400" : "fill-red-400"
+                        }`}
                       >
-                        ● {p.value >= 100 ? "High Quality (>=100%)" : "Lower Conversion (<100%)"}
+                        ● {(p.value ?? 0) <= 2.0 ? "Strong Coverage (<= 2.0x)" : (p.value ?? 0) <= 4.0 ? "Moderate Leverage (2.0x - 4.0x)" : "High Leverage (> 4.0x)"}
                       </text>
                     </>
-                  )}
-                  {hasMarginDetails && (
+                  ) : (
                     <>
+                      <rect
+                        x={Math.max(4, Math.min(width - 130, p.x - 65))}
+                        y={Math.max(2, p.y - 48)}
+                        width={130}
+                        height={42}
+                        rx={4}
+                        className="fill-slate-900/95 dark:fill-slate-950/95 stroke-slate-700/80 shadow-md"
+                      />
                       <text
                         x={Math.max(4, Math.min(width - 130, p.x - 65)) + 65}
-                        y={Math.max(2, p.y - 48) + 24}
+                        y={Math.max(2, p.y - 48) + 12}
                         textAnchor="middle"
-                        className="text-[8px] font-medium fill-slate-300"
+                        className="text-[9px] font-bold fill-white"
                       >
-                        Op Inc: {formatHelperCurrency(p.operatingIncome)}
+                        {p.label}: {formatChartValue(p.value)}
                       </text>
-                      <text
-                        x={Math.max(4, Math.min(width - 130, p.x - 65)) + 65}
-                        y={Math.max(2, p.y - 48) + 35}
-                        textAnchor="middle"
-                        className="text-[8px] font-medium fill-slate-300"
-                      >
-                        Rev: {formatHelperCurrency(p.revenue)}
-                      </text>
+                      {hasFCFDetails && (
+                        <>
+                          <text
+                            x={Math.max(4, Math.min(width - 130, p.x - 65)) + 65}
+                            y={Math.max(2, p.y - 48) + 24}
+                            textAnchor="middle"
+                            className="text-[8px] font-medium fill-slate-300"
+                          >
+                            FCF: {formatHelperCurrency(p.fcf)} | Net Inc: {formatHelperCurrency(p.netIncome)}
+                          </text>
+                          <text
+                            x={Math.max(4, Math.min(width - 130, p.x - 65)) + 65}
+                            y={Math.max(2, p.y - 48) + 35}
+                            textAnchor="middle"
+                            className={`text-[8px] font-semibold ${(p.value ?? 0) >= 100 ? "fill-emerald-400" : "fill-amber-400"}`}
+                          >
+                            ● {(p.value ?? 0) >= 100 ? "High Quality (>=100%)" : "Lower Conversion (<100%)"}
+                          </text>
+                        </>
+                      )}
+                      {hasMarginDetails && (
+                        <>
+                          <text
+                            x={Math.max(4, Math.min(width - 130, p.x - 65)) + 65}
+                            y={Math.max(2, p.y - 48) + 24}
+                            textAnchor="middle"
+                            className="text-[8px] font-medium fill-slate-300"
+                          >
+                            Op Inc: {formatHelperCurrency(p.operatingIncome)}
+                          </text>
+                          <text
+                            x={Math.max(4, Math.min(width - 130, p.x - 65)) + 65}
+                            y={Math.max(2, p.y - 48) + 35}
+                            textAnchor="middle"
+                            className="text-[8px] font-medium fill-slate-300"
+                          >
+                            Rev: {formatHelperCurrency(p.revenue)}
+                          </text>
+                        </>
+                      )}
                     </>
                   )}
                 </g>

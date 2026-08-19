@@ -595,7 +595,7 @@ export const METRIC_SECTIONS: MetricSectionDef[] = [
       {
         id: "netDebtToFcf",
         label: "Net Debt / FCF",
-        description: "Years of Free Cash Flow required to eliminate entire Net Debt burden",
+        description: "Ratio of Net Debt (Total Debt minus Cash & Equivalents) to Free Cash Flow",
         direction: "lower_is_better",
         getValue: (_, bal, cf) => {
           const netDebt =

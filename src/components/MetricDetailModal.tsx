@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { AnalysisResult, FinancialMetrics } from "../types";
+import { AnalysisResult, FinancialMetrics, ChartDataPoint } from "../types";
 import { getFCFFormula } from "../utils/financialCalculations";
 import { formatPercentageMetric, formatShortenedShareCount } from "../utils/scoring";
 
@@ -49,7 +49,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       statusText: undefined as string | undefined,
       changePct: undefined as number | null | undefined,
       unit: "",
-      chartData: [] as { label: string; value: number }[],
+      chartData: [] as ChartDataPoint[],
       chartValueType: "currency" as "currency" | "percent" | "number",
       directionStrategy: "higherIsBetter" as "higherIsBetter" | "lowerIsBetter",
       description: "",
@@ -232,10 +232,10 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           ],
           getInsights: () => ["High long-term FCF conversion indicates high-quality earnings backed by real cash flow over full business cycles."],
         };
-      case "marginStability":
+      case "marginStability": {
         const msDetail = result.metrics?.marginStabilityDetail;
         const avgMargin = result.marginStabilityHistory && result.marginStabilityHistory.length > 0
-          ? result.marginStabilityHistory.reduce((a, b) => a + b.value, 0) / result.marginStabilityHistory.length
+          ? result.marginStabilityHistory.reduce((a, b) => a + (b.value ?? 0), 0) / result.marginStabilityHistory.length
           : undefined;
         return {
           ...defaultData,
@@ -246,6 +246,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           unit: "%",
           chartData: result.marginStabilityHistory || [],
           chartValueType: "percent" as const,
+          directionStrategy: "higherIsBetter" as const,
           referenceLineValue: avgMargin,
           referenceLineLabel: avgMargin !== undefined ? `Avg Margin: ${avgMargin.toFixed(1)}%` : undefined,
           description: "Margin stability measures how consistently a company's operating margins have performed over time. The score rewards low margin volatility and sustained improvement, while penalizing significant volatility and persistent margin deterioration.",
@@ -266,12 +267,18 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
             { label: "Average", range: "50 - 69%", color: "text-amber-500" },
             { label: "Poor", range: "< 50%", color: "text-red-500" },
           ],
-          getInsights: () => analyzeEfficiencyHistory(result.marginStabilityHistory || [], "Operating Margin", 15),
+          getInsights: () => [
+            `Operating margin standard deviation: ${msDetail?.marginStandardDeviation.toFixed(2) ?? "N/A"}%`,
+            msDetail?.trendSlope && msDetail.trendSlope > 0
+              ? "Positive margin expansion trend is enhancing overall stability."
+              : "Margins have faced pressure or cyclical fluctuations over the analyzed period.",
+          ],
         };
+      }
       case "netDebtToFCF":
         return {
           ...defaultData,
-          title: "Net Debt / Normalized FCF",
+          title: "Net Debt / FCF",
           icon: "🏦",
           score: result.scores.netDebtToFCF,
           value: result.metrics.netDebtToFCF,
@@ -281,10 +288,10 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           directionStrategy: "lowerIsBetter" as const,
           referenceLineValue: 2.0,
           referenceLineLabel: "2.0x Target",
-          description: "Measures financial flexibility by comparing net debt against normalized free cash flow. Using multi-year average free cash flow reduces distortion from business cycles and unusual yearly fluctuations. Lower ratios indicate stronger balance sheet health.",
-          formula: "Net Debt / Normalized FCF = (Total Debt - Cash & Equivalents) / Average Annual Free Cash Flow over last 5 fiscal years",
+          description: "Measures financial flexibility by comparing net debt against free cash flow. Lower ratios indicate stronger balance sheet health.",
+          formula: "Net Debt / FCF = (Total Debt - Cash & Cash Equivalents) / Free Cash Flow",
           mathExplanation: [
-            `1. Net Debt / Normalized FCF Ratio: ${result.metrics.netDebtToFCF !== null ? `${result.metrics.netDebtToFCF.toFixed(2)}x` : "N/A"}`,
+            `1. Net Debt / Normalized FCF Ratio: ${result.metrics.netDebtToFCF !== null && result.metrics.netDebtToFCF !== 99 ? `${result.metrics.netDebtToFCF.toFixed(2)}x` : result.metrics.netDebtToFCF === 99 ? "High Leverage (Negative Normalized FCF)" : "N/A"}`,
             `2. Normalized FCF represents the average annual Free Cash Flow generated over up to 5 available fiscal years (minimum 3 years required).`,
             `3. Multi-year normalization prevents single-year business cycle distortions or temporary capex spikes from misrepresenting balance sheet health.`,
           ],
@@ -295,7 +302,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
             { label: "Moderate Risk", range: "4.0x - 6.0x", color: "text-amber-500" },
             { label: "High Leverage", range: "> 6.0x", color: "text-red-500" },
           ],
-          getInsights: () => ["Lower Net Debt / Normalized FCF ratios indicate strong balance sheet health and sustainable debt repayment capacity."],
+          getInsights: () => ["Lower Net Debt / FCF ratios indicate strong balance sheet health and sustainable debt repayment capacity."],
         };
       case "shareDilution":
         return {
@@ -541,13 +548,19 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
   };
 
 
-  const formatChartValue = (val: number, type: "currency" | "percent" | "number" = "currency"): string => {
+  const formatChartValue = (val: number | null | undefined, type: "currency" | "percent" | "number" = "currency"): string => {
+    if (val === null || val === undefined || isNaN(val)) {
+      return "N/A";
+    }
     if (type === "percent") {
       return formatPercentageMetric(val, true);
     }
     if (type === "number") {
       if (config.title.toLowerCase().includes("dilution") || config.title.toLowerCase().includes("share")) {
         return formatShortenedShareCount(val);
+      }
+      if (config.title.toLowerCase().includes("debt") || config.unit === "x") {
+        return `${val.toFixed(2)}x`;
       }
       return val.toFixed(2);
     }
@@ -569,14 +582,15 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
 
   // Math Explanations generators
   function getMathCAGRExplanation(
-    rawSeries: { label: string; value: number }[],
+    rawSeries: { label: string; value: number | null }[],
     type: "currency" | "percent" | "number",
     actualCAGR: number | null
   ): string[] {
-    if (!rawSeries || rawSeries.length < 2) return ["Insufficient historical data to calculate CAGR."];
+    const validSeries = rawSeries.filter((d): d is { label: string; value: number } => typeof d.value === "number" && d.value !== null && isFinite(d.value));
+    if (!validSeries || validSeries.length < 2) return ["Insufficient historical data to calculate CAGR."];
     
     // Evaluate up to 10 years of history (up to 11 entries)
-    const data = rawSeries.length > 11 ? rawSeries.slice(-11) : rawSeries;
+    const data = validSeries.length > 11 ? validSeries.slice(-11) : validSeries;
 
     const last = data[data.length - 1];
 
@@ -634,10 +648,11 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
   }
 
   function getFCFMathExplanation(
-    data: { label: string; value: number }[],
+    rawSeries: { label: string; value: number | null }[],
     actualCAGR: number | null,
     metrics?: FinancialMetrics
   ): string[] {
+    const data = rawSeries.filter((d): d is { label: string; value: number } => typeof d.value === "number" && d.value !== null && isFinite(d.value));
     if (data.length === 0) return ["No Free Cash Flow data available."];
     const first = data[0];
     const last = data[data.length - 1];
@@ -690,12 +705,13 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     return lines;
   }
 
-  function getFCFMarginMathExplanation(val: number | null, data: { label: string; value: number }[]): string[] {
-    if (val === null || data.length === 0) return ["No FCF Margin data available."];
+  function getFCFMarginMathExplanation(val: number | null, data: { label: string; value: number | null }[]): string[] {
+    const valid = data.filter((d): d is { label: string; value: number } => typeof d.value === "number" && d.value !== null && isFinite(d.value));
+    if (val === null || valid.length === 0) return ["No FCF Margin data available."];
     const period = result.selectedPeriod || "10Y";
     const periodLabel = `${period === "10Y" ? "10-Year" : period === "5Y" ? "5-Year" : "3-Year"} Average`;
-    const count = data.length;
-    const yearsRange = count === 1 ? data[0].label : `${data[0].label}–${data[count - 1].label}`;
+    const count = valid.length;
+    const yearsRange = count === 1 ? valid[0].label : `${valid[0].label}–${valid[count - 1].label}`;
     return [
       `1. ${periodLabel} FCF Margin (${yearsRange}): ${val.toFixed(2)}%`,
       `2. Formula Used: Arithmetic Average of Annual (Free Cash Flow / Revenue) × 100 across ${count} valid annual observations.`,
@@ -703,7 +719,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     ];
   }
 
-  function getROICMathExplanation(_val: number | null, _data: { label: string; value: number }[]): string[] {
+  function getROICMathExplanation(_val: number | null, _data: { label: string; value: number | null }[]): string[] {
     const detail = result.metrics.roicDetail || result.roicDetail;
     const period = result.selectedPeriod || detail?.period || "10Y";
     const periodLabel = detail?.periodLabel || `${period === "10Y" ? "10-Year" : period === "5Y" ? "5-Year" : "3-Year"} Average`;
@@ -755,20 +771,22 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     return lines;
   }
 
-  function getAverageMathExplanation(actualValue: number | null, data: { label: string; value: number }[], symbol: string): string[] {
-    if (actualValue === null || data.length === 0) return ["No data available."];
-    const sum = data.reduce((acc, curr) => acc + curr.value, 0);
+  function getAverageMathExplanation(actualValue: number | null, data: { label: string; value: number | null }[], symbol: string): string[] {
+    const valid = data.filter((d): d is { label: string; value: number } => typeof d.value === "number" && d.value !== null && isFinite(d.value));
+    if (actualValue === null || valid.length === 0) return ["No data available."];
+    const sum = valid.reduce((acc, curr) => acc + curr.value, 0);
 
     return [
-      `1. Sum of ${data.length} annual values: ${data.map(d => `${d.value.toFixed(1)}${symbol}`).join(" + ")} = ${sum.toFixed(1)}${symbol}`,
-      `2. Total periods: ${data.length} years (${data.map(d => d.label).join(", ")})`,
+      `1. Sum of ${valid.length} annual values: ${valid.map(d => `${d.value.toFixed(1)}${symbol}`).join(" + ")} = ${sum.toFixed(1)}${symbol}`,
+      `2. Total periods: ${valid.length} years (${valid.map(d => d.label).join(", ")})`,
       `3. Measured Average Result: ${actualValue.toFixed(2)}${symbol}`,
     ];
   }
 
-  function getLatestMathExplanation(actualValue: number | null, data: { label: string; value: number }[], name: string, symbol: string): string[] {
-    if (actualValue === null || data.length === 0) return ["No data available."];
-    const latest = data[data.length - 1];
+  function getLatestMathExplanation(actualValue: number | null, data: { label: string; value: number | null }[], name: string, symbol: string): string[] {
+    const valid = data.filter((d): d is { label: string; value: number } => typeof d.value === "number" && d.value !== null && isFinite(d.value));
+    if (actualValue === null || valid.length === 0) return ["No data available."];
+    const latest = valid[valid.length - 1];
     return [
       `1. Latest fiscal year checked: ${latest ? latest.label : "Most Recent Fiscal Year"}`,
       `2. Measured ${name} value: ${actualValue.toFixed(2)}${symbol}`,
@@ -776,23 +794,24 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
   }
 
   // YoY Growth Helper
-  const getYoYGrowth = (index: number, data: { label: string; value: number }[]): string => {
+  const getYoYGrowth = (index: number, data: { label: string; value: number | null }[]): string => {
     if (index === 0) return "—";
-    const prev = data[index - 1].value;
-    const curr = data[index].value;
-    if (prev === 0) return "—";
+    const prev = data[index - 1]?.value;
+    const curr = data[index]?.value;
+    if (prev === null || prev === undefined || curr === null || curr === undefined || prev === 0 || isNaN(prev) || isNaN(curr)) return "—";
     const growth = ((curr - prev) / Math.abs(prev)) * 100;
     return `${growth >= 0 ? "+" : ""}${growth.toFixed(1)}%`;
   };
 
   // Automated Trend Analyzers
-  function analyzeGrowthHistory(data: { label: string; value: number }[], metricLabel: string): string {
-    if (data.length < 3) return "Steady trend confirmation requires at least 3 consecutive years of data.";
+  function analyzeGrowthHistory(data: { label: string; value: number | null }[], metricLabel: string): string {
+    const valid = data.filter((d): d is { label: string; value: number } => typeof d.value === "number" && d.value !== null && isFinite(d.value));
+    if (valid.length < 3) return "Steady trend confirmation requires at least 3 consecutive years of data.";
 
     const growths: number[] = [];
-    for (let i = 1; i < data.length; i++) {
-      const prev = data[i - 1].value;
-      const curr = data[i].value;
+    for (let i = 1; i < valid.length; i++) {
+      const prev = valid[i - 1].value;
+      const curr = valid[i].value;
       if (prev !== 0) growths.push(((curr - prev) / Math.abs(prev)) * 100);
     }
 
@@ -806,7 +825,7 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
 
     let text = "";
     if (allPositive) {
-      text = `The company has shown consistent year-over-year expansions in ${metricLabel} across the entire ${data.length}-year timeline. `;
+      text = `The company has shown consistent year-over-year expansions in ${metricLabel} across the entire ${valid.length}-year timeline. `;
       if (isAccelerating) {
         text += "Importantly, this growth is accelerating (growth rates are climbing year-over-year), showing strong momentum.";
       } else if (isSlowing) {
@@ -817,19 +836,39 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     } else if (allNegative) {
       text = `The company is showing persistent contracting ${metricLabel} values year-over-year, indicating structural declines or significant industry headwinds.`;
     } else {
-      text = `The company's ${metricLabel} growth has been volatile and inconsistent. Some years showed strong expansion, while others experienced contractions. `;
-      text += "This volatility indicates a cyclical business model or operational instability. Investors should inspect the drivers behind these spikes and dips.";
+      text = `The company has experienced mixed and cyclical ${metricLabel} performance across the observed years, with alternating periods of growth and contractions.`;
+    }
+
+    // Volatility warning
+    const absGrowths = growths.map(Math.abs);
+    const maxJump = Math.max(...absGrowths);
+    if (maxJump > 50) {
+      text += " Notably, there are large individual swings exceeding 50% year-over-year.";
+    }
+
+    const positiveYears = growths.filter(g => g > 0).length;
+    const negativeYears = growths.filter(g => g < 0).length;
+    text += ` Over this timeline, ${metricLabel} expanded in ${positiveYears} out of ${growths.length} measurable annual transitions`;
+    if (negativeYears > 0) {
+      text += ` and contracted in ${negativeYears} years.`;
+    } else {
+      text += ".";
+    }
+
+    if (!allPositive && !allNegative && maxJump > 30) {
+      text += " This volatility indicates a cyclical business model or operational instability. Investors should inspect the drivers behind these spikes and dips.";
     }
 
     return text;
   }
 
-  function analyzeEfficiencyHistory(data: { label: string; value: number }[], name: string, threshold: number): string {
-    if (data.length === 0) return "No trend data available.";
-    const latest = data[data.length - 1].value;
-    const average = data.reduce((acc, curr) => acc + curr.value, 0) / data.length;
+  function analyzeEfficiencyHistory(data: { label: string; value: number | null }[], name: string, threshold: number): string {
+    const valid = data.filter((d): d is { label: string; value: number } => typeof d.value === "number" && d.value !== null && isFinite(d.value));
+    if (valid.length === 0) return "No trend data available.";
+    const latest = valid[valid.length - 1].value;
+    const average = valid.reduce((acc, curr) => acc + curr.value, 0) / valid.length;
     
-    let text = `The company's latest ${name} is ${latest.toFixed(1)}%, with a ${data.length}-year average of ${average.toFixed(1)}%. `;
+    let text = `The company's latest ${name} is ${latest.toFixed(1)}%, with a ${valid.length}-year average of ${average.toFixed(1)}%. `;
 
     if (average >= threshold) {
       text += `This indicates a highly efficient business that easily exceeds typical capital costs (usually ~8-10%), suggesting the presence of a wide economic moat. `;
@@ -837,23 +876,24 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       text += `This indicates moderate to low efficiency. The returns might be close to or below the cost of capital, showing weaker pricing power or capital allocation. `;
     }
 
-    if (data.length >= 2) {
-      const first = data[0].value;
+    if (valid.length >= 2) {
+      const first = valid[0].value;
       if (latest > first + 2) {
         text += "Importantly, returns are expanding over time, indicating improving operational efficiency and moat expansion.";
       } else if (latest < first - 2) {
         text += "Of concern, efficiency returns are contracting, showing that profit margins or asset turn ratios are degrading over time.";
       } else {
-        text += `Returns have remained stable and consistent over the last ${data.length} years.`;
+        text += `Returns have remained stable and consistent over the last ${valid.length} years.`;
       }
     }
 
     return text;
   }
 
-  function analyzeLeverageHistory(data: { label: string; value: number }[]): string {
-    if (data.length === 0) return "No leverage data available.";
-    const latest = data[data.length - 1].value;
+  function analyzeLeverageHistory(data: { label: string; value: number | null }[]): string {
+    const valid = data.filter((d): d is { label: string; value: number } => typeof d.value === "number" && d.value !== null && isFinite(d.value));
+    if (valid.length === 0) return "No leverage data available.";
+    const latest = valid[valid.length - 1].value;
     
     let text = `The latest Debt-to-Equity ratio is ${latest.toFixed(2)}. `;
     if (latest <= 0.5) {
@@ -864,8 +904,8 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       text += "This indicates high financial leverage, meaning a significant portion of assets are funded via debt, which increases sensitivity to interest rates and refinancing risk. ";
     }
 
-    if (data.length >= 2) {
-      const first = data[0].value;
+    if (valid.length >= 2) {
+      const first = valid[0].value;
       if (latest > first + 0.2) {
         text += "Leverage has increased over the period, showing the company is taking on more debt relative to equity to fund its activities.";
       } else if (latest < first - 0.2) {
@@ -878,11 +918,12 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     return text;
   }
 
-  function analyzeValuationHistory(data: { label: string; value: number }[], name: string, lowVal: number, highVal: number): string {
-    if (data.length === 0) return "No historical valuation data available.";
-    const latest = data[data.length - 1].value;
-    const avg = data.reduce((acc, curr) => acc + curr.value, 0) / data.length;
-    let text = `The latest ${name} is ${latest.toFixed(1)}, with a ${data.length}-year historical average of ${avg.toFixed(1)}. `;
+  function analyzeValuationHistory(data: { label: string; value: number | null }[], name: string, lowVal: number, highVal: number): string {
+    const valid = data.filter((d): d is { label: string; value: number } => typeof d.value === "number" && d.value !== null && isFinite(d.value));
+    if (valid.length === 0) return "No historical valuation data available.";
+    const latest = valid[valid.length - 1].value;
+    const avg = valid.reduce((acc, curr) => acc + curr.value, 0) / valid.length;
+    let text = `The latest ${name} is ${latest.toFixed(1)}, with a ${valid.length}-year historical average of ${avg.toFixed(1)}. `;
     if (latest <= lowVal) {
       text += "This places current valuation in an attractive discount range relative to historical norms. ";
     } else if (latest >= highVal) {
@@ -933,9 +974,10 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
      * 3. Long-term operational consistency.
      */
     if ((config as any).chartType === "bar") {
-      const values = config.chartData.map(d => d.value);
-      const minVal = Math.min(...values);
-      const maxVal = Math.max(...values);
+      const validBars = config.chartData.filter(d => typeof d.value === "number" && d.value !== null && isFinite(d.value));
+      const values = validBars.map(d => d.value as number);
+      const minVal = values.length > 0 ? Math.min(...values) : 0;
+      const maxVal = values.length > 0 ? Math.max(...values) : 0;
 
       const yMin = Math.min(0, minVal);
       const yMax = Math.max(0, maxVal);
@@ -978,8 +1020,9 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           {config.chartData.map((item, i) => {
             const xCenter = paddingLeft + (i + 0.5) * step;
             const xLeft = xCenter - barWidth / 2;
-            const yVal = getY(item.value);
-            const isPositive = item.value > 0;
+            const val = item.value ?? 0;
+            const yVal = getY(val);
+            const isPositive = val > 0;
             const barY = isPositive ? yVal : yZero;
             const barH = Math.max(3, Math.abs(yVal - yZero));
             const barColor = isPositive ? "#10b981" : "#ef4444";
@@ -1042,9 +1085,12 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       );
     }
 
-    const values = config.chartData.map(d => d.value);
-    let minVal = Math.min(...values);
-    let maxVal = Math.max(...values);
+    const validPoints = config.chartData.filter(
+      (d) => typeof d.value === "number" && d.value !== null && isFinite(d.value)
+    );
+    const validValues = validPoints.map((d) => d.value as number);
+    let minVal = validValues.length > 0 ? Math.min(...validValues) : 0;
+    let maxVal = validValues.length > 0 ? Math.max(...validValues) : 5;
     const refVal = (config as any).referenceLineValue;
     const refLabel = (config as any).referenceLineLabel;
     if (typeof refVal === "number" && isFinite(refVal)) {
@@ -1061,17 +1107,23 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
     const points = config.chartData.map((item, i) => {
       const divisor = config.chartData.length > 1 ? config.chartData.length - 1 : 1;
       const x = paddingLeft + (i / divisor) * plotWidth;
-      const val = item.value;
-      const y = height - paddingBottom - ((val - adjustedMin) / (adjustedMax - adjustedMin)) * plotHeight;
+      const isUnavailable = item.value === null || item.value === undefined || isNaN(item.value);
+      const val = isUnavailable ? null : item.value;
+      const y = isUnavailable
+        ? height - paddingBottom - 0.45 * plotHeight
+        : height - paddingBottom - ((val! - adjustedMin) / (adjustedMax - adjustedMin)) * plotHeight;
       return {
         x,
         y,
         label: item.label,
         value: item.value,
+        isUnavailable,
+        unavailableReason: (item as any).unavailableReason,
         netIncome: (item as any).netIncome,
         fcf: (item as any).fcf,
         revenue: (item as any).revenue,
         operatingIncome: (item as any).operatingIncome,
+        netDebt: (item as any).netDebt,
       };
     });
 
@@ -1081,13 +1133,33 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
 
     const gradId = `modal-chart-grad-${metricKey}`;
 
-    let linePath = "";
-    let areaPath = "";
-
-    if (points.length > 1) {
-      linePath = `M ${points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L ")}`;
-      areaPath = `${linePath} L ${points[points.length - 1].x.toFixed(1)},${(height - paddingBottom).toFixed(1)} L ${points[0].x.toFixed(1)},${(height - paddingBottom).toFixed(1)} Z`;
+    // Segment valid continuous points so N/A does not create spikes
+    const segments: { x: number; y: number }[][] = [];
+    let currentSegment: { x: number; y: number }[] = [];
+    points.forEach((p) => {
+      if (!p.isUnavailable && typeof p.value === "number") {
+        currentSegment.push({ x: p.x, y: p.y });
+      } else {
+        if (currentSegment.length > 0) {
+          segments.push(currentSegment);
+          currentSegment = [];
+        }
+      }
+    });
+    if (currentSegment.length > 0) {
+      segments.push(currentSegment);
     }
+
+    const linePaths = segments
+      .filter((seg) => seg.length > 1)
+      .map((seg) => `M ${seg.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L ")}`);
+
+    const areaPaths = segments
+      .filter((seg) => seg.length > 1)
+      .map((seg) => {
+        const line = `M ${seg.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L ")}`;
+        return `${line} L ${seg[seg.length - 1].x.toFixed(1)},${(height - paddingBottom).toFixed(1)} L ${seg[0].x.toFixed(1)},${(height - paddingBottom).toFixed(1)} Z`;
+      });
 
     const formatHelperCurrency = (v: number | undefined): string => {
       if (v === undefined || isNaN(v)) return "N/A";
@@ -1152,45 +1224,62 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
         )}
 
         {/* Area */}
-        {points.length > 1 && <path d={areaPath} fill={`url(#${gradId})`} />}
+        {areaPaths.map((ap, idx) => (
+          <path key={idx} d={ap} fill={`url(#${gradId})`} />
+        ))}
 
         {/* Path Line */}
-        {points.length > 1 && (
+        {linePaths.map((lp, idx) => (
           <path 
-            d={linePath} 
+            key={idx}
+            d={lp} 
             fill="none" 
             stroke={activeColorHex} 
             strokeWidth="3" 
             strokeLinecap="round" 
             strokeLinejoin="round" 
           />
-        )}
+        ))}
 
         {/* Nodes and Hover Tooltips */}
         {points.map((p, i) => {
           const hasFCFDetails = p.netIncome !== undefined && p.fcf !== undefined;
           const hasMarginDetails = p.revenue !== undefined && p.operatingIncome !== undefined;
+          const isNetDebtMetric = config.title.toLowerCase().includes("debt") || (p.netDebt !== undefined && p.fcf !== undefined);
 
           return (
             <g key={i} className="group/modalnode cursor-pointer">
               {/* Value Label above dot */}
               <text 
                 x={p.x} 
-                y={p.y - 8} 
+                y={p.isUnavailable ? p.y - 9 : p.y - 8} 
                 textAnchor="middle" 
-                className="text-[10px] font-bold fill-slate-700 dark:fill-slate-200"
+                className={`text-[10px] font-bold ${p.isUnavailable ? "fill-slate-400 dark:fill-slate-500" : "fill-slate-700 dark:fill-slate-200"}`}
               >
-                {formatChartValue(p.value, config.chartValueType)}
+                {p.isUnavailable ? "N/A" : formatChartValue(p.value, config.chartValueType)}
               </text>
               
               {/* Circle Node */}
-              <circle 
-                cx={p.x} 
-                cy={p.y} 
-                r="5" 
-                fill={activeColorHex} 
-                className="stroke-white dark:stroke-slate-900 stroke-[2.5px] drop-shadow-sm group-hover/modalnode:r-7 transition-all"
-              />
+              {p.isUnavailable ? (
+                <circle 
+                  cx={p.x} 
+                  cy={p.y} 
+                  r="5" 
+                  fill="none" 
+                  stroke="#94a3b8" 
+                  strokeWidth="2.5" 
+                  strokeDasharray="3,3" 
+                  className="group-hover/modalnode:r-7 transition-all"
+                />
+              ) : (
+                <circle 
+                  cx={p.x} 
+                  cy={p.y} 
+                  r="5" 
+                  fill={activeColorHex} 
+                  className="stroke-white dark:stroke-slate-900 stroke-[2.5px] drop-shadow-sm group-hover/modalnode:r-7 transition-all"
+                />
+              )}
               
               {/* Year Label below axis */}
               <text 
@@ -1203,62 +1292,150 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
               </text>
 
               {/* Enhanced Interactive Tooltip on Hover */}
-              {(hasFCFDetails || hasMarginDetails) && (
+              {(hasFCFDetails || hasMarginDetails || isNetDebtMetric || p.isUnavailable) && (
                 <g className="opacity-0 group-hover/modalnode:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                  <rect
-                    x={Math.max(6, Math.min(width - 150, p.x - 75))}
-                    y={Math.max(4, p.y - 52)}
-                    width={150}
-                    height={46}
-                    rx={5}
-                    className="fill-slate-900/95 dark:fill-slate-950/95 stroke-slate-700/80 shadow-lg"
-                  />
-                  <text
-                    x={Math.max(6, Math.min(width - 150, p.x - 75)) + 75}
-                    y={Math.max(4, p.y - 52) + 14}
-                    textAnchor="middle"
-                    className="text-[10px] font-bold fill-white"
-                  >
-                    {p.label}: {formatChartValue(p.value, config.chartValueType)}
-                  </text>
-                  {hasFCFDetails && (
+                  {isNetDebtMetric && p.isUnavailable ? (
                     <>
+                      <rect
+                        x={Math.max(6, Math.min(width - 230, p.x - 115))}
+                        y={Math.max(4, p.y - 62)}
+                        width={230}
+                        height={56}
+                        rx={5}
+                        className="fill-slate-900/95 dark:fill-slate-950/95 stroke-slate-700/80 shadow-lg"
+                      />
                       <text
-                        x={Math.max(6, Math.min(width - 150, p.x - 75)) + 75}
+                        x={Math.max(6, Math.min(width - 230, p.x - 115)) + 115}
+                        y={Math.max(4, p.y - 62) + 14}
+                        textAnchor="middle"
+                        className="text-[10px] font-bold fill-white"
+                      >
+                        {p.label}: N/A
+                      </text>
+                      <text
+                        x={Math.max(6, Math.min(width - 230, p.x - 115)) + 115}
+                        y={Math.max(4, p.y - 62) + 26}
+                        textAnchor="middle"
+                        className="text-[9px] font-bold fill-amber-400"
+                      >
+                        ● {p.fcf === 0 ? "N/A — Zero FCF" : "N/A — Negative FCF"}
+                      </text>
+                      <text
+                        x={Math.max(6, Math.min(width - 230, p.x - 115)) + 115}
+                        y={Math.max(4, p.y - 62) + 38}
+                        textAnchor="middle"
+                        className="text-[8.5px] font-normal fill-slate-300"
+                      >
+                        {p.fcf === 0
+                          ? "Net Debt / FCF cannot be calculated when Free Cash Flow is zero."
+                          : "Net Debt / FCF cannot provide a meaningful ratio when Free Cash Flow is zero or negative."}
+                      </text>
+                      {p.fcf !== undefined && p.netDebt !== undefined && (
+                        <text
+                          x={Math.max(6, Math.min(width - 230, p.x - 115)) + 115}
+                          y={Math.max(4, p.y - 62) + 50}
+                          textAnchor="middle"
+                          className="text-[8.5px] font-medium fill-slate-400"
+                        >
+                          FCF: {formatHelperCurrency(p.fcf)} | Net Debt: {formatHelperCurrency(p.netDebt)}
+                        </text>
+                      )}
+                    </>
+                  ) : isNetDebtMetric && !p.isUnavailable ? (
+                    <>
+                      <rect
+                        x={Math.max(6, Math.min(width - 170, p.x - 85))}
+                        y={Math.max(4, p.y - 52)}
+                        width={170}
+                        height={46}
+                        rx={5}
+                        className="fill-slate-900/95 dark:fill-slate-950/95 stroke-slate-700/80 shadow-lg"
+                      />
+                      <text
+                        x={Math.max(6, Math.min(width - 170, p.x - 85)) + 85}
+                        y={Math.max(4, p.y - 52) + 14}
+                        textAnchor="middle"
+                        className="text-[10px] font-bold fill-white"
+                      >
+                        {p.label}: {formatChartValue(p.value, config.chartValueType)}
+                      </text>
+                      <text
+                        x={Math.max(6, Math.min(width - 170, p.x - 85)) + 85}
                         y={Math.max(4, p.y - 52) + 27}
                         textAnchor="middle"
                         className="text-[9px] font-medium fill-slate-300"
                       >
-                        FCF: {formatHelperCurrency(p.fcf)} | Net Inc: {formatHelperCurrency(p.netIncome)}
+                        Net Debt: {formatHelperCurrency(p.netDebt)} | FCF: {formatHelperCurrency(p.fcf)}
                       </text>
                       <text
-                        x={Math.max(6, Math.min(width - 150, p.x - 75)) + 75}
+                        x={Math.max(6, Math.min(width - 170, p.x - 85)) + 85}
                         y={Math.max(4, p.y - 52) + 39}
                         textAnchor="middle"
-                        className={`text-[9px] font-semibold ${p.value >= 100 ? "fill-emerald-400" : "fill-amber-400"}`}
+                        className={`text-[9px] font-semibold ${
+                          (p.value ?? 0) <= 2.0 ? "fill-emerald-400" : (p.value ?? 0) <= 4.0 ? "fill-blue-400" : "fill-red-400"
+                        }`}
                       >
-                        ● {p.value >= 100 ? "High Quality (>=100%)" : "Lower Conversion (<100%)"}
+                        ● {(p.value ?? 0) <= 2.0 ? "Strong Coverage (<= 2.0x)" : (p.value ?? 0) <= 4.0 ? "Moderate Leverage (2.0x - 4.0x)" : "High Leverage (> 4.0x)"}
                       </text>
                     </>
-                  )}
-                  {hasMarginDetails && (
+                  ) : (
                     <>
+                      <rect
+                        x={Math.max(6, Math.min(width - 150, p.x - 75))}
+                        y={Math.max(4, p.y - 52)}
+                        width={150}
+                        height={46}
+                        rx={5}
+                        className="fill-slate-900/95 dark:fill-slate-950/95 stroke-slate-700/80 shadow-lg"
+                      />
                       <text
                         x={Math.max(6, Math.min(width - 150, p.x - 75)) + 75}
-                        y={Math.max(4, p.y - 52) + 27}
+                        y={Math.max(4, p.y - 52) + 14}
                         textAnchor="middle"
-                        className="text-[9px] font-medium fill-slate-300"
+                        className="text-[10px] font-bold fill-white"
                       >
-                        Op Inc: {formatHelperCurrency(p.operatingIncome)}
+                        {p.label}: {formatChartValue(p.value, config.chartValueType)}
                       </text>
-                      <text
-                        x={Math.max(6, Math.min(width - 150, p.x - 75)) + 75}
-                        y={Math.max(4, p.y - 52) + 39}
-                        textAnchor="middle"
-                        className="text-[9px] font-medium fill-slate-300"
-                      >
-                        Rev: {formatHelperCurrency(p.revenue)}
-                      </text>
+                      {hasFCFDetails && (
+                        <>
+                          <text
+                            x={Math.max(6, Math.min(width - 150, p.x - 75)) + 75}
+                            y={Math.max(4, p.y - 52) + 27}
+                            textAnchor="middle"
+                            className="text-[9px] font-medium fill-slate-300"
+                          >
+                            FCF: {formatHelperCurrency(p.fcf)} | Net Inc: {formatHelperCurrency(p.netIncome)}
+                          </text>
+                          <text
+                            x={Math.max(6, Math.min(width - 150, p.x - 75)) + 75}
+                            y={Math.max(4, p.y - 52) + 39}
+                            textAnchor="middle"
+                            className={`text-[9px] font-semibold ${(p.value ?? 0) >= 100 ? "fill-emerald-400" : "fill-amber-400"}`}
+                          >
+                            ● {(p.value ?? 0) >= 100 ? "High Quality (>=100%)" : "Lower Conversion (<100%)"}
+                          </text>
+                        </>
+                      )}
+                      {hasMarginDetails && (
+                        <>
+                          <text
+                            x={Math.max(6, Math.min(width - 150, p.x - 75)) + 75}
+                            y={Math.max(4, p.y - 52) + 27}
+                            textAnchor="middle"
+                            className="text-[9px] font-medium fill-slate-300"
+                          >
+                            Op Inc: {formatHelperCurrency(p.operatingIncome)}
+                          </text>
+                          <text
+                            x={Math.max(6, Math.min(width - 150, p.x - 75)) + 75}
+                            y={Math.max(4, p.y - 52) + 39}
+                            textAnchor="middle"
+                            className="text-[9px] font-medium fill-slate-300"
+                          >
+                            Rev: {formatHelperCurrency(p.revenue)}
+                          </text>
+                        </>
+                      )}
                     </>
                   )}
                 </g>
@@ -1274,13 +1451,14 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
   const { label: scoreLabel, color: scoreColor } = getScoreCategory(config.score || 0);
 
   const getTrendColorHex = (
-    data: { value: number }[],
+    data: { value: number | null }[],
     strategy: "higherIsBetter" | "lowerIsBetter",
     defaultHex: string
   ): string => {
-    if (data.length < 2) return defaultHex;
-    const firstVal = data[0].value;
-    const lastVal = data[data.length - 1].value;
+    const valid = data.filter((d): d is { value: number } => typeof d.value === "number" && d.value !== null && isFinite(d.value));
+    if (valid.length < 2) return defaultHex;
+    const firstVal = valid[0].value;
+    const lastVal = valid[valid.length - 1].value;
     if (lastVal === firstVal) return "#94a3b8"; // Neutral slate
     const isImprovement = strategy === "lowerIsBetter" 
       ? lastVal < firstVal 
@@ -1455,8 +1633,8 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
             {/* Share Count Summary Section */}
             {metricKey === "shareDilution" && result.shareDilutionHistory && result.shareDilutionHistory.length > 0 && (() => {
               const history = result.shareDilutionHistory;
-              const initialShares = history[0].value;
-              const latestShares = history[history.length - 1].value;
+              const initialShares = history[0]?.value ?? 0;
+              const latestShares = history[history.length - 1]?.value ?? 0;
               const netChange = latestShares - initialShares;
               const initialFormatted = formatShortenedShareCount(initialShares);
               const latestFormatted = formatShortenedShareCount(latestShares);

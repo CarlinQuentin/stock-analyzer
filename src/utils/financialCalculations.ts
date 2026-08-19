@@ -6,6 +6,7 @@ import {
   HistoricalPeriod,
   ROICAnalysisDetail,
   MarginStabilityDetail,
+  ChartDataPoint,
 } from "../types";
 
 /**
@@ -561,7 +562,7 @@ export function calculateFCFTrend(
  * Return dynamic FCF formula string based on starting and ending FCF values.
  */
 export function getFCFFormula(
-  data: { label?: string; value?: number; operatingCashFlow?: number; capitalExpenditure?: number }[] | null | undefined,
+  data: { label?: string; value?: number | null; operatingCashFlow?: number; capitalExpenditure?: number }[] | null | undefined,
   actualCAGR: number | null,
 ): string {
   if (actualCAGR !== null) {
@@ -571,7 +572,7 @@ export function getFCFFormula(
     return "FCF Growth Formula";
   }
 
-  const getFCFVal = (item: { value?: number; operatingCashFlow?: number; capitalExpenditure?: number }): number | null => {
+  const getFCFVal = (item: { value?: number | null; operatingCashFlow?: number; capitalExpenditure?: number }): number | null => {
     if (typeof item.value === "number") return item.value;
     if (typeof item.operatingCashFlow === "number" && typeof item.capitalExpenditure === "number") {
       return item.operatingCashFlow - item.capitalExpenditure;
@@ -1436,16 +1437,17 @@ export function calculateNetDebtToFCF(
 /**
  * Historical Net Debt / FCF History Generator:
  * Computes annual Net Debt / FCF ratios for trend visualization.
+ * When FCF <= 0, marks point as unavailable (N/A) without artificial 99.00 values.
  */
 export function calculateNetDebtToFCFHistory(
   balanceSheets: FinancialStatement[] | null | undefined,
   cashFlowStatements: FinancialStatement[] | null | undefined,
-): { label: string; value: number }[] {
+): ChartDataPoint[] {
   if (!balanceSheets || !cashFlowStatements || balanceSheets.length === 0 || cashFlowStatements.length === 0) {
     return [];
   }
 
-  const result: { label: string; value: number }[] = [];
+  const result: ChartDataPoint[] = [];
   const reversedBalance = [...balanceSheets]
     .filter((s) => s && s.date)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -1461,9 +1463,26 @@ export function calculateNetDebtToFCFHistory(
       const fcf = calculateFCF(matchCF.operatingCashFlow, matchCF.capitalExpenditure);
 
       if (fcf !== null) {
-        const ratio = fcf > 0 ? netDebt / fcf : netDebt <= 0 ? netDebt / Math.abs(fcf || 1) : 99.0;
-        if (isFinite(ratio)) {
-          result.push({ label: year, value: Number(ratio.toFixed(2)) });
+        if (fcf > 0) {
+          const ratio = netDebt / fcf;
+          if (isFinite(ratio)) {
+            result.push({
+              label: year,
+              value: Number(ratio.toFixed(2)),
+              fcf,
+              netDebt,
+            });
+          }
+        } else {
+          // Zero or Negative FCF: Display as N/A without artificial 99.00 values
+          result.push({
+            label: year,
+            value: null,
+            fcf,
+            netDebt,
+            isUnavailable: true,
+            unavailableReason: fcf === 0 ? "Zero FCF" : "Negative FCF",
+          });
         }
       }
     }

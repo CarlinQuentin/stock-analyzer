@@ -1727,7 +1727,7 @@ describe("calculateShareDilution", () => {
     expect(calculateShareDilution([{ date: "2024-12-31" }])).toBeNull();
   });
 
-  it("should generate Net Debt / FCF history array correctly", () => {
+  it("should generate Net Debt / FCF history array correctly for positive FCF", () => {
     const balance = [
       { date: "2024-12-31", totalDebt: 500, cashAndCashEquivalents: 100 },
       { date: "2023-12-31", totalDebt: 600, cashAndCashEquivalents: 100 },
@@ -1738,8 +1738,43 @@ describe("calculateShareDilution", () => {
     ];
     const history = calculateNetDebtToFCFHistory(balance, cashFlow);
     expect(history.length).toBe(2);
-    expect(history[0]).toEqual({ label: "2023", value: 2.5 });
-    expect(history[1]).toEqual({ label: "2024", value: 2.0 });
+    expect(history[0]).toEqual({ label: "2023", value: 2.5, fcf: 200, netDebt: 500 });
+    expect(history[1]).toEqual({ label: "2024", value: 2.0, fcf: 200, netDebt: 400 });
+  });
+
+  it("should handle zero and negative FCF by returning null (N/A) without artificial 99.00 values", () => {
+    const balance = [
+      { date: "2025-12-31", totalDebt: 500, cashAndCashEquivalents: 100 }, // Net Debt = 400
+      { date: "2024-12-31", totalDebt: 500, cashAndCashEquivalents: 100 }, // Net Debt = 400
+      { date: "2023-12-31", totalDebt: 500, cashAndCashEquivalents: 100 }, // Net Debt = 400
+    ];
+    const cashFlow = [
+      { date: "2025-12-31", operatingCashFlow: -50, capitalExpenditure: 50 }, // FCF = -100 (Negative)
+      { date: "2024-12-31", operatingCashFlow: 50, capitalExpenditure: 50 },   // FCF = 0 (Zero)
+      { date: "2023-12-31", operatingCashFlow: 300, capitalExpenditure: 100 }, // FCF = 200 (Positive)
+    ];
+    const history = calculateNetDebtToFCFHistory(balance, cashFlow);
+    expect(history.length).toBe(3);
+    // 2023: Positive FCF -> 400 / 200 = 2.0x
+    expect(history[0]).toEqual({ label: "2023", value: 2.0, fcf: 200, netDebt: 400 });
+    // 2024: Zero FCF -> N/A (null)
+    expect(history[1]).toEqual({
+      label: "2024",
+      value: null,
+      fcf: 0,
+      netDebt: 400,
+      isUnavailable: true,
+      unavailableReason: "Zero FCF",
+    });
+    // 2025: Negative FCF -> N/A (null)
+    expect(history[2]).toEqual({
+      label: "2025",
+      value: null,
+      fcf: -100,
+      netDebt: 400,
+      isUnavailable: true,
+      unavailableReason: "Negative FCF",
+    });
   });
 
   it("should generate Share Dilution history array correctly using FMP fields with YoY % changes", () => {

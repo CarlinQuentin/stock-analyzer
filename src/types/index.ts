@@ -196,12 +196,15 @@ export interface ScoringConfig {
 
 export interface ChartDataPoint {
   label: string;
-  value: number;
+  value: number | null;
   netIncome?: number;
   fcf?: number;
   revenue?: number;
   operatingIncome?: number;
   yoyChange?: number | null;
+  netDebt?: number;
+  isUnavailable?: boolean;
+  unavailableReason?: string;
 }
 
 export type HistoricalPeriod = "10Y" | "5Y" | "3Y";

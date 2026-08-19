@@ -1180,7 +1180,7 @@ function App() {
                       result.marginStabilityHistory &&
                       result.marginStabilityHistory.length > 0
                         ? result.marginStabilityHistory.reduce(
-                            (a, b) => a + b.value,
+                            (a, b) => a + (b.value ?? 0),
                             0,
                           ) / result.marginStabilityHistory.length
                         : undefined
@@ -1188,7 +1188,7 @@ function App() {
                     referenceLineLabel={
                       result.marginStabilityHistory &&
                       result.marginStabilityHistory.length > 0
-                        ? `Avg: ${(result.marginStabilityHistory.reduce((a, b) => a + b.value, 0) / result.marginStabilityHistory.length).toFixed(1)}%`
+                        ? `Avg: ${(result.marginStabilityHistory.reduce((a, b) => a + (b.value ?? 0), 0) / result.marginStabilityHistory.length).toFixed(1)}%`
                         : undefined
                     }
                     isExpanded={showAllCharts}
@@ -1196,12 +1196,12 @@ function App() {
                     directionStrategy="higherIsBetter"
                   />
                   <MetricCard
-                    title="Net Debt / Normalized FCF"
+                    title="Net Debt / FCF"
                     value={result.metrics.netDebtToFCF}
                     unit="x"
                     score={result.scores.netDebtToFCF}
                     description="Net Debt / 5-Yr Avg FCF"
-                    tooltip="Measures financial flexibility by comparing net debt against normalized free cash flow. Using multi-year average free cash flow reduces distortion from business cycles and unusual yearly fluctuations. Lower ratios indicate stronger balance sheet health."
+                    tooltip="Measures financial flexibility by comparing net debt against free cash flow. Using multi-year average free cash flow reduces distortion from business cycles and unusual yearly fluctuations. Lower ratios indicate stronger balance sheet health."
                     icon="🏦"
                     chartData={result.netDebtToFCFHistory}
                     chartValueType="number"
