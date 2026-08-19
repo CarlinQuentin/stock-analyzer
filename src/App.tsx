@@ -5,7 +5,6 @@ import { StockNews } from "./components/StockNews";
 import { ScoreGauge } from "./components/ScoreGauge";
 import { StockPriceChart } from "./components/StockPriceChart";
 import { MetricCard } from "./components/MetricCard";
-import { ValuationTable } from "./components/ValuationTable";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import { ErrorMessage } from "./components/ErrorMessage";
 import { MetricDetailModal } from "./components/MetricDetailModal";
@@ -59,7 +58,6 @@ import {
   calculateOverallValuationScore,
   calculateValuationConfidenceScore,
   getUnavailableValuationMetrics,
-  getValuationAnalysis,
 } from "./utils/valuationScoring";
 
 import { initAnonymousAuth } from "./services/supabaseClient";
@@ -1352,65 +1350,6 @@ function App() {
                 onSelectCompany={handleSearch}
               />
             </div>
-
-            {/* Key Insights */}
-            <div className="bg-white dark:bg-slate-800 border border-transparent dark:border-slate-700/50 rounded-lg shadow-lg p-8 mb-8 transition-colors duration-300">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">
-                Key Insights
-              </h2>
-              <div className="space-y-4 text-slate-600 dark:text-slate-300">
-                {result.metrics.revenueCAGR !== null && (
-                  <p>
-                    <strong>Revenue Trend:</strong> The company's revenue has
-                    grown at a CAGR of{" "}
-                    {(result.metrics.revenueCAGR * 100).toFixed(2)}% over the
-                    past 10 years.{" "}
-                    {result.metrics.revenueCAGR > 0.15
-                      ? "This demonstrates excellent revenue growth."
-                      : result.metrics.revenueCAGR > 0.08
-                        ? "This represents solid revenue growth."
-                        : "This growth rate is moderate."}
-                  </p>
-                )}
-                {result.metrics.debtToEquity !== null && (
-                  <p>
-                    <strong>Financial Health:</strong> With a debt-to-equity
-                    ratio of {result.metrics.debtToEquity.toFixed(2)}, the
-                    company{" "}
-                    {result.metrics.debtToEquity < 0.5
-                      ? "maintains conservative leverage with low financial risk."
-                      : result.metrics.debtToEquity <= 1
-                        ? "operates with reasonable leverage."
-                        : "carries elevated debt levels relative to equity."}
-                  </p>
-                )}
-                {result.metrics.netMargin !== null && (
-                  <p>
-                    <strong>Profitability:</strong> The company maintains a net
-                    profit margin of {result.metrics.netMargin.toFixed(2)}%,
-                    indicating{" "}
-                    {result.metrics.netMargin >= 10
-                      ? "strong"
-                      : result.metrics.netMargin >= 5
-                        ? "adequate"
-                        : "modest"}{" "}
-                    profitability.
-                  </p>
-                )}
-                {result.metrics.fcfGrowth !== null && (
-                  <p>
-                    <strong>Cash Generation:</strong> Free cash flow has grown
-                    at {(result.metrics.fcfGrowth * 100).toFixed(2)}% CAGR,
-                    showing{" "}
-                    {result.metrics.fcfGrowth > 0.1
-                      ? "excellent cash generation capability."
-                      : result.metrics.fcfGrowth > 0.05
-                        ? "solid cash flow expansion."
-                        : "moderate cash flow trends."}
-                  </p>
-                )}
-              </div>
-            </div>
           </>
         )}
 
@@ -1521,71 +1460,6 @@ function App() {
                   onClick={() => setSelectedMetric("historical")}
                   directionStrategy="lowerIsBetter"
                 />
-              </div>
-            </div>
-
-            {/* Valuation Table */}
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
-                Detailed Valuation Analysis
-              </h2>
-              <ValuationTable
-                valuationMetrics={result.valuationMetrics}
-                valuationScores={result.valuationScores}
-              />
-            </div>
-
-            {/* Valuation Insights */}
-            <div className="bg-white dark:bg-slate-800 border border-transparent dark:border-slate-700/50 rounded-lg shadow-lg p-8 mb-8 transition-colors duration-300">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">
-                Valuation Insights
-              </h2>
-              <div className="space-y-4 text-slate-600 dark:text-slate-300">
-                <p>
-                  <strong>Current Valuation Stance:</strong> According to our
-                  scoring system, the stock's valuation is rated as{" "}
-                  <strong
-                    className={
-                      result.overallValuationScore >= 80
-                        ? "text-green-600 dark:text-green-400"
-                        : result.overallValuationScore >= 60
-                          ? "text-blue-600 dark:text-blue-400"
-                          : result.overallValuationScore >= 40
-                            ? "text-amber-600 dark:text-amber-400"
-                            : "text-red-600 dark:text-red-400"
-                    }
-                  >
-                    {getValuationAnalysis(result.overallValuationScore).label}
-                  </strong>
-                  .
-                </p>
-                {result.valuationMetrics.peRatio !== null && (
-                  <p>
-                    <strong>P/E Multiple:</strong> The P/E ratio is currently{" "}
-                    {result.valuationMetrics.peRatio.toFixed(2)}x.{" "}
-                    {result.valuationMetrics.peRatio <= 15
-                      ? "This is historically considered attractive and undervalued."
-                      : result.valuationMetrics.peRatio <= 25
-                        ? "This represents a reasonable price for a stable company."
-                        : "This indicates a premium valuation, requiring robust future growth to justify."}
-                  </p>
-                )}
-                {result.valuationMetrics.averagePremium !== null && (
-                  <p>
-                    <strong>Historical Comparison:</strong> The current stock
-                    valuation represents a{" "}
-                    <strong>
-                      {result.valuationMetrics.averagePremium >= 0
-                        ? "premium of "
-                        : "discount of "}
-                      {Math.abs(
-                        result.valuationMetrics.averagePremium * 100,
-                      ).toFixed(1)}
-                      %
-                    </strong>{" "}
-                    against its 10-year historical multiples.
-                  </p>
-                )}
               </div>
             </div>
           </>
