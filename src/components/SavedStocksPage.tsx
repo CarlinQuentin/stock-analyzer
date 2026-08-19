@@ -122,7 +122,7 @@ export const SavedStocksPage: React.FC<SavedStocksPageProps> = ({
                     )}
                     <div>
                       <h3 className="font-bold text-lg text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                        {stock.companyName}
+                        {stock.companyName || stock.ticker}
                       </h3>
                       <span className="inline-block text-xs font-bold text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-950/60 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-900/50 mt-1">
                         {stock.ticker}
@@ -132,22 +132,35 @@ export const SavedStocksPage: React.FC<SavedStocksPageProps> = ({
                 </div>
 
                 {/* Score Section */}
-                <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                    Universal Score
-                  </span>
-                  <div className={`flex items-center gap-2 px-3 py-1 rounded-lg border font-bold text-sm ${getScoreBadge(stock.score)}`}>
-                    <span>{stock.score}</span>
-                    <span className="text-[10px] uppercase font-bold tracking-wider">
-                      ({getScoreLabel(stock.score)})
+                {stock.score !== undefined && stock.score !== null ? (
+                  <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                      Universal Score
+                    </span>
+                    <div className={`flex items-center gap-2 px-3 py-1 rounded-lg border font-bold text-sm ${getScoreBadge(stock.score)}`}>
+                      <span>{stock.score}</span>
+                      <span className="text-[10px] uppercase font-bold tracking-wider">
+                        ({getScoreLabel(stock.score)})
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                      Status
+                    </span>
+                    <span className="text-xs text-blue-600 dark:text-blue-400 font-bold">
+                      Saved Bookmark
                     </span>
                   </div>
-                </div>
+                )}
 
-                {/* Last Analyzed Date */}
+                {/* Last Analyzed / Saved Date */}
                 <div className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-                  <span className="font-medium text-slate-600 dark:text-slate-300">Last Analyzed:</span>{" "}
-                  {formatDate(stock.lastAnalyzed)}
+                  <span className="font-medium text-slate-600 dark:text-slate-300">
+                    {stock.lastAnalyzed ? "Last Analyzed:" : "Saved On:"}
+                  </span>{" "}
+                  {formatDate(stock.lastAnalyzed || stock.created_at || "")}
                 </div>
               </div>
 

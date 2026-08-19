@@ -400,20 +400,30 @@ function App() {
     });
   }, []);
 
+  const isAuthenticated = Boolean(user && user.email && user.email.includes("@"));
+
   // Fetch account-specific saved stocks whenever current user changes
   useEffect(() => {
     let isMounted = true;
-    savedStocksService.getSavedStocks(user?.id).then((stocks) => {
-      if (isMounted) {
-        setSavedStocks(stocks);
-      }
-    });
+    if (isAuthenticated && user) {
+      savedStocksService
+        .getSavedStocks(user)
+        .then((stocks) => {
+          if (isMounted) {
+            setSavedStocks(stocks);
+          }
+        })
+        .catch((err) => {
+          console.warn("Failed to fetch saved stocks from database:", err);
+          if (isMounted) setSavedStocks([]);
+        });
+    } else {
+      setSavedStocks([]);
+    }
     return () => {
       isMounted = false;
     };
-  }, [user?.id]);
-
-  const isAuthenticated = Boolean(user && user.email && user.email.includes("@"));
+  }, [user, isAuthenticated]);
 
   const handleRequireAuth = useCallback((message?: string) => {
     setAuthPromptMessage(message || "Sign in to save stocks to your account.");
@@ -421,7 +431,7 @@ function App() {
   }, []);
 
   const handleToggleSaveStock = useCallback(async () => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user) {
       handleRequireAuth("Sign in to save stocks to your account.");
       return;
     }
@@ -435,19 +445,34 @@ function App() {
       image: result.companyProfile.image,
       lastAnalyzed: new Date().toISOString(),
     };
-    const { stocks } = await savedStocksService.toggleSaveStock(
-      stockToSave,
-      user?.id,
-    );
-    setSavedStocks(stocks);
-  }, [result, user?.id, isAuthenticated, handleRequireAuth]);
+    try {
+      const { stocks } = await savedStocksService.toggleSaveStock(
+        stockToSave,
+        user,
+        savedStocks,
+      );
+      setSavedStocks(stocks);
+    } catch (err: any) {
+      console.error("Failed to toggle save stock:", err);
+      // Re-reconcile with database
+      const fresh = await savedStocksService.getSavedStocks(user);
+      setSavedStocks(fresh);
+    }
+  }, [result, user, isAuthenticated, savedStocks, handleRequireAuth]);
 
   const handleRemoveSavedStock = useCallback(
     async (ticker: string) => {
-      const stocks = await savedStocksService.removeStock(ticker, user?.id);
-      setSavedStocks(stocks);
+      if (!isAuthenticated || !user) return;
+      try {
+        const stocks = await savedStocksService.removeStock(ticker, user);
+        setSavedStocks(stocks);
+      } catch (err: any) {
+        console.error("Failed to remove saved stock:", err);
+        const fresh = await savedStocksService.getSavedStocks(user);
+        setSavedStocks(fresh);
+      }
     },
-    [user?.id],
+    [user, isAuthenticated],
   );
 
   const loadStockData = useCallback(async (ticker: string) => {
@@ -518,7 +543,7 @@ function App() {
           .catch((err) => console.warn("Future Outlook fetch failed:", err))
           .finally(() => setIsLoadingFutureOutlook(false));
 
-        if (savedStocksService.isStockSaved(ticker, savedStocks)) {
+        if (isAuthenticated && user && savedStocksService.isStockSaved(ticker, savedStocks)) {
           const updatedStocks = await savedStocksService.saveStock(
             {
               ticker,
@@ -529,7 +554,7 @@ function App() {
               image: profile.image,
               lastAnalyzed: new Date().toISOString(),
             },
-            user?.id,
+            user,
           );
           setSavedStocks(updatedStocks);
         }

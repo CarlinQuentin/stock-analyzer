@@ -125,6 +125,49 @@ app.get("/api/auth/me", authenticateToken, (req, res) => {
   }
 });
 
+// GET /api/saved-stocks (Protected: Only authenticated users)
+app.get("/api/saved-stocks", authenticateToken, (req, res) => {
+  try {
+    const saved = db.getSavedStocks(req.user.id);
+    res.json({ savedStocks: saved });
+  } catch (error) {
+    console.error("Error fetching saved stocks:", error);
+    res.status(500).json({ message: "Server error fetching saved stocks" });
+  }
+});
+
+// POST /api/saved-stocks (Protected: Only authenticated users)
+app.post("/api/saved-stocks", authenticateToken, (req, res) => {
+  try {
+    const { ticker } = req.body;
+    if (!ticker) {
+      return res.status(400).json({ message: "Ticker is required" });
+    }
+    const cleanTicker = ticker.trim().toUpperCase();
+    const updated = db.saveStock(req.user.id, cleanTicker);
+    res.status(201).json({ message: "Stock saved successfully", savedStocks: updated });
+  } catch (error) {
+    console.error("Error saving stock:", error);
+    res.status(500).json({ message: "Server error saving stock" });
+  }
+});
+
+// DELETE /api/saved-stocks/:ticker (Protected: Only authenticated users)
+app.delete("/api/saved-stocks/:ticker", authenticateToken, (req, res) => {
+  try {
+    const { ticker } = req.params;
+    if (!ticker) {
+      return res.status(400).json({ message: "Ticker is required" });
+    }
+    const cleanTicker = ticker.trim().toUpperCase();
+    const updated = db.removeStock(req.user.id, cleanTicker);
+    res.json({ message: "Stock removed successfully", savedStocks: updated });
+  } catch (error) {
+    console.error("Error removing stock:", error);
+    res.status(500).json({ message: "Server error removing stock" });
+  }
+});
+
 import { getStockNewsServer } from "./newsService.js";
 
 // GET /api/stocks/:ticker/news

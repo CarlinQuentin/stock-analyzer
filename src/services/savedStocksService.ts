@@ -1,196 +1,258 @@
 import { supabase, isSupabaseConfigured } from "./supabaseClient";
 import { SavedStock } from "../types";
+import { UserProfile } from "./authService";
 
-const LEGACY_STORAGE_KEY = "stock_analyzer_saved_stocks";
-
-const getStorage = (): Storage | null => {
-  if (typeof window !== "undefined" && window.localStorage) {
-    return window.localStorage;
-  }
-  return null;
-};
+const LOCAL_STORAGE_PREFIX = "stock_analyzer_saved_stocks_";
 
 export const savedStocksService = {
-  getStorageKey(userId?: string | null): string {
-    if (userId) {
-      return `stock_analyzer_saved_stocks_${userId}`;
-    }
-    return `stock_analyzer_saved_stocks_guest`;
+  /**
+   * Helper to verify if the provided user profile represents a genuine authenticated user
+   */
+  isAuthenticatedUser(user?: UserProfile | null): boolean {
+    if (!user) return false;
+    if (!user.email || !user.email.includes("@")) return false;
+    if (user.id?.startsWith("anon-") || user.id?.startsWith("guest-")) return false;
+    return true;
   },
 
-  async getSavedStocks(userId?: string | null): Promise<SavedStock[]> {
-    this.migrateLegacyStocks(userId);
-
-    if (
-      isSupabaseConfigured &&
-      userId &&
-      !userId.startsWith("local-") &&
-      !userId.startsWith("demo-")
-    ) {
-      try {
-        const { data, error } = await supabase
-          .from("saved_stocks")
-          .select("*")
-          .eq("user_id", userId)
-          .order("last_analyzed", { ascending: false });
-
-        if (!error && data) {
-          const mapped: SavedStock[] = data.map((row) => ({
-            ticker: row.ticker,
-            companyName: row.company_name,
-            score: Number(row.score),
-            lastAnalyzed: row.last_analyzed || new Date().toISOString(),
-            sector: row.sector || undefined,
-            industry: row.industry || undefined,
-            image: row.image || undefined,
-          }));
-          this.saveToLocalStorage(userId, mapped);
-          return mapped;
-        }
-      } catch (e) {
-        console.warn("Supabase fetch saved_stocks warning:", e);
-      }
-    }
-
-    return this.getFromLocalStorage(userId);
+  /**
+   * Helper to normalize ticker symbol
+   */
+  normalizeTicker(ticker: string): string {
+    return (ticker || "").trim().toUpperCase();
   },
 
+  /**
+   * Check if a ticker is in the current saved stocks list
+   */
   isStockSaved(ticker: string, currentStocks: SavedStock[]): boolean {
-    if (!ticker || !currentStocks) return false;
-    return currentStocks.some(
-      (s) => s.ticker.toUpperCase() === ticker.toUpperCase(),
-    );
+    if (!ticker || !Array.isArray(currentStocks)) return false;
+    const clean = this.normalizeTicker(ticker);
+    return currentStocks.some((s) => this.normalizeTicker(s.ticker) === clean);
   },
 
-  async saveStock(stock: SavedStock, userId?: string | null): Promise<SavedStock[]> {
-    if (!userId || !stock || !stock.ticker) return [];
-    const cleanTicker = stock.ticker.toUpperCase();
-    const now = new Date().toISOString();
+  /**
+   * Retrieve saved stocks for the authenticated user from the database.
+   * Anonymous or unauthenticated users always return an empty list.
+   */
+  async getSavedStocks(user?: UserProfile | null | string): Promise<SavedStock[]> {
+    // Support either UserProfile object or userId string (if user profile)
+    const userProfile: UserProfile | null =
+      typeof user === "string"
+        ? { id: user, email: user.includes("@") ? user : `${user}@local.dev`, name: user }
+        : user || null;
 
-    const currentStocks = await this.getSavedStocks(userId);
-    const existingIndex = currentStocks.findIndex(
-      (s) => s.ticker.toUpperCase() === cleanTicker,
+    if (!this.isAuthenticatedUser(userProfile)) {
+      return [];
+    }
+
+    if (isSupabaseConfigured) {
+      // 1. Verify active Supabase session
+      const { data: userData } = await supabase.auth.getUser();
+      const currentAuthUser = userData?.user;
+
+      if (!currentAuthUser || currentAuthUser.is_anonymous || !currentAuthUser.email) {
+        return [];
+      }
+
+      // 2. Fetch from Supabase database (RLS ensures only current user's records are returned)
+      const { data, error } = await supabase
+        .from("saved_stocks")
+        .select("id, user_id, ticker, created_at")
+        .eq("user_id", currentAuthUser.id)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Database fetch saved_stocks error:", error.message);
+        throw new Error(`Failed to load saved stocks from database: ${error.message}`);
+      }
+
+      const stocks: SavedStock[] = (data || []).map((row) => ({
+        id: row.id,
+        ticker: this.normalizeTicker(row.ticker),
+        created_at: row.created_at,
+        lastAnalyzed: row.created_at,
+      }));
+
+      return stocks;
+    }
+
+    // Local / Offline Fallback Mode for authenticated demo users
+    return this.getFromLocalStorage(userProfile?.id);
+  },
+
+  /**
+   * Save a stock for the authenticated user into the database.
+   * Throws an error if the user is unauthenticated or anonymous.
+   */
+  async saveStock(
+    stockOrTicker: SavedStock | string,
+    user?: UserProfile | null | string
+  ): Promise<SavedStock[]> {
+    const userProfile: UserProfile | null =
+      typeof user === "string"
+        ? { id: user, email: user.includes("@") ? user : `${user}@local.dev`, name: user }
+        : user || null;
+
+    if (!userProfile || !this.isAuthenticatedUser(userProfile)) {
+      throw new Error("Authentication required: Anonymous users cannot save stocks.");
+    }
+
+    const ticker = typeof stockOrTicker === "string" ? stockOrTicker : stockOrTicker.ticker;
+    const cleanTicker = this.normalizeTicker(ticker);
+    if (!cleanTicker) {
+      throw new Error("Invalid ticker symbol.");
+    }
+
+    if (isSupabaseConfigured) {
+      // 1. Verify active Supabase session
+      const { data: userData } = await supabase.auth.getUser();
+      const currentAuthUser = userData?.user;
+
+      if (!currentAuthUser || currentAuthUser.is_anonymous || !currentAuthUser.email) {
+        throw new Error("Authentication required: Please sign in to save stocks to your account.");
+      }
+
+      // 2. Insert into Supabase database with duplicate protection (onConflict user_id, ticker)
+      const { error } = await supabase
+        .from("saved_stocks")
+        .upsert(
+          {
+            user_id: currentAuthUser.id,
+            ticker: cleanTicker,
+            created_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,ticker" }
+        );
+
+      if (error) {
+        console.error("Database upsert saved_stocks error:", error.message);
+        throw new Error(`Failed to save stock to database: ${error.message}`);
+      }
+
+      // 3. Return fresh list from database
+      return await this.getSavedStocks(userProfile);
+    }
+
+    // Local / Offline Fallback Mode for authenticated demo users
+    const current = this.getFromLocalStorage(userProfile.id);
+    const existingIndex = current.findIndex(
+      (s) => this.normalizeTicker(s.ticker) === cleanTicker
     );
+
+    const metadata = typeof stockOrTicker === "object" ? stockOrTicker : {};
+    const now = new Date().toISOString();
 
     let updated: SavedStock[];
     if (existingIndex >= 0) {
-      updated = [...currentStocks];
+      updated = [...current];
       updated[existingIndex] = {
-        ...currentStocks[existingIndex],
-        ...stock,
+        ...updated[existingIndex],
+        ...metadata,
         ticker: cleanTicker,
         lastAnalyzed: now,
       };
     } else {
-      updated = [{ ...stock, ticker: cleanTicker, lastAnalyzed: now }, ...currentStocks];
+      updated = [
+        {
+          ticker: cleanTicker,
+          created_at: now,
+          lastAnalyzed: now,
+          ...metadata,
+        },
+        ...current,
+      ];
     }
 
-    this.saveToLocalStorage(userId, updated);
-
-    if (
-      isSupabaseConfigured &&
-      userId &&
-      !userId.startsWith("local-") &&
-      !userId.startsWith("demo-")
-    ) {
-      try {
-        await supabase.from("saved_stocks").upsert(
-          {
-            user_id: userId,
-            ticker: cleanTicker,
-            company_name: stock.companyName,
-            score: stock.score,
-            last_analyzed: now,
-            sector: stock.sector || null,
-            industry: stock.industry || null,
-            image: stock.image || null,
-          },
-          { onConflict: "user_id,ticker" },
-        );
-      } catch (e) {
-        console.warn("Supabase save stock warning:", e);
-      }
-    }
-
+    this.saveToLocalStorage(userProfile.id, updated);
     return updated;
   },
 
-  async removeStock(ticker: string, userId?: string | null): Promise<SavedStock[]> {
-    if (!userId || !ticker) return [];
-    const cleanTicker = ticker.toUpperCase();
+  /**
+   * Remove a saved stock for the authenticated user from the database.
+   */
+  async removeStock(
+    ticker: string,
+    user?: UserProfile | null | string
+  ): Promise<SavedStock[]> {
+    const userProfile: UserProfile | null =
+      typeof user === "string"
+        ? { id: user, email: user.includes("@") ? user : `${user}@local.dev`, name: user }
+        : user || null;
 
-    const currentStocks = await this.getSavedStocks(userId);
-    const updated = currentStocks.filter(
-      (s) => s.ticker.toUpperCase() !== cleanTicker,
-    );
-
-    this.saveToLocalStorage(userId, updated);
-
-    if (
-      isSupabaseConfigured &&
-      userId &&
-      !userId.startsWith("local-") &&
-      !userId.startsWith("demo-")
-    ) {
-      try {
-        await supabase
-          .from("saved_stocks")
-          .delete()
-          .eq("user_id", userId)
-          .eq("ticker", cleanTicker);
-      } catch (e) {
-        console.warn("Supabase delete stock warning:", e);
-      }
+    if (!userProfile || !this.isAuthenticatedUser(userProfile)) {
+      throw new Error("Authentication required to modify saved stocks.");
     }
 
+    const cleanTicker = this.normalizeTicker(ticker);
+    if (!cleanTicker) return this.getSavedStocks(userProfile);
+
+    if (isSupabaseConfigured) {
+      // 1. Verify active Supabase session
+      const { data: userData } = await supabase.auth.getUser();
+      const currentAuthUser = userData?.user;
+
+      if (!currentAuthUser || currentAuthUser.is_anonymous || !currentAuthUser.email) {
+        throw new Error("Authentication required: Please sign in to manage saved stocks.");
+      }
+
+      // 2. Delete from Supabase database
+      const { error } = await supabase
+        .from("saved_stocks")
+        .delete()
+        .eq("user_id", currentAuthUser.id)
+        .eq("ticker", cleanTicker);
+
+      if (error) {
+        console.error("Database delete saved_stocks error:", error.message);
+        throw new Error(`Failed to remove stock from database: ${error.message}`);
+      }
+
+      // 3. Return fresh list from database
+      return await this.getSavedStocks(userProfile);
+    }
+
+    // Local / Offline Fallback Mode for authenticated demo users
+    const current = this.getFromLocalStorage(userProfile.id);
+    const updated = current.filter((s) => this.normalizeTicker(s.ticker) !== cleanTicker);
+    this.saveToLocalStorage(userProfile.id, updated);
     return updated;
   },
 
+  /**
+   * Toggle save/unsave state for a stock
+   */
   async toggleSaveStock(
-    stock: SavedStock,
-    userId?: string | null,
+    stockOrTicker: SavedStock | string,
+    user?: UserProfile | null | string,
+    currentStocks: SavedStock[] = []
   ): Promise<{ isSaved: boolean; stocks: SavedStock[] }> {
-    const currentStocks = await this.getSavedStocks(userId);
-    if (this.isStockSaved(stock.ticker, currentStocks)) {
-      const stocks = await this.removeStock(stock.ticker, userId);
+    const userProfile: UserProfile | null =
+      typeof user === "string"
+        ? { id: user, email: user.includes("@") ? user : `${user}@local.dev`, name: user }
+        : user || null;
+
+    if (!this.isAuthenticatedUser(userProfile)) {
+      throw new Error("Authentication required: Anonymous users cannot save stocks.");
+    }
+
+    const ticker = typeof stockOrTicker === "string" ? stockOrTicker : stockOrTicker.ticker;
+    const cleanTicker = this.normalizeTicker(ticker);
+
+    if (this.isStockSaved(cleanTicker, currentStocks)) {
+      const stocks = await this.removeStock(cleanTicker, userProfile);
       return { isSaved: false, stocks };
     } else {
-      const stocks = await this.saveStock(stock, userId);
+      const stocks = await this.saveStock(stockOrTicker, userProfile);
       return { isSaved: true, stocks };
     }
   },
 
-  migrateLegacyStocks(userId?: string | null) {
-    try {
-      const storage = getStorage();
-      if (!storage) return;
-      const legacyData = storage.getItem(LEGACY_STORAGE_KEY);
-      if (legacyData) {
-        const legacyStocks: SavedStock[] = JSON.parse(legacyData);
-        if (Array.isArray(legacyStocks) && legacyStocks.length > 0) {
-          const userKey = this.getStorageKey(userId);
-          const existingUserStocks = this.getFromLocalStorage(userId);
-          const merged = [...existingUserStocks];
-          for (const item of legacyStocks) {
-            if (!merged.some((m) => m.ticker.toUpperCase() === item.ticker.toUpperCase())) {
-              merged.push(item);
-            }
-          }
-          storage.setItem(userKey, JSON.stringify(merged));
-        }
-        storage.removeItem(LEGACY_STORAGE_KEY);
-      }
-    } catch (e) {
-      console.warn("Legacy migration warning:", e);
-    }
-  },
-
+  // --- Local storage helpers (used strictly in offline demo mode for authenticated demo users) ---
   getFromLocalStorage(userId?: string | null): SavedStock[] {
+    if (typeof window === "undefined" || !window.localStorage || !userId) return [];
     try {
-      const storage = getStorage();
-      if (!storage) return [];
-      const key = this.getStorageKey(userId);
-      const data = storage.getItem(key);
+      const data = window.localStorage.getItem(`${LOCAL_STORAGE_PREFIX}${userId}`);
       return data ? JSON.parse(data) : [];
     } catch {
       return [];
@@ -198,13 +260,11 @@ export const savedStocksService = {
   },
 
   saveToLocalStorage(userId: string | null | undefined, stocks: SavedStock[]) {
+    if (typeof window === "undefined" || !window.localStorage || !userId) return;
     try {
-      const storage = getStorage();
-      if (!storage) return;
-      const key = this.getStorageKey(userId);
-      storage.setItem(key, JSON.stringify(stocks));
+      window.localStorage.setItem(`${LOCAL_STORAGE_PREFIX}${userId}`, JSON.stringify(stocks));
     } catch (e) {
-      console.error("Failed to save to user-scoped localStorage:", e);
+      console.error("Failed to save to local storage:", e);
     }
   },
 };

@@ -364,10 +364,12 @@ export interface MarketMover {
 }
 
 export interface SavedStock {
+  id?: string;
   ticker: string;
-  companyName: string;
-  score: number;
-  lastAnalyzed: string;
+  created_at?: string;
+  companyName?: string;
+  score?: number;
+  lastAnalyzed?: string;
   sector?: string;
   industry?: string;
   image?: string;
