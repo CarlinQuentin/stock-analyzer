@@ -5,6 +5,7 @@ interface ErrorMessageProps {
   message: string;
   details?: string;
   onRetry?: () => void;
+  onGoHome?: () => void;
 }
 
 export const ErrorMessage: React.FC<ErrorMessageProps> = ({
@@ -12,6 +13,7 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({
   message,
   details,
   onRetry,
+  onGoHome,
 }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 flex items-center justify-center p-4 transition-colors duration-300">
@@ -41,12 +43,21 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({
           </p>
         )}
         <div className="flex gap-3">
-          <a
-            href="/"
-            className="flex-1 bg-slate-600 hover:bg-slate-700 text-white font-medium py-2 px-4 rounded transition-colors text-center"
-          >
-            Go Home
-          </a>
+          {onGoHome ? (
+            <button
+              onClick={onGoHome}
+              className="flex-1 bg-slate-600 hover:bg-slate-700 text-white font-medium py-2 px-4 rounded transition-colors text-center"
+            >
+              Go Home
+            </button>
+          ) : (
+            <a
+              href="/"
+              className="flex-1 bg-slate-600 hover:bg-slate-700 text-white font-medium py-2 px-4 rounded transition-colors text-center"
+            >
+              Go Home
+            </a>
+          )}
           {onRetry && (
             <button
               onClick={onRetry}

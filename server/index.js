@@ -159,6 +159,29 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const distPath = path.join(__dirname, "../dist");
+
+// Serve static assets from dist folder if built
+app.use(express.static(distPath));
+
+// SPA catch-all fallback for client-side routing
+app.get("*", (req, res, next) => {
+  if (req.url.startsWith("/api/")) {
+    return next();
+  }
+  const indexPath = path.join(distPath, "index.html");
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      next();
+    }
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`Express server running on http://localhost:${PORT}`);
 });

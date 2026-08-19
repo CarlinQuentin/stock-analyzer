@@ -19,6 +19,8 @@ import { CompetitorsSection } from "./components/CompetitorsSection";
 import { FutureOutlookSection } from "./components/FutureOutlookSection";
 import { RawFinancialsSection } from "./components/RawFinancialsSection";
 import { PeriodSelector } from "./components/PeriodSelector";
+import { StockSearchCompact } from "./components/StockSearchCompact";
+import { useNavigation, TabType } from "./utils/navigation";
 import { authService, UserProfile } from "./services/authService";
 import { fmpService } from "./services/financialModelingPrep";
 import { savedStocksService } from "./services/savedStocksService";
@@ -80,10 +82,22 @@ function App() {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"fundamentals" | "valuation" | "leadership" | "futureOutlook" | "rawFinancials">(
-    "fundamentals",
-  );
   const [selectedPeriod, setSelectedPeriod] = useState<HistoricalPeriod>("10Y");
+
+  // Navigation & URL routing as single source of truth
+  const {
+    currentTicker,
+    currentTab,
+    currentView,
+    navigateToStock,
+    navigateToTab,
+    navigateToHome,
+    navigateToSaved,
+  } = useNavigation();
+
+  // Active tab is derived directly from the URL route
+  const activeTab: TabType = currentTab;
+
   const [rawStatementData, setRawStatementData] = useState<{
     ticker: string;
     profile: CompanyProfile;
@@ -108,7 +122,6 @@ function App() {
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
   const [savedStocks, setSavedStocks] = useState<SavedStock[]>([]);
-  const [currentView, setCurrentView] = useState<"analyze" | "saved">("analyze");
 
   const computeAnalysisResult = useCallback(
     (
@@ -407,15 +420,6 @@ function App() {
     setShowAuthModal(true);
   }, []);
 
-  const handleLogout = useCallback(() => {
-    authService.logout();
-    setUser(null);
-    setSavedStocks([]); // Immediately clear cached saved stocks on sign out
-    setResult(null);
-    setProfileOnly(null);
-    setCurrentView("analyze");
-  }, []);
-
   const handleToggleSaveStock = useCallback(async () => {
     if (!isAuthenticated) {
       handleRequireAuth("Sign in to save stocks to your account.");
@@ -446,7 +450,7 @@ function App() {
     [user?.id],
   );
 
-  const handleSearch = useCallback(async (ticker: string) => {
+  const loadStockData = useCallback(async (ticker: string) => {
     setIsLoading(true);
     setError(null);
     setResult(null);
@@ -454,7 +458,6 @@ function App() {
     setIsLoadingLeadership(true);
     setCompetitorData(null);
     setIsLoadingCompetitors(true);
-    setActiveTab("fundamentals");
     setShowAllCharts(false);
     setSelectedMetric(null);
 
@@ -568,14 +571,36 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [computeAnalysisResult, savedStocks, user?.id]);
+
+  // Synchronize data loading with URL route ticker
+  useEffect(() => {
+    if (currentTicker) {
+      const normalizedCurrent = currentTicker.toUpperCase();
+      const loadedTicker = result?.ticker?.toUpperCase() || profileOnly?.ticker?.toUpperCase();
+      if (loadedTicker !== normalizedCurrent) {
+        loadStockData(normalizedCurrent);
+      }
+    } else {
+      if (result !== null || profileOnly !== null) {
+        setResult(null);
+        setProfileOnly(null);
+      }
+    }
+  }, [currentTicker, result?.ticker, profileOnly?.ticker, loadStockData]);
+
+  const handleSearch = useCallback(
+    (ticker: string) => {
+      navigateToStock(ticker);
+    },
+    [navigateToStock],
+  );
 
   const handleSelectSavedStock = useCallback(
     (ticker: string) => {
-      setCurrentView("analyze");
-      handleSearch(ticker);
+      navigateToStock(ticker);
     },
-    [handleSearch],
+    [navigateToStock],
   );
 
   const handleAuthSuccess = useCallback(
@@ -586,17 +611,29 @@ function App() {
       if (pendingTicker) {
         const tickerToRetry = pendingTicker;
         setPendingTicker(null);
-        handleSearch(tickerToRetry);
+        navigateToStock(tickerToRetry);
       }
     },
-    [pendingTicker, handleSearch],
+    [pendingTicker, navigateToStock],
   );
 
   const handleRetry = useCallback(() => {
     setError(null);
+    if (currentTicker) {
+      loadStockData(currentTicker);
+    } else {
+      navigateToHome();
+    }
+  }, [currentTicker, loadStockData, navigateToHome]);
+
+  const handleLogout = useCallback(() => {
+    authService.logout();
+    setUser(null);
+    setSavedStocks([]);
     setResult(null);
     setProfileOnly(null);
-  }, []);
+    navigateToHome(true);
+  }, [navigateToHome]);
 
   if (isCheckingAuth) {
     return (
@@ -607,7 +644,7 @@ function App() {
             savedCount={savedStocks.length}
             onLogout={handleLogout}
             onLoginRequest={() => handleRequireAuth("Sign in to save stocks to your account.")}
-            onOpenSavedStocks={() => setCurrentView("saved")}
+            onOpenSavedStocks={() => navigateToSaved()}
           />
         </div>
         <ThemeToggle />
@@ -619,9 +656,9 @@ function App() {
   // Render Saved Stocks Page View
   if (currentView === "saved") {
     if (!isAuthenticated) {
-      // Unauthenticated users are prompted to sign in and redirected back to analyze
+      // Unauthenticated users are prompted to sign in and redirected back to home
       setTimeout(() => {
-        setCurrentView("analyze");
+        navigateToHome(true);
         handleRequireAuth("Sign in to access your saved stocks.");
       }, 0);
       return null;
@@ -635,7 +672,7 @@ function App() {
             savedCount={savedStocks.length}
             onLogout={handleLogout}
             onLoginRequest={() => handleRequireAuth("Sign in to access your saved stocks.")}
-            onOpenSavedStocks={() => setCurrentView("saved")}
+            onOpenSavedStocks={() => navigateToSaved()}
           />
         </div>
         <ThemeToggle />
@@ -643,7 +680,13 @@ function App() {
           savedStocks={savedStocks}
           onSelectStock={handleSelectSavedStock}
           onRemoveStock={handleRemoveSavedStock}
-          onReturnToAnalysis={() => setCurrentView("analyze")}
+          onReturnToAnalysis={() => {
+            if (result) {
+              navigateToStock(result.ticker, currentTab);
+            } else {
+              navigateToHome();
+            }
+          }}
         />
         {showAuthModal && (
           <AuthModal
@@ -668,7 +711,7 @@ function App() {
             savedCount={savedStocks.length}
             onLogout={handleLogout}
             onLoginRequest={() => handleRequireAuth("Sign in to save stocks to your account.")}
-            onOpenSavedStocks={() => setCurrentView("saved")}
+            onOpenSavedStocks={() => navigateToSaved()}
           />
         </div>
         <ThemeToggle />
@@ -696,7 +739,7 @@ function App() {
             savedCount={savedStocks.length}
             onLogout={handleLogout}
             onLoginRequest={() => handleRequireAuth("Sign in to save stocks to your account.")}
-            onOpenSavedStocks={() => setCurrentView("saved")}
+            onOpenSavedStocks={() => navigateToSaved()}
           />
         </div>
         <ThemeToggle />
@@ -704,6 +747,7 @@ function App() {
           title="Analysis Failed"
           message={error}
           onRetry={handleRetry}
+          onGoHome={() => navigateToHome()}
         />
         {showAuthModal && (
           <AuthModal
@@ -728,7 +772,7 @@ function App() {
             savedCount={savedStocks.length}
             onLogout={handleLogout}
             onLoginRequest={() => handleRequireAuth("Sign in to save stocks to your account.")}
-            onOpenSavedStocks={() => setCurrentView("saved")}
+            onOpenSavedStocks={() => navigateToSaved()}
           />
         </div>
         <ThemeToggle />
@@ -756,7 +800,7 @@ function App() {
             savedCount={savedStocks.length}
             onLogout={handleLogout}
             onLoginRequest={() => handleRequireAuth("Sign in to save stocks to your account.")}
-            onOpenSavedStocks={() => setCurrentView("saved")}
+            onOpenSavedStocks={() => navigateToSaved()}
           />
         </div>
         <ThemeToggle />
@@ -766,6 +810,7 @@ function App() {
           onBack={() => {
             setProfileOnly(null);
             setResult(null);
+            navigateToHome();
           }}
         />
         {showAuthModal && (
@@ -794,31 +839,37 @@ function App() {
           savedCount={savedStocks.length}
           onLogout={handleLogout}
           onLoginRequest={() => handleRequireAuth("Sign in to save stocks to your account.")}
-          onOpenSavedStocks={() => setCurrentView("saved")}
+          onOpenSavedStocks={() => navigateToSaved()}
         />
       </div>
       <ThemeToggle />
       <div className="max-w-7xl mx-auto">
-        {/* Back button */}
-        <button
-          onClick={() => setResult(null)}
-          className="mb-6 inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        {/* Top Navigation Bar: Back to Search + Quick Search Bar */}
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <button
+            onClick={() => navigateToHome()}
+            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-semibold text-sm transition-colors group"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-          Back to Search
-        </button>
+            <svg
+              className="w-5 h-5 transition-transform group-hover:-translate-x-1"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+            <span>Back to Search</span>
+          </button>
+
+          <div className="w-full sm:w-80">
+            <StockSearchCompact onSearch={handleSearch} isLoading={isLoading} />
+          </div>
+        </div>
 
         {/* Stock Overview Card & Latest News Side-by-Side */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6 items-stretch">
@@ -901,7 +952,7 @@ function App() {
         <div className="border-b border-slate-200 dark:border-slate-700 mb-6">
           <div className="flex border-b-0 overflow-x-auto scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden text-xs sm:text-sm">
             <button
-              onClick={() => setActiveTab("fundamentals")}
+              onClick={() => navigateToTab("fundamentals")}
               className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
                 activeTab === "fundamentals"
                   ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
@@ -912,7 +963,7 @@ function App() {
               <span>Business Quality (Fundamentals)</span>
             </button>
             <button
-              onClick={() => setActiveTab("valuation")}
+              onClick={() => navigateToTab("valuation")}
               className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
                 activeTab === "valuation"
                   ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
@@ -923,7 +974,7 @@ function App() {
               <span>Stock Valuation (Price)</span>
             </button>
             <button
-              onClick={() => setActiveTab("rawFinancials")}
+              onClick={() => navigateToTab("rawFinancials")}
               className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
                 activeTab === "rawFinancials"
                   ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
@@ -934,7 +985,7 @@ function App() {
               <span>Raw Financials</span>
             </button>
             <button
-              onClick={() => setActiveTab("futureOutlook")}
+              onClick={() => navigateToTab("futureOutlook")}
               className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
                 activeTab === "futureOutlook"
                   ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
@@ -945,7 +996,7 @@ function App() {
               <span>Future Outlook</span>
             </button>
             <button
-              onClick={() => setActiveTab("leadership")}
+              onClick={() => navigateToTab("leadership")}
               className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
                 activeTab === "leadership"
                   ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
@@ -1560,7 +1611,7 @@ function App() {
           </p>
           <p className="mt-2">
             <button
-              onClick={() => setResult(null)}
+              onClick={() => navigateToHome()}
               className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
             >
               Analyze another stock
