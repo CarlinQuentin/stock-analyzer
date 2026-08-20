@@ -1,4 +1,3 @@
-import axios, { AxiosInstance } from "axios";
 import type {
   CompanyProfile,
   FinancialStatement,
@@ -23,14 +22,49 @@ export interface FmpNormalizedQuote {
 const BASE_URL = "https://financialmodelingprep.com/stable";
 
 export class FmpServerService {
-  private client: AxiosInstance;
+  public client = {
+    get: async (endpoint: string, config?: { params?: Record<string, any> }) => {
+      const params = config?.params || {};
+      const url = new URL(`${BASE_URL}${endpoint.startsWith("/") ? endpoint : "/" + endpoint}`);
+      for (const [k, v] of Object.entries(params)) {
+        if (v !== undefined && v !== null && v !== "") {
+          url.searchParams.set(k, String(v));
+        }
+      }
 
-  constructor() {
-    this.client = axios.create({
-      baseURL: BASE_URL,
-      timeout: 10000,
-    });
-  }
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+      try {
+        const res = await fetch(url.toString(), {
+          signal: controller.signal,
+          headers: { Accept: "application/json" },
+        });
+        clearTimeout(timer);
+        if (!res.ok) {
+          let errData: any = {};
+          try {
+            errData = await res.json();
+          } catch {
+            errData = await res.text().catch(() => "");
+          }
+          const error: any = new Error(`FMP HTTP ${res.status}: ${res.statusText}`);
+          error.status = res.status;
+          error.response = { status: res.status, data: errData };
+          throw error;
+        }
+        const data = await res.json();
+        return { data };
+      } catch (err: any) {
+        clearTimeout(timer);
+        if (err.name === "AbortError") {
+          const timeoutErr: any = new Error("FMP request timed out");
+          (timeoutErr as any).code = "ECONNABORTED";
+          throw timeoutErr;
+        }
+        throw err;
+      }
+    },
+  };
 
   private getApiKey(): string {
     const key = process.env.FMP_API_KEY || process.env.VITE_FMP_API_KEY;
@@ -1109,20 +1143,18 @@ export class FmpServerService {
   }
 
   private handleError(error: any, fallbackMessage: string): Error {
-    if (axios.isAxiosError(error)) {
-      const status = error.response?.status;
-      if (status === 401 || status === 403) {
-        return new Error("Authentication failed with upstream financial provider");
-      }
-      if (status === 404) {
-        return new Error("Financial data not found for requested symbol");
-      }
-      if (status === 429) {
-        return new Error("Upstream API rate limit reached. Please try again in a few moments");
-      }
-      if (status && status >= 500) {
-        return new Error("Upstream financial service is temporarily unavailable");
-      }
+    const status = error?.response?.status || error?.status;
+    if (status === 401 || status === 403) {
+      return new Error("Authentication failed with upstream financial provider");
+    }
+    if (status === 404) {
+      return new Error("Financial data not found for requested symbol");
+    }
+    if (status === 429) {
+      return new Error("Upstream API rate limit reached. Please try again in a few moments");
+    }
+    if (status && status >= 500) {
+      return new Error("Upstream financial service is temporarily unavailable");
     }
     return new Error(error?.message || fallbackMessage);
   }
