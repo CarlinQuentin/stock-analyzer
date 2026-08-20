@@ -390,12 +390,47 @@ function App() {
   };
 
   useEffect(() => {
-    // Automatically initialize anonymous Supabase auth session for new visitors
-    initAnonymousAuth();
-    authService.getMe().then((userProfile) => {
-      setUser(userProfile);
+    // 1. Check for OAuth errors in URL hash or search params (e.g. ?error=access_denied)
+    if (typeof window !== "undefined") {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const searchParams = new URLSearchParams(window.location.search);
+      const oauthError =
+        searchParams.get("error_description") ||
+        hashParams.get("error_description") ||
+        searchParams.get("error") ||
+        hashParams.get("error");
+      if (oauthError) {
+        console.warn("OAuth authentication error:", oauthError);
+        setError(`Authentication Error: ${oauthError}`);
+      }
+    }
+
+    // 2. Subscribe to auth state changes (OAuth redirects, login, logout, token refresh)
+    const { data: authListener } = authService.onAuthStateChange((event, _session, userProfile) => {
+      if (userProfile) {
+        setUser(userProfile);
+        setShowAuthModal(false);
+        setAuthPromptMessage(null);
+      } else if (event === "SIGNED_OUT") {
+        setUser(null);
+      }
       setIsCheckingAuth(false);
     });
+
+    // 3. Automatically initialize anonymous Supabase auth session for new visitors if needed
+    initAnonymousAuth();
+
+    // 4. Initial check for existing authenticated session
+    authService.getMe().then((userProfile) => {
+      if (userProfile) {
+        setUser(userProfile);
+      }
+      setIsCheckingAuth(false);
+    });
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
   }, []);
 
   const isAuthenticated = Boolean(user && user.email && user.email.includes("@"));

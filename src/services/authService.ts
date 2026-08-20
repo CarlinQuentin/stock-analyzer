@@ -14,6 +14,51 @@ export interface AuthResponse {
 
 const LOCAL_DEMO_KEY = "stock_analyzer_demo_user";
 
+const safeStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      return typeof localStorage !== "undefined" ? localStorage.getItem(key) : null;
+    } catch {
+      return null;
+    }
+  },
+  setItem: (key: string, value: string): void => {
+    try {
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(key, value);
+      }
+    } catch {}
+  },
+  removeItem: (key: string): void => {
+    try {
+      if (typeof localStorage !== "undefined") {
+        localStorage.removeItem(key);
+      }
+    } catch {}
+  },
+};
+
+export function extractUserProfile(authUser: any): UserProfile | null {
+  if (!authUser || authUser.is_anonymous || !authUser.email) {
+    return null;
+  }
+
+  const metadata = authUser.user_metadata || {};
+  const name =
+    metadata.full_name ||
+    metadata.name ||
+    metadata.user_name ||
+    authUser.email.split("@")[0] ||
+    "Investor";
+
+  return {
+    id: authUser.id,
+    name: name.trim(),
+    email: authUser.email.trim().toLowerCase(),
+    created_at: authUser.created_at,
+  };
+}
+
 class AuthService {
   async register(name: string, email: string, password: string): Promise<AuthResponse> {
     const cleanEmail = email.trim().toLowerCase();
@@ -27,7 +72,7 @@ class AuthService {
         email: cleanEmail,
         created_at: new Date().toISOString(),
       };
-      localStorage.setItem(LOCAL_DEMO_KEY, JSON.stringify(user));
+      safeStorage.setItem(LOCAL_DEMO_KEY, JSON.stringify(user));
       return { message: "Registered successfully (Local mode)", user };
     }
 
@@ -76,10 +121,10 @@ class AuthService {
       throw new Error("Registration failed. Please try again.");
     }
 
-    const user: UserProfile = {
+    const user = extractUserProfile(resUser) || {
       id: resUser.id,
-      name: resUser.user_metadata?.name || cleanName,
-      email: resUser.email || cleanEmail,
+      name: cleanName,
+      email: cleanEmail,
       created_at: resUser.created_at,
     };
 
@@ -89,7 +134,7 @@ class AuthService {
   async login(email: string, password: string): Promise<AuthResponse> {
     if (!isSupabaseConfigured) {
       // Local fallback mode
-      const stored = localStorage.getItem(LOCAL_DEMO_KEY);
+      const stored = safeStorage.getItem(LOCAL_DEMO_KEY);
       let user: UserProfile;
       if (stored) {
         user = JSON.parse(stored);
@@ -102,7 +147,7 @@ class AuthService {
           created_at: new Date().toISOString(),
         };
       }
-      localStorage.setItem(LOCAL_DEMO_KEY, JSON.stringify(user));
+      safeStorage.setItem(LOCAL_DEMO_KEY, JSON.stringify(user));
       return { message: "Logged in successfully (Local mode)", user };
     }
 
@@ -119,9 +164,9 @@ class AuthService {
       throw new Error("Login failed. Invalid credentials.");
     }
 
-    const user: UserProfile = {
+    const user = extractUserProfile(data.user) || {
       id: data.user.id,
-      name: data.user.user_metadata?.name || data.user.email?.split("@")[0] || "Investor",
+      name: data.user.email?.split("@")[0] || "Investor",
       email: data.user.email || email,
       created_at: data.user.created_at,
     };
@@ -129,9 +174,59 @@ class AuthService {
     return { message: "Logged in successfully", user };
   }
 
+  /**
+   * Initiates Supabase Google OAuth ("Continue with Google") flow
+   */
+  async loginWithGoogle(redirectTo?: string): Promise<{ data: any; error: any }> {
+    if (!isSupabaseConfigured) {
+      // Local fallback mode when Supabase is not configured
+      const user: UserProfile = {
+        id: "local-google-" + Date.now(),
+        name: "Google Demo User",
+        email: "google.user@example.com",
+        created_at: new Date().toISOString(),
+      };
+      safeStorage.setItem(LOCAL_DEMO_KEY, JSON.stringify(user));
+      return { data: { user, session: null }, error: null };
+    }
+
+    const targetRedirect =
+      redirectTo ||
+      (typeof window !== "undefined"
+        ? `${window.location.origin}${window.location.pathname}`
+        : undefined);
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: targetRedirect,
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent",
+        },
+      },
+    });
+
+    return { data, error };
+  }
+
+  /**
+   * Subscribes to Supabase Auth state changes (OAuth redirects, token refreshes, sign in/out)
+   */
+  onAuthStateChange(callback: (event: string, session: any, user: UserProfile | null) => void) {
+    if (!isSupabaseConfigured) {
+      return { data: { subscription: { unsubscribe: () => {} } } };
+    }
+
+    return supabase.auth.onAuthStateChange((event, session) => {
+      const user = session?.user ? extractUserProfile(session.user) : null;
+      callback(event, session, user);
+    });
+  }
+
   async getMe(): Promise<UserProfile | null> {
     if (!isSupabaseConfigured) {
-      const stored = localStorage.getItem(LOCAL_DEMO_KEY);
+      const stored = safeStorage.getItem(LOCAL_DEMO_KEY);
       if (!stored) return null;
       try {
         return JSON.parse(stored);
@@ -143,13 +238,7 @@ class AuthService {
     try {
       const { data } = await supabase.auth.getUser();
       if (!data || !data.user) return null;
-
-      return {
-        id: data.user.id,
-        name: data.user.user_metadata?.name || data.user.email?.split("@")[0] || "Investor",
-        email: data.user.email || "",
-        created_at: data.user.created_at,
-      };
+      return extractUserProfile(data.user);
     } catch (err) {
       return null;
     }
@@ -157,7 +246,7 @@ class AuthService {
 
   async logout(): Promise<void> {
     if (!isSupabaseConfigured) {
-      localStorage.removeItem(LOCAL_DEMO_KEY);
+      safeStorage.removeItem(LOCAL_DEMO_KEY);
       return;
     }
 
