@@ -1,6 +1,6 @@
 import { fmpServerService } from "../../src/lib/server/fmpServerService";
 import { verifyServerAuth } from "../../src/lib/server/authHelper";
-import { fetchGoogleStockNewsServer } from "../news";
+import { fetchGoogleStockNews } from "../../src/services/newsEngine";
 import { sendJson, extractTicker, extractOperation, extractParam } from "../_lib/handlerHelper";
 
 /**
@@ -87,7 +87,7 @@ export default async function handler(req: any, res: any) {
         const companyName = extractParam(req, "companyName");
         const refresh = extractParam(req, "refresh") === "true";
         const limit = parseInt(extractParam(req, "limit") || "8", 10);
-        const news = await fetchGoogleStockNewsServer(ticker, companyName, refresh, limit);
+        const news = await fetchGoogleStockNews(ticker, companyName, refresh, limit);
         res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
         return sendJson(res, 200, news);
       }

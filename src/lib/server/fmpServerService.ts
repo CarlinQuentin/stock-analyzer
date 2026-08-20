@@ -33,7 +33,7 @@ export class FmpServerService {
   }
 
   private getApiKey(): string {
-    const key = process.env.FMP_API_KEY;
+    const key = process.env.FMP_API_KEY || process.env.VITE_FMP_API_KEY;
     if (!key || key.trim().length === 0) {
       throw new Error("FMP_API_KEY environment variable is not configured on the server");
     }
