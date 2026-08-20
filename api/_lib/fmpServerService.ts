@@ -9,7 +9,7 @@ import type {
   PriceTargetNewsItem,
   AnalystGradeItem,
   FutureOutlookData,
-} from "./types";
+} from "./types.js";
 
 export interface FmpNormalizedQuote {
   symbol: string;

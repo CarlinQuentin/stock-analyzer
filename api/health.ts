@@ -1,7 +1,7 @@
 /**
  * Vercel Serverless Function: GET /api/health
  */
-import { fmpServerService } from "./_lib/fmpServerService";
+import { fmpServerService } from "./_lib/fmpServerService.js";
 
 export default async function handler(_req: any, res: any) {
   res.setHeader("Cache-Control", "no-cache");

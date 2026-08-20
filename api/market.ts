@@ -1,5 +1,5 @@
-import { fmpServerService } from "./_lib/fmpServerService";
-import { sendJson, extractParam, extractOperation } from "./_lib/handlerHelper";
+import { fmpServerService } from "./_lib/fmpServerService.js";
+import { sendJson, extractParam, extractOperation } from "./_lib/handlerHelper.js";
 
 /**
  * Consolidated Vercel Serverless Function: GET & POST /api/market

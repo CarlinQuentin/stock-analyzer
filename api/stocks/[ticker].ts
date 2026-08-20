@@ -1,7 +1,7 @@
-import { fmpServerService } from "../_lib/fmpServerService";
-import { verifyServerAuth } from "../_lib/authHelper";
-import { fetchGoogleStockNews } from "../_lib/newsEngine";
-import { sendJson, extractTicker, extractOperation, extractParam } from "../_lib/handlerHelper";
+import { fmpServerService } from "../_lib/fmpServerService.js";
+import { verifyServerAuth } from "../_lib/authHelper.js";
+import { fetchGoogleStockNews } from "../_lib/newsEngine.js";
+import { sendJson, extractTicker, extractOperation, extractParam } from "../_lib/handlerHelper.js";
 
 /**
  * Consolidated Vercel Serverless Function: GET /api/stocks/:ticker
