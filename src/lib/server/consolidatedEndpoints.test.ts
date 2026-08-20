@@ -4,6 +4,7 @@ import marketHandler from "../../../api/market";
 import searchHandler from "../../../api/search";
 import newsHandler from "../../../api/news";
 import { fmpServerService } from "./fmpServerService";
+import * as authHelper from "../../../api/_lib/authHelper.js";
 
 describe("Consolidated Vercel Serverless Function Handlers", () => {
   beforeEach(() => {
@@ -56,17 +57,91 @@ describe("Consolidated Vercel Serverless Function Handlers", () => {
       expect(res.body.symbol).toBe("AAPL");
     });
 
-    it("1.2 Rejects unauthenticated requests to ?operation=statements with 401", async () => {
+    it("1.2 Returns HTTP 200 with public statement data and null futureOutlook for unauthenticated requests, skipping Outlook FMP calls", async () => {
+      vi.spyOn(fmpServerService, "getStatementData").mockResolvedValue({
+        incomeStatements: [{ date: "2024-01-01", revenue: 1000 }],
+        balanceSheets: [],
+        cashFlowStatements: [],
+      } as any);
+      const outlookSpy = vi.spyOn(fmpServerService, "getFutureOutlookData");
+
       const req = { method: "GET", query: { ticker: "NVDA", operation: "statements" }, headers: {} };
+      const res = createMockRes();
+
+      await stocksHandler(req, res);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.incomeStatements).toHaveLength(1);
+      expect(res.body.futureOutlook).toBeNull();
+      expect(outlookSpy).not.toHaveBeenCalled();
+    });
+
+    it("1.3 Rejects unauthenticated direct requests to ?operation=outlook with 401 without calling FMP", async () => {
+      const outlookSpy = vi.spyOn(fmpServerService, "getFutureOutlookData");
+      const req = { method: "GET", query: { ticker: "NVDA", operation: "outlook" }, headers: {} };
       const res = createMockRes();
 
       await stocksHandler(req, res);
 
       expect(res.statusCode).toBe(401);
       expect(res.body.message).toBeDefined();
+      expect(outlookSpy).not.toHaveBeenCalled();
     });
 
-    it("1.3 Handles invalid symbol format with 400", async () => {
+    it("1.4 Returns HTTP 200 with statement data AND futureOutlook for authenticated requests", async () => {
+      vi.spyOn(authHelper, "verifyServerAuth").mockResolvedValue({
+        authenticated: true,
+        user: { id: "user-123", email: "investor@example.com" },
+      });
+      vi.spyOn(fmpServerService, "getStatementData").mockResolvedValue({
+        incomeStatements: [{ date: "2024-01-01", revenue: 5000 }],
+        balanceSheets: [],
+        cashFlowStatements: [],
+      } as any);
+      vi.spyOn(fmpServerService, "getFutureOutlookData").mockResolvedValue({
+        estimates: [{ period: "2025", estimatedRevenueAvg: 6000 }],
+      } as any);
+
+      const req = {
+        method: "GET",
+        query: { ticker: "NVDA", operation: "statements" },
+        headers: { authorization: "Bearer valid-token" },
+      };
+      const res = createMockRes();
+
+      await stocksHandler(req, res);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.incomeStatements).toHaveLength(1);
+      expect(res.body.futureOutlook).toBeDefined();
+      expect(res.body.futureOutlook.estimates).toHaveLength(1);
+    });
+
+    it("1.5 Returns HTTP 200 for authenticated direct ?operation=outlook requests", async () => {
+      vi.spyOn(authHelper, "verifyServerAuth").mockResolvedValue({
+        authenticated: true,
+        user: { id: "user-123", email: "investor@example.com" },
+      });
+      vi.spyOn(fmpServerService, "getFutureOutlookData").mockResolvedValue({
+        estimates: [{ period: "2025", estimatedRevenueAvg: 6000 }],
+        priceTarget: { targetConsensus: 150 },
+      } as any);
+
+      const req = {
+        method: "GET",
+        query: { ticker: "NVDA", operation: "outlook" },
+        headers: { authorization: "Bearer valid-token" },
+      };
+      const res = createMockRes();
+
+      await stocksHandler(req, res);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.estimates).toHaveLength(1);
+      expect(res.body.priceTarget.targetConsensus).toBe(150);
+    });
+
+    it("1.6 Handles invalid symbol format with 400", async () => {
       const req = { method: "GET", query: { ticker: "INVALID$$$TICKER", operation: "profile" } };
       const res = createMockRes();
 
@@ -75,7 +150,7 @@ describe("Consolidated Vercel Serverless Function Handlers", () => {
       expect(res.statusCode).toBe(400);
     });
 
-    it("1.4 Handles unsupported operation with 400", async () => {
+    it("1.7 Handles unsupported operation with 400", async () => {
       const req = { method: "GET", query: { ticker: "AAPL", operation: "nonexistent_op" } };
       const res = createMockRes();
 

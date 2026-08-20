@@ -24,6 +24,12 @@ export const ALL_TABS: TabType[] = [
   "leadership",
 ];
 
+export const PROTECTED_TABS: TabType[] = ["futureOutlook"];
+
+export function isTabProtected(tab: TabType): boolean {
+  return PROTECTED_TABS.includes(tab);
+}
+
 export const TAB_TO_SLUG_MAP: Record<TabType, string> = {
   fundamentals: "fundamentals",
   valuation: "valuation",

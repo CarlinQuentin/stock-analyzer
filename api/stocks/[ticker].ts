@@ -28,16 +28,39 @@ export default async function handler(req: any, res: any) {
         return sendJson(res, 200, profile);
       }
 
-      case "statements": {
+      case "statements":
+      case "analysis":
+      case "all": {
         const authResult = await verifyServerAuth(req);
-        if (!authResult.authenticated) {
-          return sendJson(res, 401, {
-            message: authResult.error || "Authentication required. Please sign in.",
-          });
-        }
-        const statements = await fmpServerService.getStatementData(ticker);
+        const shouldFetchOutlook = Boolean(authResult.authenticated);
+
+        const currentPriceParam = extractParam(req, "currentPrice");
+        const historicalEpsCagrParam = extractParam(req, "historicalEpsCagr");
+        const historicalRevenueCagrParam = extractParam(req, "historicalRevenueCagr");
+
+        const currentPrice = currentPriceParam ? parseFloat(currentPriceParam) : undefined;
+        const historicalEpsCagr = historicalEpsCagrParam ? parseFloat(historicalEpsCagrParam) : undefined;
+        const historicalRevenueCagr = historicalRevenueCagrParam ? parseFloat(historicalRevenueCagrParam) : undefined;
+
+        const [statements, futureOutlook] = await Promise.all([
+          fmpServerService.getStatementData(ticker),
+          shouldFetchOutlook
+            ? fmpServerService
+                .getFutureOutlookData(
+                  ticker,
+                  currentPrice,
+                  historicalEpsCagr,
+                  historicalRevenueCagr
+                )
+                .catch(() => null)
+            : Promise.resolve(null),
+        ]);
+
         res.setHeader("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=7200");
-        return sendJson(res, 200, statements);
+        return sendJson(res, 200, {
+          ...statements,
+          futureOutlook,
+        });
       }
 
       case "prices": {
@@ -53,6 +76,15 @@ export default async function handler(req: any, res: any) {
       }
 
       case "outlook": {
+        const authResult = await verifyServerAuth(req);
+        if (!authResult.authenticated) {
+          return sendJson(res, 401, {
+            message:
+              authResult.error ||
+              "Authentication required to view future outlook data.",
+          });
+        }
+
         const currentPriceParam = extractParam(req, "currentPrice");
         const historicalEpsCagrParam = extractParam(req, "historicalEpsCagr");
         const historicalRevenueCagrParam = extractParam(req, "historicalRevenueCagr");

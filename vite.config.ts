@@ -146,13 +146,38 @@ function apiMiddlewarePlugin(env: Record<string, string>): Plugin {
               const ticker = rawTicker;
               const operation = subOperation || searchParams.get("operation") || "profile";
 
-              if (operation === "statements") {
+              if (operation === "statements" || operation === "analysis" || operation === "all") {
                 const authResult = await verifyServerAuth(req);
-                if (!authResult.authenticated) {
-                  return sendResponse(401, { message: authResult.error || "Authentication required. Please sign in." });
-                }
-                const result = await fmpServerService.getStatementData(ticker);
-                return sendResponse(200, result);
+                const shouldFetchOutlook = Boolean(authResult.authenticated);
+
+                const currentPrice = searchParams.has("currentPrice")
+                  ? parseFloat(searchParams.get("currentPrice")!)
+                  : undefined;
+                const historicalEpsCagr = searchParams.has("historicalEpsCagr")
+                  ? parseFloat(searchParams.get("historicalEpsCagr")!)
+                  : undefined;
+                const historicalRevenueCagr = searchParams.has("historicalRevenueCagr")
+                  ? parseFloat(searchParams.get("historicalRevenueCagr")!)
+                  : undefined;
+
+                const [statements, futureOutlook] = await Promise.all([
+                  fmpServerService.getStatementData(ticker),
+                  shouldFetchOutlook
+                    ? fmpServerService
+                        .getFutureOutlookData(
+                          ticker,
+                          currentPrice,
+                          historicalEpsCagr,
+                          historicalRevenueCagr
+                        )
+                        .catch(() => null)
+                    : Promise.resolve(null),
+                ]);
+
+                return sendResponse(200, {
+                  ...statements,
+                  futureOutlook,
+                });
               }
 
               if (operation === "prices") {
@@ -166,6 +191,15 @@ function apiMiddlewarePlugin(env: Record<string, string>): Plugin {
               }
 
               if (operation === "outlook") {
+                const authResult = await verifyServerAuth(req);
+                if (!authResult.authenticated) {
+                  return sendResponse(401, {
+                    message:
+                      authResult.error ||
+                      "Authentication required to view future outlook data.",
+                  });
+                }
+
                 const currentPrice = searchParams.has("currentPrice")
                   ? parseFloat(searchParams.get("currentPrice")!)
                   : undefined;

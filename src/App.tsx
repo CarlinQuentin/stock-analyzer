@@ -16,10 +16,11 @@ import { SavedStocksPage } from "./components/SavedStocksPage";
 import { LeadershipSection } from "./components/LeadershipSection";
 import { CompetitorsSection } from "./components/CompetitorsSection";
 import { FutureOutlookSection } from "./components/FutureOutlookSection";
+import { LockedFeatureTeaser } from "./components/LockedFeatureTeaser";
 import { RawFinancialsSection } from "./components/RawFinancialsSection";
 import { PeriodSelector } from "./components/PeriodSelector";
 import { StockSearchCompact } from "./components/StockSearchCompact";
-import { useNavigation, TabType } from "./utils/navigation";
+import { useNavigation, TabType, isTabProtected } from "./utils/navigation";
 import { authService, UserProfile } from "./services/authService";
 import { fmpService } from "./services/financialModelingPrep";
 import { savedStocksService } from "./services/savedStocksService";
@@ -71,6 +72,7 @@ function App() {
     null,
   );
   const [pendingTicker, setPendingTicker] = useState<string | null>(null);
+  const [pendingProtectedTab, setPendingProtectedTab] = useState<TabType | null>(null);
 
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [profileOnly, setProfileOnly] = useState<{
@@ -458,10 +460,18 @@ function App() {
     };
   }, [user, isAuthenticated]);
 
-  const handleRequireAuth = useCallback((message?: string) => {
-    setAuthPromptMessage(message || "Sign in to save stocks to your account.");
-    setShowAuthModal(true);
-  }, []);
+  const handleRequireAuth = useCallback(
+    (message?: string, returnToTab?: TabType) => {
+      setAuthPromptMessage(
+        message || "Sign in to save stocks to your account.",
+      );
+      if (returnToTab) {
+        setPendingProtectedTab(returnToTab);
+      }
+      setShowAuthModal(true);
+    },
+    [],
+  );
 
   const handleToggleSaveStock = useCallback(async () => {
     if (!isAuthenticated || !user) {
@@ -564,17 +574,26 @@ function App() {
         const initialResult = computeAnalysisResult(rawData, "10Y");
         setResult(initialResult);
 
-        // Fetch Future Outlook asynchronously using calculated historical CAGRs
-        fmpService
-          .getFutureOutlookData(
-            ticker,
-            profile.price,
-            initialResult.metrics.epsGrowth,
-            initialResult.metrics.revenueCAGR,
-          )
-          .then((foData) => setFutureOutlookData(foData))
-          .catch((err) => console.warn("Future Outlook fetch failed:", err))
-          .finally(() => setIsLoadingFutureOutlook(false));
+        // Populate or fetch Future Outlook (authenticated users only)
+        if (isAuthenticated && (statementData as any)?.futureOutlook) {
+          setFutureOutlookData((statementData as any).futureOutlook);
+          setIsLoadingFutureOutlook(false);
+        } else if (isAuthenticated) {
+          setIsLoadingFutureOutlook(true);
+          fmpService
+            .getFutureOutlookData(
+              ticker,
+              profile.price,
+              initialResult.metrics.epsGrowth,
+              initialResult.metrics.revenueCAGR,
+            )
+            .then((foData) => setFutureOutlookData(foData))
+            .catch((err) => console.warn("Future Outlook fetch failed:", err))
+            .finally(() => setIsLoadingFutureOutlook(false));
+        } else {
+          setIsLoadingFutureOutlook(false);
+          setFutureOutlookData(null);
+        }
 
         if (isAuthenticated && user && savedStocksService.isStockSaved(ticker, savedStocks)) {
           const updatedStocks = await savedStocksService.saveStock(
@@ -629,7 +648,37 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [computeAnalysisResult, savedStocks, user?.id]);
+  }, [computeAnalysisResult, savedStocks, user?.id, isAuthenticated]);
+
+  // Fetch Future Outlook data when user authenticates while viewing an already loaded stock
+  useEffect(() => {
+    if (
+      !isCheckingAuth &&
+      isAuthenticated &&
+      result &&
+      !futureOutlookData &&
+      !isLoadingFutureOutlook &&
+      result.companyProfile
+    ) {
+      setIsLoadingFutureOutlook(true);
+      fmpService
+        .getFutureOutlookData(
+          result.ticker,
+          result.companyProfile.price,
+          result.metrics.epsGrowth,
+          result.metrics.revenueCAGR,
+        )
+        .then((foData) => setFutureOutlookData(foData))
+        .catch((err) => console.warn("Future Outlook fetch failed:", err))
+        .finally(() => setIsLoadingFutureOutlook(false));
+    }
+  }, [
+    isCheckingAuth,
+    isAuthenticated,
+    result,
+    futureOutlookData,
+    isLoadingFutureOutlook,
+  ]);
 
   // Synchronize data loading with URL route ticker
   useEffect(() => {
@@ -668,11 +717,17 @@ function App() {
       setAuthPromptMessage(null);
       if (pendingTicker) {
         const tickerToRetry = pendingTicker;
+        const targetTab = pendingProtectedTab || undefined;
         setPendingTicker(null);
-        navigateToStock(tickerToRetry);
+        setPendingProtectedTab(null);
+        navigateToStock(tickerToRetry, targetTab);
+      } else if (pendingProtectedTab) {
+        const tabToNavigate = pendingProtectedTab;
+        setPendingProtectedTab(null);
+        navigateToTab(tabToNavigate);
       }
     },
-    [pendingTicker, navigateToStock],
+    [pendingTicker, pendingProtectedTab, navigateToStock, navigateToTab],
   );
 
   const handleRetry = useCallback(() => {
@@ -688,6 +743,7 @@ function App() {
     authService.logout();
     setUser(null);
     setSavedStocks([]);
+    setFutureOutlookData(null);
     setResult(null);
     setProfileOnly(null);
     navigateToHome(true);
@@ -1043,7 +1099,16 @@ function App() {
               <span>Raw Financials</span>
             </button>
             <button
-              onClick={() => navigateToTab("futureOutlook")}
+              onClick={() => {
+                if (isTabProtected("futureOutlook") && !isAuthenticated) {
+                  handleRequireAuth(
+                    "Sign in or create a free account to unlock Future Outlook forecasts and analyst estimates.",
+                    "futureOutlook",
+                  );
+                  return;
+                }
+                navigateToTab("futureOutlook");
+              }}
               className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
                 activeTab === "futureOutlook"
                   ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
@@ -1052,6 +1117,12 @@ function App() {
             >
               <span>🔮</span>
               <span>Future Outlook</span>
+              {isTabProtected("futureOutlook") && !isAuthenticated && (
+                <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 flex items-center gap-1">
+                  <span>🔒</span>
+                  <span>Free Account</span>
+                </span>
+              )}
             </button>
             <button
               onClick={() => navigateToTab("leadership")}
@@ -1517,10 +1588,25 @@ function App() {
 
         {/* Future Outlook Tab Content */}
         {activeTab === "futureOutlook" && (
-          <FutureOutlookSection
-            data={futureOutlookData}
-            loading={isLoadingFutureOutlook}
-          />
+          isTabProtected("futureOutlook") && !isAuthenticated ? (
+            <LockedFeatureTeaser
+              title="Member-Only Feature"
+              description="Sign in or create a free account to unlock consensus Wall Street analyst forecasts, 12-month price targets, revenue estimates, and earnings outlook."
+              badge="Free Account"
+              ctaText="Sign In / Create Account"
+              onUnlock={() =>
+                handleRequireAuth(
+                  "Sign in or create a free account to unlock Future Outlook forecasts and analyst estimates.",
+                  "futureOutlook",
+                )
+              }
+            />
+          ) : (
+            <FutureOutlookSection
+              data={futureOutlookData}
+              loading={isLoadingFutureOutlook}
+            />
+          )
         )}
 
         {/* Leadership Tab Content */}
@@ -1565,6 +1651,7 @@ function App() {
             onClose={() => {
               setShowAuthModal(false);
               setAuthPromptMessage(null);
+              setPendingProtectedTab(null);
             }}
             customPrompt={authPromptMessage}
           />

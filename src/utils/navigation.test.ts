@@ -8,6 +8,8 @@ import {
   navigateTo,
   NAVIGATE_EVENT,
   DEFAULT_TAB,
+  PROTECTED_TABS,
+  isTabProtected,
 } from "./navigation";
 
 describe("Navigation & URL Routing Utility", () => {
@@ -259,6 +261,20 @@ describe("Navigation & URL Routing Utility", () => {
       navigateTo("/stock/MSFT?tab=valuation", true);
       expect(replaceStateMock).toHaveBeenCalledWith({}, "", "/stock/MSFT?tab=valuation");
       expect(eventReceived).toEqual({ url: "/stock/MSFT?tab=valuation" });
+    });
+  });
+
+  describe("Protected Tabs Configuration", () => {
+    it("identifies protected tabs correctly", () => {
+      expect(isTabProtected("futureOutlook")).toBe(true);
+      expect(PROTECTED_TABS).toContain("futureOutlook");
+    });
+
+    it("identifies public unrestricted tabs correctly", () => {
+      expect(isTabProtected("fundamentals")).toBe(false);
+      expect(isTabProtected("valuation")).toBe(false);
+      expect(isTabProtected("rawFinancials")).toBe(false);
+      expect(isTabProtected("leadership")).toBe(false);
     });
   });
 });
