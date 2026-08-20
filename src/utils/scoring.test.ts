@@ -13,6 +13,7 @@ import {
   scoreNetDebtToFCF,
   scoreShareDilution,
   scoreROIC,
+  getMetricAnalysis,
   calculateMetricScores,
   calculateUniversalBusinessScore,
   calculateIndustryScore,
@@ -93,6 +94,39 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
     it("11. Verifies ROIC Quality Score is preserved for AAL (0.3443% -> 22/100) and Case 2 (45.20% -> 100/100)", () => {
       expect(scoreROIC(0.3443)).toBe(22);
       expect(scoreROIC(45.2)).toBe(100);
+    });
+
+    it("11b. Verifies ROIC 10.84% scores in Good tier (70-84) and tests all ROIC tiers", () => {
+      // 10.84% is in Good tier (10% - 15%)
+      const score1084 = scoreROIC(10.84);
+      expect(score1084).toBe(72);
+      expect(score1084).toBeGreaterThanOrEqual(70);
+      expect(score1084).toBeLessThanOrEqual(84);
+      expect(getMetricAnalysis(score1084)).toBe("Good");
+
+      // Tier 1: Excellent (>= 15%): Score 85-100
+      expect(scoreROIC(25)).toBe(100);
+      expect(scoreROIC(20)).toBe(93);
+      expect(scoreROIC(16)).toBe(87);
+
+      // Tier 2: Good (10% - 15%): Score 70-84
+      expect(scoreROIC(15)).toBe(84);
+      expect(scoreROIC(14)).toBe(81);
+      expect(scoreROIC(12)).toBe(76);
+      expect(scoreROIC(11)).toBe(73);
+
+      // Tier 3: Average (6% - 10%): Score 50-69
+      expect(scoreROIC(10)).toBe(69);
+      expect(scoreROIC(8)).toBe(60);
+      expect(scoreROIC(7)).toBe(55);
+
+      // Tier 4: Poor (< 6%): Score 0-49
+      expect(scoreROIC(6)).toBe(49);
+      expect(scoreROIC(4)).toBe(39);
+      expect(scoreROIC(2)).toBe(30);
+      expect(scoreROIC(1)).toBe(25);
+      expect(scoreROIC(0)).toBe(19);
+      expect(scoreROIC(-5)).toBe(0);
     });
 
     it("12. Formats Historical Valuation decimal premium (0.0395) accurately as 3.95% (never 395.41%)", () => {

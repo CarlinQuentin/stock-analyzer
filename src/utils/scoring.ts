@@ -1,5 +1,5 @@
 import { FinancialMetrics, MetricScores, FinancialStatement, ScoringConfig, HistoricalPeriod } from "../types";
-import { calculateEPSTrend, calculateFCFTrend, calculateROICAnalysis } from "./financialCalculations";
+import { calculateEPSTrend, calculateFCFTrend } from "./financialCalculations";
 
 export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
   universalScoreMetrics: {
@@ -205,17 +205,12 @@ export function scoreFCFGrowth(
  * Poor: < 6%       (Score 0-49)
  */
 export function scoreROIC(
-  roic: number | null,
-  incomeStatements?: FinancialStatement[],
-  balanceSheets?: FinancialStatement[],
-  selectedPeriod: HistoricalPeriod = "10Y",
+  roic: number | null | undefined,
+  _incomeStatements?: FinancialStatement[],
+  _balanceSheets?: FinancialStatement[],
+  _selectedPeriod: HistoricalPeriod = "10Y",
 ): number | null {
-  if (roic === null) return null;
-
-  if (incomeStatements && balanceSheets && incomeStatements.length > 0 && balanceSheets.length > 0) {
-    const analysis = calculateROICAnalysis(incomeStatements, balanceSheets, selectedPeriod);
-    return analysis.totalROICScore100;
-  }
+  if (roic === null || roic === undefined || isNaN(roic)) return null;
 
   return interpolateScore(roic, [
     { minVal: -5, maxVal: 0, minScore: 0, maxScore: 19 },
