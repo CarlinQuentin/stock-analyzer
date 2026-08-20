@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { fmpService } from "../../services/financialModelingPrep";
+import { fmpServerService as fmpService } from "../../lib/server/fmpServerService";
 import { calculateAllMetrics } from "../../utils/financialCalculations";
 import { calculateValuationMetrics } from "../../utils/valuationScoring";
 import {
@@ -21,7 +21,8 @@ describe("E2E / API Data-Mapping Layer Tests (Layer 1)", () => {
   let axiosGetSpy: any;
 
   beforeEach(() => {
-    // Spy on the underlying Axios client used by fmpService to mock raw FMP HTTP responses
+    process.env.FMP_API_KEY = "test_fmp_api_key";
+    // Spy on the underlying Axios client used by fmpServerService to mock raw FMP HTTP responses
     axiosGetSpy = vi.spyOn((fmpService as any).client, "get");
   });
 
@@ -410,10 +411,7 @@ describe("E2E / API Data-Mapping Layer Tests (Layer 1)", () => {
 
       await expect(
         fmpService.getCompanyProfile("INVALID"),
-      ).rejects.toMatchObject({
-        code: "ERROR",
-        message: "Company not found: INVALID",
-      });
+      ).rejects.toThrow("Company not found: INVALID");
     });
 
     it("6.2 Null response data: getIncomeStatements throws friendly error", async () => {

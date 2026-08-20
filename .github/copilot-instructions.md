@@ -67,7 +67,7 @@ npm install
 1. Get API key: https://financialmodelingprep.com/developer/docs (free tier available)
 2. Create `.env.local` in project root:
    ```
-   VITE_FMP_API_KEY=your_api_key_here
+   FMP_API_KEY=your_api_key_here
    ```
 
 ### Development Server
@@ -192,7 +192,7 @@ Edit thresholds in `src/utils/scoring.ts`:
 ### "API key not found"
 
 - Check `.env.local` exists
-- Verify `VITE_FMP_API_KEY` is set correctly
+- Verify `FMP_API_KEY` is set correctly
 - Restart dev server after changing env variables
 
 ### "Company not found"

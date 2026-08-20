@@ -35,7 +35,7 @@ All metrics are combined into a **Quality Score (0-100)** that indicates whether
    - Copy `.env.example` to `.env.local`
    - Add your API key:
      ```
-     VITE_FMP_API_KEY=your_api_key_here
+     FMP_API_KEY=your_api_key_here
      ```
 
 3. **Start development server**:
@@ -205,7 +205,7 @@ Free API tier includes 250 requests per day.
 ## Environment Variables
 
 ```
-VITE_FMP_API_KEY  - Financial Modeling Prep API key (required)
+FMP_API_KEY  - Financial Modeling Prep API key (required)
 ```
 
 ## Development
@@ -225,7 +225,7 @@ Types are checked during the build process.
 ### "API key not found" error
 
 - Ensure `.env.local` file exists in the project root
-- Verify `VITE_FMP_API_KEY` is set correctly
+- Verify `FMP_API_KEY` is set correctly
 - API keys are case-sensitive
 
 ### "Company not found" error

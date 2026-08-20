@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { fmpService } from "./financialModelingPrep";
+import { fmpServerService } from "../lib/server/fmpServerService";
 import {
   mockRawFmpAnalystEstimates,
   mockRawFmpPriceTargetConsensus,
@@ -8,11 +8,12 @@ import {
   mockRawFmpGrades,
 } from "../tests/e2e/fixtures/fmpFixtures";
 
-describe("futureOutlookService / fmpService Future Outlook Integration", () => {
+describe("futureOutlookService / fmpServerService Future Outlook Integration", () => {
   let axiosGetSpy: any;
 
   beforeEach(() => {
-    axiosGetSpy = vi.spyOn((fmpService as any).client, "get");
+    process.env.FMP_API_KEY = "test_fmp_api_key";
+    axiosGetSpy = vi.spyOn((fmpServerService as any).client, "get");
   });
 
   afterEach(() => {
@@ -22,7 +23,7 @@ describe("futureOutlookService / fmpService Future Outlook Integration", () => {
   it("1. getAnalystEstimates: parses EPS, Revenue, and EBITDA estimates with YoY growth calculations", async () => {
     axiosGetSpy.mockResolvedValueOnce({ data: mockRawFmpAnalystEstimates });
 
-    const estimates = await fmpService.getAnalystEstimates("AAPL");
+    const estimates = await fmpServerService.getAnalystEstimates("AAPL");
 
     expect(estimates).toHaveLength(2);
     expect(estimates[0].fiscalYear).toBe("FY 2026");
@@ -40,7 +41,7 @@ describe("futureOutlookService / fmpService Future Outlook Integration", () => {
       .mockResolvedValueOnce({ data: mockRawFmpPriceTargetConsensus })
       .mockResolvedValueOnce({ data: mockRawFmpPriceTargetSummary });
 
-    const target = await fmpService.getPriceTargetConsensus("AAPL", 185.5);
+    const target = await fmpServerService.getPriceTargetConsensus("AAPL", 185.5);
 
     expect(target).not.toBeNull();
     expect(target?.targetConsensus).toBe(337.43);
@@ -59,7 +60,7 @@ describe("futureOutlookService / fmpService Future Outlook Integration", () => {
       .mockResolvedValueOnce({ data: mockRawFmpGrades });
 
     // Historical EPS CAGR = 0.05 (5.0%), Expected Forward EPS Growth = 9.1% -> Accelerating (> 2.0% diff)
-    const futureData = await fmpService.getFutureOutlookData("AAPL", 185.5, 0.05, 0.05);
+    const futureData = await fmpServerService.getFutureOutlookData("AAPL", 185.5, 0.05, 0.05);
 
     expect(futureData.symbol).toBe("AAPL");
     expect(futureData.estimates).toHaveLength(2);
@@ -77,7 +78,7 @@ describe("futureOutlookService / fmpService Future Outlook Integration", () => {
       .mockResolvedValueOnce({ data: [] })
       .mockResolvedValueOnce({ data: [] });
 
-    const futureData = await fmpService.getFutureOutlookData("UNKNOWN_TICKER", 100);
+    const futureData = await fmpServerService.getFutureOutlookData("UNKNOWN_TICKER", 100);
 
     expect(futureData.symbol).toBe("UNKNOWN_TICKER");
     expect(futureData.estimates).toEqual([]);
