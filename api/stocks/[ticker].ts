@@ -1,6 +1,6 @@
-import { fmpServerService } from "../../src/lib/server/fmpServerService";
-import { verifyServerAuth } from "../../src/lib/server/authHelper";
-import { fetchGoogleStockNews } from "../../src/services/newsEngine";
+import { fmpServerService } from "../_lib/fmpServerService";
+import { verifyServerAuth } from "../_lib/authHelper";
+import { fetchGoogleStockNews } from "../_lib/newsEngine";
 import { sendJson, extractTicker, extractOperation, extractParam } from "../_lib/handlerHelper";
 
 /**

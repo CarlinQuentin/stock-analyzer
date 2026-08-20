@@ -1,4 +1,4 @@
-import { fetchGoogleStockNews } from "../src/services/newsEngine";
+import { fetchGoogleStockNews } from "./_lib/newsEngine";
 import { sendJson, extractParam, extractTicker } from "./_lib/handlerHelper";
 
 export const fetchGoogleStockNewsServer = fetchGoogleStockNews;

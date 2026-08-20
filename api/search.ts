@@ -1,4 +1,4 @@
-import { fmpServerService } from "../src/lib/server/fmpServerService";
+import { fmpServerService } from "./_lib/fmpServerService";
 import { sendJson, extractParam, extractOperation } from "./_lib/handlerHelper";
 
 /**
