@@ -1,6 +1,6 @@
 import { defineConfig, Plugin } from "vite";
 import react from "@vitejs/plugin-react";
-import { getStockNewsServer } from "./server/newsService.js";
+import { fetchGoogleStockNews } from "./src/services/newsEngine";
 
 function apiMiddlewarePlugin(): Plugin {
   return {
@@ -23,7 +23,7 @@ function apiMiddlewarePlugin(): Plugin {
             const refresh = parsedUrl.searchParams.get("refresh") === "true";
             const limit = parseInt(parsedUrl.searchParams.get("limit") || "8", 10);
 
-            const result = await getStockNewsServer(ticker, companyName, refresh, limit);
+            const result = await fetchGoogleStockNews(ticker, companyName, refresh, limit);
             res.setHeader("Content-Type", "application/json");
             res.statusCode = 200;
             res.end(JSON.stringify(result));

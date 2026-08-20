@@ -407,3 +407,117 @@ export class NewsMemoryCache {
 }
 
 export const newsMemoryCache = new NewsMemoryCache();
+
+/**
+ * Fetches Google News RSS search directly via server-side fetch
+ */
+export async function fetchGoogleNewsRss(query: string): Promise<string> {
+  const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+  const res = await fetch(rssUrl, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Accept": "application/rss+xml, application/xml, text/xml, */*",
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Google News RSS responded with status ${res.status}`);
+  }
+
+  return await res.text();
+}
+
+export interface GoogleStockNewsResult {
+  ticker: string;
+  news: NewsItem[];
+  source: string;
+  isStale: boolean;
+  timestamp: string;
+}
+
+/**
+ * Server-side entry point for discovering company-specific stock news via Google search
+ */
+export async function fetchGoogleStockNews(
+  ticker: string,
+  companyName?: string,
+  forceRefresh: boolean = false,
+  limit: number = 8,
+): Promise<GoogleStockNewsResult> {
+  const cleanTicker = (ticker || "").toUpperCase().trim();
+  const cleanName = cleanCompanyName(companyName);
+  const startTime = Date.now();
+
+  // 1. Check scoped cache if not force-refreshing
+  if (!forceRefresh) {
+    const cached = newsMemoryCache.get(cleanTicker, cleanName);
+    if (cached && cached.length > 0) {
+      return {
+        ticker: cleanTicker,
+        news: cached.slice(0, limit),
+        source: "cache",
+        isStale: false,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  // 2. Multi-stage Google News queries
+  const queries: string[] = [];
+  if (cleanName && cleanName.length > 2) {
+    queries.push(`"${cleanName}" ${cleanTicker} news`);
+    queries.push(`"${cleanName}" stock`);
+  }
+  queries.push(`${cleanTicker} stock news`);
+
+  const allRawItems: RawRssNewsItem[] = [];
+
+  for (const query of queries) {
+    try {
+      const xmlText = await fetchGoogleNewsRss(query);
+      const items = parseGoogleNewsXml(xmlText);
+      if (items.length > 0) {
+        allRawItems.push(...items);
+        if (allRawItems.length >= 15) break; // sufficient raw pool
+      }
+    } catch (err: any) {
+      console.warn(`[News API] Query failed for "${query}":`, err?.message || err);
+    }
+  }
+
+  const durationMs = Date.now() - startTime;
+
+  // 3. Process, filter strictly for this company, deduplicate, and sort
+  if (allRawItems.length > 0) {
+    const normalized = allRawItems.map((raw, idx) => normalizeRssItem(raw, cleanTicker, idx));
+    const relevant = filterRelevantNews(normalized, cleanTicker, cleanName);
+    const deduped = deduplicateArticles(relevant);
+
+    deduped.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+    const finalNews = deduped.slice(0, limit);
+
+    if (finalNews.length > 0) {
+      newsMemoryCache.set(cleanTicker, cleanName, finalNews);
+      console.info(`[News API] Ticker: ${cleanTicker} (${cleanName}) | Duration: ${durationMs}ms | Count: ${finalNews.length} | Source: google_news`);
+
+      return {
+        ticker: cleanTicker,
+        news: finalNews,
+        source: "google_news",
+        isStale: false,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  // 4. If no company-specific news was found, return clean empty result
+  console.info(`[News API] No matching news found for ${cleanTicker} (${cleanName}) | Duration: ${durationMs}ms`);
+  return {
+    ticker: cleanTicker,
+    news: [],
+    source: "google_news",
+    isStale: false,
+    timestamp: new Date().toISOString(),
+  };
+}
+

@@ -225,4 +225,48 @@ describe("Google News RSS Engine & Discovery", () => {
       expect(formatRelativeNewsTime(fourDaysAgo.toISOString())).toBe("4d ago");
     });
   });
+
+  describe("Vercel Serverless Function & API Path", () => {
+    it("handles Vercel API response in newsService without public CORS proxies", async () => {
+      const { newsService } = await import("./newsService");
+      
+      const mockNewsItem: NewsItem = {
+        id: "news-STLD-1",
+        ticker: "STLD",
+        title: "Steel Dynamics Reports Q2 Results",
+        source: "Reuters",
+        url: "https://reuters.com/stld",
+        publishedAt: new Date().toISOString(),
+      };
+
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = async (input: RequestInfo | URL) => {
+        const urlStr = typeof input === "string" ? input : input.toString();
+        if (urlStr.includes("/api/stocks/STLD/news")) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              ticker: "STLD",
+              news: [mockNewsItem],
+              source: "google_news",
+              isStale: false,
+              timestamp: new Date().toISOString(),
+            }),
+          } as Response;
+        }
+        return { ok: false, status: 404 } as Response;
+      };
+
+      try {
+        const result = await newsService.getStockNews("STLD", "Steel Dynamics, Inc.", true);
+        expect(result).toHaveLength(1);
+        expect(result[0].ticker).toBe("STLD");
+        expect(result[0].title).toBe("Steel Dynamics Reports Q2 Results");
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+  });
 });
+

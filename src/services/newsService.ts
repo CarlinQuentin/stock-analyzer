@@ -1,15 +1,13 @@
 import { NewsItem, StockNewsResponse } from "../types";
 import {
   newsMemoryCache,
-  processGoogleNewsRss,
   cleanCompanyName,
 } from "./newsEngine";
 
 export class NewsService {
   /**
-   * Fetch General Stock News & Headlines for a ticker using Google search-based discovery.
-   * Primary route: AGY Server Endpoint (/api/stocks/:ticker/news).
-   * Fallback: Direct Google News RSS fetch.
+   * Fetch General Stock News & Headlines for a ticker using server-side Google discovery.
+   * Authoritative route: /api/stocks/:ticker/news
    */
   async getStockNews(
     ticker: string,
@@ -37,7 +35,7 @@ export class NewsService {
       if (existing) return existing;
     }
 
-    // 3. Attempt to fetch via AGY Server Route (/api/stocks/:ticker/news)
+    // 3. Fetch via authoritative server API route (/api/stocks/:ticker/news)
     try {
       const params = new URLSearchParams();
       if (forceRefresh) params.set("refresh", "true");
@@ -56,51 +54,14 @@ export class NewsService {
           }
           return payload.news;
         }
-      }
-    } catch {
-      // Backend route unreachable, proceed to direct client fallback
-    }
-
-    // 4. Direct Client Fallback: Query Google News RSS directly
-    try {
-      const query = cleanName && cleanName.length > 2
-        ? `"${cleanName}" ${cleanTicker} news`
-        : `${cleanTicker} stock news`;
-
-      const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
-      const proxyUrls = [
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`,
-        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rssUrl)}`,
-      ];
-
-      let xmlText = "";
-      for (const pUrl of proxyUrls) {
-        try {
-          const proxyRes = await fetch(pUrl);
-          if (proxyRes.ok) {
-            const txt = await proxyRes.text();
-            if (txt && txt.includes("<item>")) {
-              xmlText = txt;
-              break;
-            }
-          }
-        } catch {
-          // ignore proxy failure and try next
-        }
-      }
-
-      if (xmlText) {
-        const directNews = processGoogleNewsRss(xmlText, cleanTicker, cleanName, 8);
-        if (directNews.length > 0) {
-          newsMemoryCache.set(cleanTicker, cleanName, directNews);
-          return directNews;
-        }
+      } else {
+        console.warn(`[NewsService] News API responded with status ${response.status} for ${cleanTicker}`);
       }
     } catch (err) {
-      console.warn(`[NewsService] Direct news fetch error for ${cleanTicker}:`, err);
+      console.warn(`[NewsService] News API fetch error for ${cleanTicker}:`, err);
     }
 
-    // 5. If no news found, return empty array (DO NOT cross-contaminate with other stocks)
+    // 4. Return empty array if no news found or server error (DO NOT cross-contaminate with other stocks)
     return [];
   }
 }
