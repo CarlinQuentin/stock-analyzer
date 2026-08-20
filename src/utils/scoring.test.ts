@@ -94,6 +94,14 @@ describe("Scoring Utilities - Individual Metric Scores", () => {
       expect(scoreROIC(0.3443)).toBe(22);
       expect(scoreROIC(45.2)).toBe(100);
     });
+
+    it("12. Formats Historical Valuation decimal premium (0.0395) accurately as 3.95% (never 395.41%)", () => {
+      const visaDecimalPremium = 0.039541;
+      expect(formatPercentageMetric(visaDecimalPremium, false)).toBe("3.95%");
+      expect(formatPercentageMetric(visaDecimalPremium, false)).not.toBe("395.41%");
+      expect(formatPercentageMetric(-0.04, false)).toBe("-4.00%");
+      expect(formatPercentageMetric(0.125, false)).toBe("12.50%");
+    });
   });
 
   describe("formatMarketCap Display Formatting", () => {

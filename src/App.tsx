@@ -1443,12 +1443,8 @@ function App() {
                   directionStrategy="lowerIsBetter"
                 />
                 <MetricCard
-                  title="Historical Valuation Premium"
-                  value={
-                    result.valuationMetrics.averagePremium !== null
-                      ? result.valuationMetrics.averagePremium * 100
-                      : null
-                  }
+                  title="Historical Valuation vs Average"
+                  value={result.valuationMetrics.averagePremium}
                   unit="%"
                   score={result.valuationScores.historical}
                   description="Vs. Historical Average"

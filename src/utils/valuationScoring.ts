@@ -144,58 +144,128 @@ export function calculateValuationMetrics(
 }
 
 /**
- * Score P/E Ratio
+ * Score P/E Ratio (0-100)
+ * Tiers:
+ * - Excellent (< 10.0x): Score 85-100
+ * - Good (10.0x - 20.0x): Score 70-84
+ * - Average (20.0x - 35.0x): Score 50-69
+ * - Poor (> 35.0x): Score 0-49
  */
-export function scorePERatio(pe: number | null): number | null {
-  if (pe === null || pe <= 0) return null;
-  if (pe <= 10) return 100;
-  if (pe >= 50) return 10;
-  const pct = (pe - 10) / (50 - 10);
-  return Math.round(100 - pct * 90);
+export function scorePERatio(pe: number | null | undefined): number | null {
+  if (pe === null || pe === undefined || isNaN(pe) || pe <= 0) return null;
+  if (pe <= 10.0) {
+    return Math.min(100, Math.round(85 + ((10.0 - pe) / 5.0) * 15));
+  }
+  if (pe <= 20.0) {
+    return Math.round(70 + ((20.0 - pe) / 10.0) * 14);
+  }
+  if (pe <= 35.0) {
+    return Math.round(50 + ((35.0 - pe) / 15.0) * 19);
+  }
+  return Math.max(0, Math.round(49 - ((pe - 35.0) / 25.0) * 39));
 }
 
 /**
- * Score P/S Ratio
+ * Score P/S Ratio (0-100)
+ * Tiers:
+ * - Excellent (< 1.5x): Score 85-100
+ * - Good (1.5x - 3.5x): Score 70-84
+ * - Average (3.5x - 6.0x): Score 50-69
+ * - Poor (> 6.0x): Score 0-49
  */
-export function scorePSRatio(ps: number | null): number | null {
-  if (ps === null || ps <= 0) return null;
-  if (ps <= 0.5) return 100;
-  if (ps >= 8.0) return 10;
-  const pct = (ps - 0.5) / (8.0 - 0.5);
-  return Math.round(100 - pct * 90);
+export function scorePSRatio(ps: number | null | undefined): number | null {
+  if (ps === null || ps === undefined || isNaN(ps) || ps <= 0) return null;
+  if (ps <= 1.5) {
+    return Math.min(100, Math.round(85 + ((1.5 - ps) / 1.0) * 15));
+  }
+  if (ps <= 3.5) {
+    return Math.round(70 + ((3.5 - ps) / 2.0) * 14);
+  }
+  if (ps <= 6.0) {
+    return Math.round(50 + ((6.0 - ps) / 2.5) * 19);
+  }
+  return Math.max(0, Math.round(49 - ((ps - 6.0) / 6.0) * 39));
 }
 
 /**
- * Score EV/Sales Ratio
+ * Score EV/Sales Ratio (0-100)
+ * Tiers:
+ * - Excellent (< 1.5x): Score 85-100
+ * - Good (1.5x - 3.5x): Score 70-84
+ * - Average (3.5x - 6.0x): Score 50-69
+ * - Poor (> 6.0x): Score 0-49
  */
-export function scoreEVSales(evs: number | null): number | null {
-  if (evs === null || evs <= 0) return null;
-  if (evs <= 0.5) return 100;
-  if (evs >= 8.0) return 10;
-  const pct = (evs - 0.5) / (8.0 - 0.5);
-  return Math.round(100 - pct * 90);
+export function scoreEVSales(evs: number | null | undefined): number | null {
+  if (evs === null || evs === undefined || isNaN(evs) || evs <= 0) return null;
+  if (evs <= 1.5) {
+    return Math.min(100, Math.round(85 + ((1.5 - evs) / 1.0) * 15));
+  }
+  if (evs <= 3.5) {
+    return Math.round(70 + ((3.5 - evs) / 2.0) * 14);
+  }
+  if (evs <= 6.0) {
+    return Math.round(50 + ((6.0 - evs) / 2.5) * 19);
+  }
+  return Math.max(0, Math.round(49 - ((evs - 6.0) / 6.0) * 39));
 }
 
 /**
- * Score P/FCF Ratio
+ * Score P/FCF Ratio (0-100)
+ * Tiers:
+ * - Excellent (< 12.0x): Score 85-100
+ * - Good (12.0x - 20.0x): Score 70-84
+ * - Average (20.0x - 35.0x): Score 50-69
+ * - Poor (> 35.0x): Score 0-49
  */
-export function scorePFCFRatio(pfcf: number | null): number | null {
-  if (pfcf === null || pfcf <= 0) return null;
-  if (pfcf <= 10) return 100;
-  if (pfcf >= 50) return 10;
-  const pct = (pfcf - 10) / (50 - 10);
-  return Math.round(100 - pct * 90);
+export function scorePFCFRatio(pfcf: number | null | undefined): number | null {
+  if (pfcf === null || pfcf === undefined || isNaN(pfcf) || pfcf <= 0) return null;
+  if (pfcf <= 12.0) {
+    return Math.min(100, Math.round(85 + ((12.0 - pfcf) / 6.0) * 15));
+  }
+  if (pfcf <= 20.0) {
+    return Math.round(70 + ((20.0 - pfcf) / 8.0) * 14);
+  }
+  if (pfcf <= 35.0) {
+    return Math.round(50 + ((35.0 - pfcf) / 15.0) * 19);
+  }
+  return Math.max(0, Math.round(49 - ((pfcf - 35.0) / 25.0) * 39));
 }
 
 /**
- * Score Historical Valuation Comparison
+ * Score Historical Valuation Comparison (0-100)
+ * Evaluates current multiples against historical averages based on standard tiers:
+ * - Excellent (< -15%): Score 85-100 (Deep discount to historical averages)
+ * - Good (-15% to +10%): Score 70-84 (Reasonable valuation near or below historical averages)
+ * - Average (+10% to +25%): Score 50-69 (Mild premium over historical averages)
+ * - Poor (> +25%): Score 0-49 (Significant premium / elevated valuation risk)
  */
-export function scoreHistoricalValuation(premium: number | null): number | null {
-  if (premium === null) return null;
-  if (premium <= -0.3) return 100;
-  if (premium >= 0.3) return 10;
-  const pct = (premium + 0.3) / 0.6;
-  return Math.round(100 - pct * 90);
+export function scoreHistoricalValuation(premium: number | null | undefined): number | null {
+  if (premium === null || premium === undefined || isNaN(premium)) return null;
+
+  if (premium <= -0.15) {
+    // Excellent (< -15%): Score 85-100
+    // At <= -0.30: 100
+    // At -0.15: 85
+    return Math.min(100, Math.round(85 + ((-0.15 - premium) / 0.15) * 15));
+  }
+  if (premium <= 0.10) {
+    // Good (-15% to +10%): Score 70-84
+    // At -0.15: 84
+    // At 0.00: 76
+    // At +0.0395 (Visa): 73
+    // At +0.10: 70
+    return Math.round(70 + ((0.10 - premium) / 0.25) * 14);
+  }
+  if (premium <= 0.25) {
+    // Average (+10% to +25%): Score 50-69
+    // At +0.10: 69
+    // At +0.25: 50
+    return Math.round(50 + ((0.25 - premium) / 0.15) * 19);
+  }
+  // Poor (> +25%): Score 0-49
+  // At +0.25: 49
+  // At >= +0.50: 10
+  return Math.max(0, Math.round(49 - ((premium - 0.25) / 0.25) * 39));
 }
 
 /**

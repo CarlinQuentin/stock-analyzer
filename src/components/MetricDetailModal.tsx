@@ -522,10 +522,10 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
       case "historical":
         return {
           ...defaultData,
-          title: "Historical Valuation Premium",
+          title: "Historical Valuation vs Average",
           icon: "⏳",
           score: result.valuationScores.historical,
-          value: result.valuationMetrics.averagePremium !== null ? result.valuationMetrics.averagePremium * 100 : null,
+          value: result.valuationMetrics.averagePremium,
           unit: "%",
           chartData: result.valuationPremiumHistory || [],
           chartValueType: "percent" as const,
@@ -1575,7 +1575,8 @@ export const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                   {config.value !== null && config.value !== undefined ? (
                     <>
                       {config.unit === "%"
-                        ? formatPercentageMetric(
+                        ? ((config.title.toLowerCase().includes("valuation") || config.title.toLowerCase().includes("premium") || config.title.toLowerCase().includes("vs average") || config.title.toLowerCase().includes("vs. average")) && config.value > 0 ? "+" : "") +
+                          formatPercentageMetric(
                             config.value,
                             config.title.toLowerCase().includes("roic") ||
                             config.title.toLowerCase().includes("profitability") ||

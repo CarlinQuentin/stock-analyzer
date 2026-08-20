@@ -14,6 +14,7 @@ import {
   getValuationAnalysis,
 } from "./valuationScoring";
 import { CompanyProfile, FinancialStatement, ValuationScores } from "../types";
+import { getMetricAnalysis, getScoreCategory } from "./scoring";
 
 describe("calculateValuationPremium", () => {
   it("should calculate premium when Current Multiple is greater than Historical Average Multiple", () => {
@@ -48,38 +49,143 @@ describe("calculateValuationPremium", () => {
 });
 
 describe("Individual Valuation Multiplier Scoring", () => {
-  it("scorePERatio should score P/E ratio (lower is better)", () => {
+  it("scorePERatio should score P/E ratio according to documented tiers", () => {
     expect(scorePERatio(null)).toBeNull();
+    expect(scorePERatio(undefined)).toBeNull();
     expect(scorePERatio(-5)).toBeNull();
-    expect(scorePERatio(8)).toBe(100); // <= 10 -> 100
-    expect(scorePERatio(25)).toBe(66); // ~66
-    expect(scorePERatio(60)).toBe(10); // >= 50 -> 10
+    expect(scorePERatio(0)).toBeNull();
+
+    // Tier 1: Excellent (< 10.0x): Score 85-100
+    expect(scorePERatio(5.0)).toBe(100);
+    expect(scorePERatio(8.0)).toBe(91);
+    expect(scorePERatio(10.0)).toBe(85);
+
+    // Tier 2: Good (10.0x - 20.0x): Score 70-84
+    expect(scorePERatio(12.0)).toBe(81);
+    expect(scorePERatio(15.0)).toBe(77);
+    expect(scorePERatio(20.0)).toBe(70);
+
+    // Tier 3: Average (20.0x - 35.0x): Score 50-69
+    expect(scorePERatio(25.0)).toBe(63);
+    expect(scorePERatio(30.0)).toBe(56);
+    expect(scorePERatio(33.40)).toBe(52); // Visa
+    expect(scorePERatio(35.0)).toBe(50);
+
+    // Tier 4: Poor (> 35.0x): Score 0-49
+    expect(scorePERatio(40.0)).toBe(41);
+    expect(scorePERatio(50.0)).toBe(26);
+    expect(scorePERatio(60.0)).toBe(10);
   });
 
-  it("scorePSRatio should score P/S ratio", () => {
+  it("scorePSRatio should score P/S ratio according to documented tiers", () => {
     expect(scorePSRatio(null)).toBeNull();
-    expect(scorePSRatio(0.4)).toBe(100); // <= 0.5 -> 100
-    expect(scorePSRatio(4.0)).toBe(58);
-    expect(scorePSRatio(10.0)).toBe(10); // >= 8.0 -> 10
+    expect(scorePSRatio(undefined)).toBeNull();
+    expect(scorePSRatio(-2)).toBeNull();
+    expect(scorePSRatio(0)).toBeNull();
+
+    // Tier 1: Excellent (< 1.5x): Score 85-100
+    expect(scorePSRatio(0.5)).toBe(100);
+    expect(scorePSRatio(1.0)).toBe(93);
+    expect(scorePSRatio(1.5)).toBe(85);
+
+    // Tier 2: Good (1.5x - 3.5x): Score 70-84
+    expect(scorePSRatio(2.0)).toBe(81);
+    expect(scorePSRatio(2.5)).toBe(77);
+    expect(scorePSRatio(3.5)).toBe(70);
+
+    // Tier 3: Average (3.5x - 6.0x): Score 50-69
+    expect(scorePSRatio(4.0)).toBe(65);
+    expect(scorePSRatio(5.0)).toBe(58);
+    expect(scorePSRatio(6.0)).toBe(50);
+
+    // Tier 4: Poor (> 6.0x): Score 0-49
+    expect(scorePSRatio(8.0)).toBe(36);
+    expect(scorePSRatio(12.0)).toBe(10);
+    expect(scorePSRatio(16.57)).toBe(0); // Visa
   });
 
-  it("scoreEVSales should score EV/Sales ratio", () => {
+  it("scoreEVSales should score EV/Sales ratio according to documented tiers", () => {
     expect(scoreEVSales(null)).toBeNull();
+    expect(scoreEVSales(undefined)).toBeNull();
+    expect(scoreEVSales(-1)).toBeNull();
+    expect(scoreEVSales(0)).toBeNull();
+
+    // Tier 1: Excellent (< 1.5x): Score 85-100
     expect(scoreEVSales(0.5)).toBe(100);
-    expect(scoreEVSales(9.0)).toBe(10);
+    expect(scoreEVSales(1.0)).toBe(93);
+    expect(scoreEVSales(1.5)).toBe(85);
+
+    // Tier 2: Good (1.5x - 3.5x): Score 70-84
+    expect(scoreEVSales(2.0)).toBe(81);
+    expect(scoreEVSales(2.5)).toBe(77);
+    expect(scoreEVSales(3.5)).toBe(70);
+
+    // Tier 3: Average (3.5x - 6.0x): Score 50-69
+    expect(scoreEVSales(4.0)).toBe(65);
+    expect(scoreEVSales(5.0)).toBe(58);
+    expect(scoreEVSales(6.0)).toBe(50);
+
+    // Tier 4: Poor (> 6.0x): Score 0-49
+    expect(scoreEVSales(8.0)).toBe(36);
+    expect(scoreEVSales(12.0)).toBe(10);
+    expect(scoreEVSales(16.70)).toBe(0); // Visa
   });
 
-  it("scorePFCFRatio should score P/FCF ratio", () => {
+  it("scorePFCFRatio should score P/FCF ratio according to documented tiers", () => {
     expect(scorePFCFRatio(null)).toBeNull();
-    expect(scorePFCFRatio(10)).toBe(100);
-    expect(scorePFCFRatio(55)).toBe(10);
+    expect(scorePFCFRatio(undefined)).toBeNull();
+    expect(scorePFCFRatio(-10)).toBeNull();
+    expect(scorePFCFRatio(0)).toBeNull();
+
+    // Tier 1: Excellent (< 12.0x): Score 85-100
+    expect(scorePFCFRatio(6.0)).toBe(100);
+    expect(scorePFCFRatio(10.0)).toBe(90);
+    expect(scorePFCFRatio(12.0)).toBe(85);
+
+    // Tier 2: Good (12.0x - 20.0x): Score 70-84
+    expect(scorePFCFRatio(15.0)).toBe(79);
+    expect(scorePFCFRatio(18.0)).toBe(74);
+    expect(scorePFCFRatio(20.0)).toBe(70);
+
+    // Tier 3: Average (20.0x - 35.0x): Score 50-69
+    expect(scorePFCFRatio(25.0)).toBe(63);
+    expect(scorePFCFRatio(30.0)).toBe(56);
+    expect(scorePFCFRatio(30.73)).toBe(55); // Visa
+    expect(scorePFCFRatio(35.0)).toBe(50);
+
+    // Tier 4: Poor (> 35.0x): Score 0-49
+    expect(scorePFCFRatio(40.0)).toBe(41);
+    expect(scorePFCFRatio(55.0)).toBe(18);
+    expect(scorePFCFRatio(60.0)).toBe(10);
   });
 
-  it("scoreHistoricalValuation should score discount or premium relative to history", () => {
+  it("scoreHistoricalValuation should score discount or premium relative to history according to documented tiers", () => {
     expect(scoreHistoricalValuation(null)).toBeNull();
-    expect(scoreHistoricalValuation(-0.4)).toBe(100); // <= -30% discount -> 100
-    expect(scoreHistoricalValuation(0.0)).toBe(55); // 0% premium -> ~55
-    expect(scoreHistoricalValuation(0.4)).toBe(10); // >= +30% premium -> 10
+    expect(scoreHistoricalValuation(undefined)).toBeNull();
+    expect(scoreHistoricalValuation(NaN)).toBeNull();
+
+    // Tier 1: Excellent (< -15%): Score 85-100
+    expect(scoreHistoricalValuation(-0.40)).toBe(100);
+    expect(scoreHistoricalValuation(-0.30)).toBe(100);
+    expect(scoreHistoricalValuation(-0.20)).toBe(90);
+    expect(scoreHistoricalValuation(-0.15)).toBe(85);
+
+    // Tier 2: Good (-15% to +10%): Score 70-84
+    expect(scoreHistoricalValuation(-0.10)).toBe(81);
+    expect(scoreHistoricalValuation(0.00)).toBe(76);
+    expect(scoreHistoricalValuation(0.0395)).toBe(73); // Visa (+3.95%)
+    expect(scoreHistoricalValuation(0.10)).toBe(70);
+
+    // Tier 3: Average (+10% to +25%): Score 50-69
+    expect(scoreHistoricalValuation(0.15)).toBe(63);
+    expect(scoreHistoricalValuation(0.20)).toBe(56);
+    expect(scoreHistoricalValuation(0.25)).toBe(50);
+
+    // Tier 4: Poor (> +25%): Score 0-49
+    expect(scoreHistoricalValuation(0.30)).toBe(41);
+    expect(scoreHistoricalValuation(0.40)).toBe(26);
+    expect(scoreHistoricalValuation(0.50)).toBe(10);
+    expect(scoreHistoricalValuation(0.60)).toBe(0);
   });
 });
 
@@ -177,4 +283,48 @@ describe("Valuation Scoring Aggregations", () => {
     expect(getValuationAnalysis(45).label).toContain("Fully Valued");
     expect(getValuationAnalysis(20).label).toContain("Overvalued");
   });
+
+  describe("Visa Specific Historical Valuation Premium & Quality Score", () => {
+    it("calculates individual premiums and composite +4.0% premium accurately for Visa", () => {
+      // Visa's exact multiples from detailed valuation analysis:
+      // P/E: (33.40 - 32.66) / 32.66 = +2.27% (+2.3%)
+      // P/S: (16.57 - 15.46) / 15.46 = +7.18% (+7.2%)
+      // EV/Sales: (16.70 - 15.74) / 15.74 = +6.10% (+6.1%)
+      // P/FCF: (30.73 - 30.65) / 30.65 = +0.26% (+0.3%)
+      const pePrem = calculateValuationPremium(33.40, 32.66);
+      const psPrem = calculateValuationPremium(16.57, 15.46);
+      const evsPrem = calculateValuationPremium(16.70, 15.74);
+      const pfcfPrem = calculateValuationPremium(30.73, 30.65);
+
+      expect(pePrem).not.toBeNull();
+      expect(psPrem).not.toBeNull();
+      expect(evsPrem).not.toBeNull();
+      expect(pfcfPrem).not.toBeNull();
+
+      expect(pePrem! * 100).toBeCloseTo(2.266, 1);
+      expect(psPrem! * 100).toBeCloseTo(7.180, 1);
+      expect(evsPrem! * 100).toBeCloseTo(6.099, 1);
+      expect(pfcfPrem! * 100).toBeCloseTo(0.261, 1);
+
+      // Composite premium: average of the 4 individual decimal premiums
+      const compositePrem = (pePrem! + psPrem! + evsPrem! + pfcfPrem!) / 4;
+      expect(compositePrem).toBeCloseTo(0.0395, 3); // ~ +3.95% (+4.0%)
+
+      // Verify quality score for Visa's ~+3.95% premium falls within Good tier (70-84)
+      const qualityScore = scoreHistoricalValuation(compositePrem);
+      expect(qualityScore).toBe(73); // Good tier (Score 70-84)
+      expect(qualityScore).toBeGreaterThanOrEqual(70);
+      expect(qualityScore).toBeLessThanOrEqual(84);
+
+      // Verify label and color classification
+      expect(getMetricAnalysis(qualityScore)).toBe("Good");
+      expect(getScoreCategory(qualityScore!).label).toBe("Good");
+      expect(getScoreCategory(qualityScore!).color).toBe("blue");
+
+      // Regression: Verify averagePremium is a decimal fraction (0.0395), NOT pre-multiplied (3.95 or 395.41)
+      expect(compositePrem).toBeLessThan(1.0);
+      expect(compositePrem * 100).toBeCloseTo(3.95, 1);
+    });
+  });
 });
+

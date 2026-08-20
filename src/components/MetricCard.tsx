@@ -106,12 +106,18 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     title.toLowerCase().includes("conversion") ||
     title.toLowerCase().includes("stability");
 
+  const isValuationOrPremium =
+    title.toLowerCase().includes("valuation") ||
+    title.toLowerCase().includes("premium") ||
+    title.toLowerCase().includes("vs average") ||
+    title.toLowerCase().includes("vs. average");
+
   const formattedValue =
     typeof value === "number"
       ? title.toLowerCase().includes("dilution")
         ? value > 0 ? `+${value.toFixed(2)}% / yr` : `${value.toFixed(2)}% / yr`
         : unit === "%"
-        ? formatPercentageMetric(value, isAlreadyPercentage).replace("%", "")
+        ? (isValuationOrPremium && value > 0 ? "+" : "") + formatPercentageMetric(value, isAlreadyPercentage).replace("%", "")
         : value % 1 !== 0
         ? value.toFixed(2)
         : value
