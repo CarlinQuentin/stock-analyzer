@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from "axios";
-import {
+import type {
   CompanyProfile,
   FinancialStatement,
   DividendMetrics,
@@ -10,7 +10,7 @@ import {
   PriceTargetNewsItem,
   AnalystGradeItem,
   FutureOutlookData,
-} from "../../types";
+} from "../../types/index";
 
 export interface FmpNormalizedQuote {
   symbol: string;

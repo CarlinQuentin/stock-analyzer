@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 if (typeof globalThis.WebSocket === "undefined") {
   (globalThis as any).WebSocket = class DummyWebSocket {
@@ -14,20 +14,24 @@ let serverSupabase: SupabaseClient | null = null;
 function getServerSupabase(): SupabaseClient | null {
   if (serverSupabase) return serverSupabase;
 
-  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.VITE_SUPABASE_ANON_KEY ||
-    process.env.SUPABASE_ANON_KEY;
+  try {
+    const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    const key =
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.VITE_SUPABASE_ANON_KEY ||
+      process.env.SUPABASE_ANON_KEY;
 
-  if (url && key && url.startsWith("http") && !url.includes("placeholder")) {
-    serverSupabase = createClient(url, key, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
-    return serverSupabase;
+    if (url && key && url.startsWith("http") && !url.includes("placeholder")) {
+      serverSupabase = createClient(url, key, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      });
+      return serverSupabase;
+    }
+  } catch (err) {
+    console.error("[Server Supabase Init Error]:", err);
   }
 
   return null;
