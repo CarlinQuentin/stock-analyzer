@@ -1,9 +1,44 @@
 {
   "rewrites": [
     {
+      "source": "/api/stocks/:ticker/news",
+      "destination": "/api/news?ticker=:ticker"
+    },
+    {
+      "source": "/api/stocks/:ticker/:operation",
+      "destination": "/api/stocks/:ticker?operation=:operation"
+    },
+    {
+      "source": "/api/stocks/movers",
+      "destination": "/api/market?operation=movers"
+    },
+    {
+      "source": "/api/stocks/market-movers",
+      "destination": "/api/market?operation=movers"
+    },
+    {
+      "source": "/api/stocks/screener",
+      "destination": "/api/market?operation=screener"
+    },
+    {
+      "source": "/api/stocks/batch-quotes",
+      "destination": "/api/market?operation=batch-quotes"
+    },
+    {
+      "source": "/api/stocks/industry-peers",
+      "destination": "/api/market?operation=industry-peers"
+    },
+    {
+      "source": "/api/stocks/search",
+      "destination": "/api/search"
+    },
+    {
+      "source": "/api/stocks/resolve",
+      "destination": "/api/search?operation=resolve"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
 }
-

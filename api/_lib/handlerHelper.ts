@@ -30,9 +30,34 @@ export function extractTicker(req: any): string | undefined {
   if (req.url) {
     try {
       const parsed = new URL(req.url, `http://${req.headers?.host || "localhost"}`);
-      const match = parsed.pathname.match(/\/api\/stocks\/([^/?]+)/i);
-      if (match && !["search", "resolve", "movers", "screener", "batch-quotes", "industry-peers"].includes(match[1].toLowerCase())) {
-        return decodeURIComponent(match[1]);
+      const parts = parsed.pathname.split("/").filter(Boolean);
+      if (parts.length >= 2 && parts[0] === "api" && parts[1] === "stocks") {
+        const potentialTicker = parts[2];
+        if (potentialTicker && !["search", "resolve", "movers", "screener", "batch-quotes", "industry-peers", "market"].includes(potentialTicker.toLowerCase())) {
+          return decodeURIComponent(potentialTicker);
+        }
+      }
+    } catch {}
+  }
+  return undefined;
+}
+
+export function extractOperation(req: any): string | undefined {
+  if (req.query?.operation && typeof req.query.operation === "string") {
+    return req.query.operation.toLowerCase().trim();
+  }
+  if (req.query?.op && typeof req.query.op === "string") {
+    return req.query.op.toLowerCase().trim();
+  }
+  if (req.url) {
+    try {
+      const parsed = new URL(req.url, `http://${req.headers?.host || "localhost"}`);
+      const op = parsed.searchParams.get("operation") || parsed.searchParams.get("op");
+      if (op) return op.toLowerCase().trim();
+
+      const parts = parsed.pathname.split("/").filter(Boolean);
+      if (parts.length >= 4 && parts[0] === "api" && parts[1] === "stocks") {
+        return parts[3].toLowerCase().trim();
       }
     } catch {}
   }
