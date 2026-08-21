@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   extractClientIp,
   hashClientIp,
+  getIpHashSalt,
   checkAnalysisQuota,
   setTestSupabaseClient,
 } from "./quotaHelper";
@@ -21,8 +22,19 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
     process.env = { ...originalEnv };
   });
 
-  describe("1. IP Extraction (extractClientIp)", () => {
-    it("1.1 Extracts client IP from x-forwarded-for when multiple comma-separated IPs exist", () => {
+  describe("1. IP Extraction & Header Trust (extractClientIp)", () => {
+    it("1.1 Prioritizes Vercel direct client IP headers (x-real-ip / x-vercel-forwarded-for)", () => {
+      const req = {
+        headers: {
+          "x-real-ip": "198.51.100.42",
+          "x-forwarded-for": "203.0.113.195, 70.41.3.18",
+        },
+      };
+      const ip = extractClientIp(req);
+      expect(ip).toBe("198.51.100.42");
+    });
+
+    it("1.2 Extracts client IP from x-forwarded-for when multiple comma-separated IPs exist", () => {
       const req = {
         headers: {
           "x-forwarded-for": "203.0.113.195, 70.41.3.18, 150.172.238.178",
@@ -30,16 +42,6 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
       };
       const ip = extractClientIp(req);
       expect(ip).toBe("203.0.113.195");
-    });
-
-    it("1.2 Extracts client IP from x-real-ip if x-forwarded-for is missing", () => {
-      const req = {
-        headers: {
-          "x-real-ip": "198.51.100.42",
-        },
-      };
-      const ip = extractClientIp(req);
-      expect(ip).toBe("198.51.100.42");
     });
 
     it("1.3 Extracts client IP from cf-connecting-ip if others are missing", () => {
@@ -55,21 +57,32 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
     it("1.4 Strips IPv6-mapped IPv4 prefix (::ffff:)", () => {
       const req = {
         headers: {
-          "x-forwarded-for": "::ffff:192.0.2.1",
+          "x-real-ip": "::ffff:192.0.2.1",
         },
       };
       const ip = extractClientIp(req);
       expect(ip).toBe("192.0.2.1");
     });
 
-    it("1.5 Falls back safely to 127.0.0.1 when no IP headers are present", () => {
+    it("1.5 Rejects malformed injected header values and falls back safely", () => {
+      const req = {
+        headers: {
+          "x-real-ip": "<script>alert(1)</script>",
+          "x-forwarded-for": "malformed invalid ip",
+        },
+      };
+      const ip = extractClientIp(req);
+      expect(ip).toBe("127.0.0.1");
+    });
+
+    it("1.6 Falls back safely to 127.0.0.1 when no IP headers are present", () => {
       const req = { headers: {} };
       const ip = extractClientIp(req);
       expect(ip).toBe("127.0.0.1");
     });
   });
 
-  describe("2. IP Hashing (hashClientIp)", () => {
+  describe("2. IP Hashing & Salt Configuration (hashClientIp & getIpHashSalt)", () => {
     it("2.1 Produces a valid 64-character SHA-256 hex string", () => {
       const hash = hashClientIp("203.0.113.195", "test-salt");
       expect(hash).toMatch(/^[a-f0-9]{64}$/);
@@ -95,9 +108,26 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
       const hash2 = hashClientIp("198.51.100.1");
       expect(hash1).not.toBe(hash2);
     });
+
+    it("2.5 Throws configuration error in production if IP_HASH_SALT is missing", () => {
+      process.env.NODE_ENV = "production";
+      delete process.env.IP_HASH_SALT;
+      delete process.env.IP_SALT_SECRET;
+
+      expect(() => getIpHashSalt()).toThrowError(/IP_HASH_SALT environment variable is required in production/);
+    });
+
+    it("2.6 Uses development fallback when NODE_ENV is development", () => {
+      process.env.NODE_ENV = "development";
+      delete process.env.IP_HASH_SALT;
+      delete process.env.IP_SALT_SECRET;
+
+      const salt = getIpHashSalt();
+      expect(salt).toBe("dev-only-local-ip-salt-not-for-production");
+    });
   });
 
-  describe("3. Quota Enforcement via checkAnalysisQuota", () => {
+  describe("3. Quota Enforcement & Fail-Closed Behavior (checkAnalysisQuota)", () => {
     it("3.1 Returns mock allowed when Supabase is not configured (offline / local dev mode)", async () => {
       delete process.env.SUPABASE_URL;
       delete process.env.VITE_SUPABASE_URL;
@@ -111,7 +141,24 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
       expect(result.isMock).toBe(true);
     });
 
-    it("3.2 Rejects with 401 UNAUTHORIZED if Supabase is configured but no Authorization header exists", async () => {
+    it("3.2 Fails closed with 500 CONFIGURATION_ERROR if production salt is missing", async () => {
+      process.env.NODE_ENV = "production";
+      delete process.env.IP_HASH_SALT;
+      delete process.env.IP_SALT_SECRET;
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_ANON_KEY = "anon-key-123";
+
+      const req = { headers: { authorization: "Bearer valid-token" } };
+      const result = await checkAnalysisQuota(req, "NVDA");
+
+      expect(result.allowed).toBe(false);
+      expect(result.statusCode).toBe(500);
+      expect(result.code).toBe("CONFIGURATION_ERROR");
+      expect(result.error).toBe("CONFIGURATION_ERROR");
+    });
+
+    it("3.3 Rejects with 401 UNAUTHORIZED if Supabase is configured but no Authorization header exists", async () => {
+      process.env.IP_HASH_SALT = "test-salt";
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_ANON_KEY = "anon-key-123";
 
@@ -124,7 +171,8 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
       expect(result.reason).toBe("UNAUTHORIZED");
     });
 
-    it("3.3 Calls check_and_increment_analysis_limit with non-null p_ip_hash and allows authenticated user", async () => {
+    it("3.4 Calls check_and_increment_analysis_limit with non-null p_ip_hash and allows authenticated user", async () => {
+      process.env.IP_HASH_SALT = "test-salt";
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_ANON_KEY = "anon-key-123";
 
@@ -150,7 +198,7 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
       const req = {
         headers: {
           authorization: "Bearer registered-user-jwt",
-          "x-forwarded-for": "198.51.100.77",
+          "x-real-ip": "198.51.100.77",
         },
       };
 
@@ -172,7 +220,8 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
       expect(capturedRpcParams.p_ip_hash).not.toBeNull();
     });
 
-    it("3.4 Allows anonymous user within quota and passes p_ip_hash", async () => {
+    it("3.5 Allows anonymous user within quota and passes p_ip_hash", async () => {
+      process.env.IP_HASH_SALT = "test-salt";
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_ANON_KEY = "anon-key-123";
 
@@ -211,7 +260,8 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
       expect(capturedParams.p_ip_hash).not.toBeNull();
     });
 
-    it("3.5 Denies request with HTTP 429 when anonymous user limit is exceeded", async () => {
+    it("3.6 Denies request with HTTP 429 when anonymous user limit is exceeded", async () => {
+      process.env.IP_HASH_SALT = "test-salt";
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_ANON_KEY = "anon-key-123";
 
@@ -235,7 +285,7 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
       const req = {
         headers: {
           authorization: "Bearer anonymous-user-jwt",
-          "x-forwarded-for": "203.0.113.50",
+          "x-real-ip": "203.0.113.50",
         },
       };
 
@@ -249,7 +299,8 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
       expect(result.limit).toBe(2);
     });
 
-    it("3.6 Denies request with HTTP 429 when IP limit is exceeded (IP abuse protection)", async () => {
+    it("3.7 Denies request with HTTP 429 when IP limit is exceeded (IP abuse protection)", async () => {
+      process.env.IP_HASH_SALT = "test-salt";
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_ANON_KEY = "anon-key-123";
 
@@ -275,7 +326,7 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
       const req = {
         headers: {
           authorization: "Bearer anonymous-user-jwt",
-          "x-forwarded-for": "203.0.113.50",
+          "x-real-ip": "203.0.113.50",
         },
       };
 
@@ -289,7 +340,8 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
       expect(result.ipLimit).toBe(10);
     });
 
-    it("3.7 Fails safely on RPC database error (does NOT treat RPC errors as allowed)", async () => {
+    it("3.8 Fails safely on RPC database error (does NOT treat RPC errors as allowed)", async () => {
+      process.env.IP_HASH_SALT = "test-salt";
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_ANON_KEY = "anon-key-123";
 
@@ -305,7 +357,7 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
       const req = {
         headers: {
           authorization: "Bearer some-token",
-          "x-forwarded-for": "203.0.113.50",
+          "x-real-ip": "203.0.113.50",
         },
       };
 

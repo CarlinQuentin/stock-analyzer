@@ -17,46 +17,62 @@ export interface AnalysisQuotaResult {
 }
 
 /**
- * Extract client public IP address from trusted server/proxy headers
+ * Extract client public IP address from trusted server/proxy headers in Vercel environment.
+ * On Vercel, the edge infrastructure automatically sets x-real-ip or prepends the client IP to x-forwarded-for.
  */
 export function extractClientIp(req: any): string {
   if (!req || !req.headers) return "127.0.0.1";
 
-  // 1. Standard Vercel / reverse proxy header (comma-separated list, first IP is client)
+  // 1. Vercel edge / trusted proxy direct client IP
+  const realIp =
+    req.headers["x-real-ip"] ||
+    req.headers["x-vercel-forwarded-for"] ||
+    (typeof req.getHeader === "function" ? req.getHeader("x-real-ip") : undefined);
+
+  if (typeof realIp === "string" && realIp.trim().length > 0) {
+    const firstIp = realIp.split(",")[0].trim();
+    if (isValidIp(firstIp)) {
+      return sanitizeIp(firstIp);
+    }
+  }
+
+  // 2. Standard reverse proxy x-forwarded-for (first IP in chain is the client IP)
   const forwardedFor =
     req.headers["x-forwarded-for"] ||
     (typeof req.getHeader === "function" ? req.getHeader("x-forwarded-for") : undefined);
 
   if (typeof forwardedFor === "string" && forwardedFor.trim().length > 0) {
     const firstIp = forwardedFor.split(",")[0].trim();
-    if (firstIp) {
+    if (isValidIp(firstIp)) {
       return sanitizeIp(firstIp);
     }
-  }
-
-  // 2. Direct real IP header
-  const realIp =
-    req.headers["x-real-ip"] ||
-    (typeof req.getHeader === "function" ? req.getHeader("x-real-ip") : undefined);
-  if (typeof realIp === "string" && realIp.trim().length > 0) {
-    return sanitizeIp(realIp.trim());
   }
 
   // 3. Cloudflare connecting IP header
   const cfIp =
     req.headers["cf-connecting-ip"] ||
     (typeof req.getHeader === "function" ? req.getHeader("cf-connecting-ip") : undefined);
+
   if (typeof cfIp === "string" && cfIp.trim().length > 0) {
-    return sanitizeIp(cfIp.trim());
+    const firstIp = cfIp.split(",")[0].trim();
+    if (isValidIp(firstIp)) {
+      return sanitizeIp(firstIp);
+    }
   }
 
-  // 4. Socket remote address
+  // 4. Socket remote address fallback
   const socketIp = req.socket?.remoteAddress || req.connection?.remoteAddress;
   if (typeof socketIp === "string" && socketIp.trim().length > 0) {
     return sanitizeIp(socketIp.trim());
   }
 
   return "127.0.0.1";
+}
+
+function isValidIp(ip: string): boolean {
+  if (!ip || ip.length > 64) return false;
+  // Basic sanity check against arbitrary injected strings
+  return /^([0-9a-fA-F:.]+)$/.test(ip);
 }
 
 function sanitizeIp(ip: string): string {
@@ -161,16 +177,41 @@ function sha256Hex(ascii: string): string {
 }
 
 /**
+ * Retrieves the server-only IP hash salt.
+ * In production/Vercel environments, IP_HASH_SALT must be explicitly configured.
+ * If missing in production, this throws a configuration error (fails closed).
+ */
+export function getIpHashSalt(saltOverride?: string): string {
+  if (saltOverride && saltOverride.trim().length > 0) {
+    return saltOverride.trim();
+  }
+
+  const salt = process.env.IP_HASH_SALT || process.env.IP_SALT_SECRET;
+  if (salt && salt.trim().length > 0) {
+    return salt.trim();
+  }
+
+  const isProduction =
+    process.env.NODE_ENV === "production" ||
+    process.env.VERCEL === "1" ||
+    process.env.VERCEL_ENV === "production";
+
+  if (isProduction) {
+    throw new Error(
+      "CONFIGURATION_ERROR: IP_HASH_SALT environment variable is required in production."
+    );
+  }
+
+  // Development & local test fallback only (never used in production)
+  return "dev-only-local-ip-salt-not-for-production";
+}
+
+/**
  * Deterministically hash client IP address using SHA-256 with a server-only salt.
  * Raw IP addresses are NEVER logged or stored in the database.
  */
 export function hashClientIp(ip: string, saltOverride?: string): string {
-  const salt =
-    saltOverride ||
-    process.env.IP_HASH_SALT ||
-    process.env.IP_SALT_SECRET ||
-    "stock-analyzer-quota-salt-2026";
-
+  const salt = getIpHashSalt(saltOverride);
   const cleanIp = (ip || "127.0.0.1").trim();
   return sha256Hex(`${cleanIp}:${salt}`);
 }
@@ -236,8 +277,21 @@ export async function checkAnalysisQuota(
     };
   }
 
-  const rawIp = extractClientIp(req);
-  const ipHash = hashClientIp(rawIp);
+  let ipHash: string;
+  try {
+    const rawIp = extractClientIp(req);
+    ipHash = hashClientIp(rawIp);
+  } catch (err: any) {
+    console.error("[Server Quota Configuration Error]: Missing IP_HASH_SALT in production.");
+    // Fail closed if production salt is missing
+    return {
+      allowed: false,
+      statusCode: 500,
+      error: "CONFIGURATION_ERROR",
+      code: "CONFIGURATION_ERROR",
+      message: "Server configuration error: IP_HASH_SALT is required.",
+    };
+  }
 
   const authHeader =
     req.headers?.authorization ||
