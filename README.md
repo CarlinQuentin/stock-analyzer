@@ -204,8 +204,14 @@ Free API tier includes 250 requests per day.
 
 ## Environment Variables
 
+### Server Environment Variables (Vercel / Backend)
+
 ```
-FMP_API_KEY  - Financial Modeling Prep API key (required)
+FMP_API_KEY          - Financial Modeling Prep API key (required)
+IP_HASH_SALT         - Server-only salt for deterministic client IP hashing (optional, default provided)
+SUPABASE_URL         - Supabase Project URL (optional, for persistent user auth & quota tracking)
+SUPABASE_ANON_KEY     - Supabase Anonymous API Key (optional)
+SUPABASE_SERVICE_ROLE_KEY - Supabase Service Role Key (optional)
 ```
 
 ## Development

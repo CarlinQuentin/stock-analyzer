@@ -84,7 +84,6 @@ import {
 } from "./utils/valuationScoring";
 
 import { initAnonymousAuth } from "./services/supabaseClient";
-import { stockAnalysisService } from "./services/stockAnalysisService";
 
 function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -552,9 +551,6 @@ function App() {
     setSelectedMetric(null);
 
     try {
-      // 1. Enforce quota server-side via Supabase RPC / Edge Function (limit = 2 for anonymous users)
-      await stockAnalysisService.checkQuotaAndTrack(ticker);
-
       const [profile, historicalPrices] = await Promise.all([
         fmpService.getCompanyProfile(ticker),
         fmpService.getHistoricalPrices(ticker),
@@ -635,6 +631,17 @@ function App() {
 
         setProfileOnly(null);
       } catch (statementError: any) {
+        // If server rejected due to quota or IP rate limits, escalate to show AuthModal
+        if (
+          statementError?.code === "LOGIN_REQUIRED" ||
+          statementError?.code === "RATE_LIMIT" ||
+          statementError?.status === 429 ||
+          statementError?.message?.includes("limit") ||
+          statementError?.message?.includes("Please sign up or log in")
+        ) {
+          throw statementError;
+        }
+
         setProfileOnly({
           ticker,
           profile,
@@ -647,13 +654,16 @@ function App() {
     } catch (err: any) {
       if (
         err?.code === "LOGIN_REQUIRED" ||
+        err?.code === "RATE_LIMIT" ||
+        err?.status === 429 ||
         err?.message?.includes("LOGIN_REQUIRED") ||
-        err?.message?.includes("limit of 2")
+        err?.message?.includes("limit") ||
+        err?.message?.includes("Please sign up or log in")
       ) {
         setPendingTicker(ticker);
         setAuthPromptMessage(
           err.message ||
-            "You have reached your limit of 2 free anonymous stock analyses. Please sign up or log in to continue.",
+            "You have reached your limit of free stock analyses. Please sign up or log in to continue.",
         );
         setShowAuthModal(true);
       } else {

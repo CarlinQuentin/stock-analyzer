@@ -5,11 +5,16 @@ import searchHandler from "../../../api/search";
 import newsHandler from "../../../api/news";
 import { fmpServerService } from "./fmpServerService";
 import * as authHelper from "../../../api/_lib/authHelper.js";
+import * as quotaHelper from "../../../api/_lib/quotaHelper.js";
 
 describe("Consolidated Vercel Serverless Function Handlers", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     process.env.FMP_API_KEY = "test_fmp_api_key";
+    vi.spyOn(quotaHelper, "checkAnalysisQuota").mockResolvedValue({
+      allowed: true,
+      isAnonymous: false,
+    });
   });
 
   const createMockRes = () => {
@@ -74,6 +79,30 @@ describe("Consolidated Vercel Serverless Function Handlers", () => {
       expect(res.body.incomeStatements).toHaveLength(1);
       expect(res.body.futureOutlook).toBeNull();
       expect(outlookSpy).not.toHaveBeenCalled();
+    });
+
+    it("1.2b Rejects ?operation=statements with HTTP 429 when quota is exceeded without calling FMP", async () => {
+      const quotaHelper = await import("../../../api/_lib/quotaHelper.js");
+      vi.spyOn(quotaHelper, "checkAnalysisQuota").mockResolvedValue({
+        allowed: false,
+        statusCode: 429,
+        code: "LOGIN_REQUIRED",
+        reason: "USER_LIMIT_EXCEEDED",
+        message: "You have reached your limit of 2 free anonymous stock analyses. Please sign up or log in to continue.",
+        count: 2,
+        limit: 2,
+      });
+
+      const fmpSpy = vi.spyOn(fmpServerService, "getStatementData");
+      const req = { method: "GET", query: { ticker: "NVDA", operation: "statements" }, headers: {} };
+      const res = createMockRes();
+
+      await stocksHandler(req, res);
+
+      expect(res.statusCode).toBe(429);
+      expect(res.body.code).toBe("LOGIN_REQUIRED");
+      expect(res.body.reason).toBe("USER_LIMIT_EXCEEDED");
+      expect(fmpSpy).not.toHaveBeenCalled();
     });
 
     it("1.3 Rejects unauthenticated direct requests to ?operation=outlook with 401 without calling FMP", async () => {

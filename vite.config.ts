@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import { fetchGoogleStockNews } from "./src/services/newsEngine";
 import { fmpServerService } from "./src/lib/server/fmpServerService";
 import { verifyServerAuth } from "./src/lib/server/authHelper";
+import { checkAnalysisQuota } from "./src/lib/server/quotaHelper";
 
 async function readBody(req: any): Promise<any> {
   return new Promise((resolve) => {
@@ -147,8 +148,24 @@ function apiMiddlewarePlugin(env: Record<string, string>): Plugin {
               const operation = subOperation || searchParams.get("operation") || "profile";
 
               if (operation === "statements" || operation === "analysis" || operation === "all") {
+                const quotaResult = await checkAnalysisQuota(req, ticker);
+                if (!quotaResult.allowed) {
+                  return sendResponse(quotaResult.statusCode || 429, {
+                    error: quotaResult.error || "LOGIN_REQUIRED",
+                    code: quotaResult.code || "LIMIT_EXCEEDED",
+                    reason: quotaResult.reason || "QUOTA_EXCEEDED",
+                    message:
+                      quotaResult.message ||
+                      "You have reached your limit of free stock analyses. Please sign up or log in to continue.",
+                    count: quotaResult.count,
+                    limit: quotaResult.limit,
+                    ipCount: quotaResult.ipCount,
+                    ipLimit: quotaResult.ipLimit,
+                  });
+                }
+
                 const authResult = await verifyServerAuth(req);
-                const shouldFetchOutlook = Boolean(authResult.authenticated);
+                const shouldFetchOutlook = Boolean(authResult.authenticated && !authResult.isAnonymous);
 
                 const currentPrice = searchParams.has("currentPrice")
                   ? parseFloat(searchParams.get("currentPrice")!)

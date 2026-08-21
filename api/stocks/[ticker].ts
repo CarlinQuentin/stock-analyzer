@@ -1,5 +1,6 @@
 import { fmpServerService } from "../_lib/fmpServerService.js";
 import { verifyServerAuth } from "../_lib/authHelper.js";
+import { checkAnalysisQuota } from "../_lib/quotaHelper.js";
 import { fetchGoogleStockNews } from "../_lib/newsEngine.js";
 import { sendJson, extractTicker, extractOperation, extractParam } from "../_lib/handlerHelper.js";
 
@@ -31,8 +32,25 @@ export default async function handler(req: any, res: any) {
       case "statements":
       case "analysis":
       case "all": {
+        // 1. Enforce server-side quota & IP abuse protection before expensive financial data retrieval
+        const quotaResult = await checkAnalysisQuota(req, ticker);
+        if (!quotaResult.allowed) {
+          return sendJson(res, quotaResult.statusCode || 429, {
+            error: quotaResult.error || "LOGIN_REQUIRED",
+            code: quotaResult.code || "LIMIT_EXCEEDED",
+            reason: quotaResult.reason || "QUOTA_EXCEEDED",
+            message:
+              quotaResult.message ||
+              "You have reached your limit of free stock analyses. Please sign up or log in to continue.",
+            count: quotaResult.count,
+            limit: quotaResult.limit,
+            ipCount: quotaResult.ipCount,
+            ipLimit: quotaResult.ipLimit,
+          });
+        }
+
         const authResult = await verifyServerAuth(req);
-        const shouldFetchOutlook = Boolean(authResult.authenticated);
+        const shouldFetchOutlook = Boolean(authResult.authenticated && !authResult.isAnonymous);
 
         const currentPriceParam = extractParam(req, "currentPrice");
         const historicalEpsCagrParam = extractParam(req, "historicalEpsCagr");
