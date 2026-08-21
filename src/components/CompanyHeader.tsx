@@ -61,7 +61,7 @@ export const CompanyHeader: React.FC<CompanyHeaderProps> = ({
             {profile.industry && <span>{profile.industry}</span>}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Review {profile.companyName}'s return on invested capital (ROIC), free cash flow growth, profit margins, balance-sheet strength, valuation multiples, and Investor's Edge quality score.
+            Review {profile.companyName}'s return on invested capital (ROIC), free cash flow growth, profit margins, balance-sheet strength, valuation multiples, and Investor's Edge™ quality score.
           </p>
         </div>
         {profile.image && (

@@ -113,8 +113,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-2.5 shadow-lg shadow-blue-500/25">
               <span className="text-2xl">📈</span>
             </div>
-            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-1">
-              Investor's Edge
+            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-1 flex items-center justify-center">
+              <span>Investor's Edge</span>
+              <sup className="text-xs font-bold ml-0.5 text-blue-600 dark:text-blue-400 select-none">™</sup>
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {mode === "login"

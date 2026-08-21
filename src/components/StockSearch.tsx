@@ -96,8 +96,9 @@ export const StockSearch: React.FC<StockSearchProps> = ({
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-100/90 to-slate-200/70 dark:from-slate-900 dark:to-slate-950 flex flex-col items-center justify-start p-4 md:p-8 transition-colors duration-300">
       <div className="w-full max-w-7xl mx-auto py-8">
         <div className="text-center mb-10">
-          <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 dark:text-white mb-3 tracking-tight">
-            Investor's Edge
+          <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 dark:text-white mb-3 tracking-tight flex items-center justify-center">
+            <span>Investor's Edge</span>
+            <sup className="text-lg md:text-xl font-bold ml-1 text-blue-600 dark:text-blue-400 select-none">™</sup>
           </h1>
           <p className="text-lg md:text-xl text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
             Evaluate long-term investment quality based on fundamental business

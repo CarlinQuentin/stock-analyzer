@@ -960,8 +960,16 @@ function App() {
         <main className="flex-1">
           <StockSearch onSearch={handleSearch} isLoading={isLoading} />
         </main>
-        <footer className="w-full max-w-7xl mx-auto px-4 pb-8">
+        <footer className="w-full max-w-7xl mx-auto px-4 pb-8 text-center">
           <PopularStocksDirectory onSelectStock={handleSearch} />
+          <div className="mt-8 pt-6 border-t border-slate-200/80 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
+            <p className="font-medium">
+              © {new Date().getFullYear()} Investor's Edge<sup className="text-[9px] font-bold">™</sup>. All rights reserved.
+            </p>
+            <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+              Investor's Edge™ is a trademark for fundamental stock analysis and financial intelligence tools.
+            </p>
+          </div>
         </footer>
         {showAuthModal && (
           <AuthModal
@@ -1030,27 +1038,43 @@ function App() {
       </div>
       <ThemeToggle />
       <div className="max-w-7xl mx-auto">
-        {/* Top Navigation Bar: Back to Search + Quick Search Bar */}
+        {/* Top Navigation Bar: Brand Logo + Back to Search + Quick Search Bar */}
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <button
-            onClick={() => navigateToHome()}
-            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-semibold text-sm transition-colors group"
-          >
-            <svg
-              className="w-5 h-5 transition-transform group-hover:-translate-x-1"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+            <button
+              onClick={() => navigateToHome()}
+              className="inline-flex items-center gap-2 text-slate-900 dark:text-white font-extrabold text-base tracking-tight hover:opacity-85 transition-opacity"
+              title="Return to Investor's Edge Home"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-            <span>Back to Search</span>
-          </button>
+              <div className="w-7 h-7 bg-gradient-to-br from-blue-600 to-emerald-500 rounded-lg flex items-center justify-center text-white text-xs shadow-sm flex-shrink-0">
+                📈
+              </div>
+              <span className="flex items-center">
+                <span>Investor's Edge</span>
+                <sup className="text-[10px] font-bold ml-0.5 text-blue-600 dark:text-blue-400 select-none">™</sup>
+              </span>
+            </button>
+            <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">|</span>
+            <button
+              onClick={() => navigateToHome()}
+              className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-semibold text-sm transition-colors group"
+            >
+              <svg
+                className="w-4 h-4 transition-transform group-hover:-translate-x-1"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              <span>Back to Search</span>
+            </button>
+          </div>
 
           <div className="w-full sm:w-80">
             <StockSearchCompact onSearch={handleSearch} isLoading={isLoading} />
@@ -1715,6 +1739,15 @@ function App() {
           </p>
 
           <PopularStocksDirectory onSelectStock={handleSearch} />
+
+          <div className="mt-8 pt-6 border-t border-slate-200/80 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
+            <p className="font-medium">
+              © {new Date().getFullYear()} Investor's Edge<sup className="text-[9px] font-bold">™</sup>. All rights reserved.
+            </p>
+            <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+              Investor's Edge™ is a trademark for fundamental stock analysis and financial intelligence tools.
+            </p>
+          </div>
         </footer>
 
         {/* Metric Detail Modal */}

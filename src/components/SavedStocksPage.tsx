@@ -212,6 +212,16 @@ export const SavedStocksPage: React.FC<SavedStocksPageProps> = ({
           ))}
         </div>
       )}
+
+      {/* Footer Trademark */}
+      <div className="mt-12 pt-6 border-t border-slate-200/80 dark:border-slate-800 text-center text-xs text-slate-500 dark:text-slate-400">
+        <p className="font-medium">
+          © {new Date().getFullYear()} Investor's Edge<sup className="text-[9px] font-bold">™</sup>. All rights reserved.
+        </p>
+        <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+          Investor's Edge™ is a trademark for fundamental stock analysis and financial intelligence tools.
+        </p>
+      </div>
     </div>
   );
 };
