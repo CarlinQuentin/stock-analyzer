@@ -4,7 +4,54 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Investor's Edge - Fundamental Analysis Tool</title>
+    <title>Investor's Edge | Fundamental Stock Analysis</title>
+    <meta
+      name="description"
+      content="Analyze stocks with fundamental metrics, ROIC, free cash flow, valuation data, growth trends, and quality scoring with Investor's Edge."
+    />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://stock-analyzer-five-rouge.vercel.app/" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Investor's Edge" />
+    <meta property="og:title" content="Investor's Edge | Fundamental Stock Analysis" />
+    <meta
+      property="og:description"
+      content="Analyze stocks using fundamental metrics, ROIC, free cash flow, valuation, growth, and quality scoring."
+    />
+    <meta property="og:url" content="https://stock-analyzer-five-rouge.vercel.app/" />
+    <meta property="og:image" content="https://stock-analyzer-five-rouge.vercel.app/og-image.png" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Investor's Edge | Fundamental Stock Analysis" />
+    <meta
+      name="twitter:description"
+      content="Analyze stocks using fundamental metrics, ROIC, free cash flow, valuation, growth, and quality scoring."
+    />
+    <meta name="twitter:image" content="https://stock-analyzer-five-rouge.vercel.app/og-image.png" />
+
+    <!-- Preconnect to direct client services (Supabase auth) -->
+    <link rel="preconnect" href="https://lntjlkuivffcjaregngp.supabase.co" />
+
+    <!-- Structured Data: WebSite & SearchAction Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Investor's Edge",
+      "url": "https://stock-analyzer-five-rouge.vercel.app/",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://stock-analyzer-five-rouge.vercel.app/stock/{search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

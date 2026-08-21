@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { fmpService } from "../services/financialModelingPrep";
 import { MarketMover } from "../types";
+import { buildStockUrl } from "../utils/navigation";
 
 interface MarketMoversProps {
   onSelectStock: (ticker: string) => void;
@@ -122,10 +123,14 @@ export const MarketMovers: React.FC<MarketMoversProps> = ({ onSelectStock }) => 
             ) : (
               <div className="space-y-2">
                 {losers.map((item, index) => (
-                  <div
+                  <a
                     key={item.symbol || index}
-                    onClick={() => onSelectStock(item.symbol)}
-                    className="group flex items-center justify-between p-3 rounded-xl bg-slate-50/70 hover:bg-rose-50/60 dark:bg-slate-900/40 dark:hover:bg-rose-950/30 border border-slate-100 dark:border-slate-800/70 hover:border-rose-300/60 dark:hover:border-rose-800/50 cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md"
+                    href={buildStockUrl(item.symbol)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onSelectStock(item.symbol);
+                    }}
+                    className="group flex items-center justify-between p-3 rounded-xl bg-slate-50/70 hover:bg-rose-50/60 dark:bg-slate-900/40 dark:hover:bg-rose-950/30 border border-slate-100 dark:border-slate-800/70 hover:border-rose-300/60 dark:hover:border-rose-800/50 cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md no-underline block"
                   >
                     <div className="flex items-center gap-3 min-w-0 pr-2">
                       <span className="text-xs font-bold text-slate-400 dark:text-slate-500 w-5 text-right flex-shrink-0">
@@ -157,7 +162,7 @@ export const MarketMovers: React.FC<MarketMoversProps> = ({ onSelectStock }) => 
                         <span>{item.changesPercentage.toFixed(2)}%</span>
                       </div>
                     </div>
-                  </div>
+                  </a>
                 ))}
               </div>
             )}
@@ -188,10 +193,14 @@ export const MarketMovers: React.FC<MarketMoversProps> = ({ onSelectStock }) => 
             ) : (
               <div className="space-y-2">
                 {gainers.map((item, index) => (
-                  <div
+                  <a
                     key={item.symbol || index}
-                    onClick={() => onSelectStock(item.symbol)}
-                    className="group flex items-center justify-between p-3 rounded-xl bg-slate-50/70 hover:bg-emerald-50/60 dark:bg-slate-900/40 dark:hover:bg-emerald-950/30 border border-slate-100 dark:border-slate-800/70 hover:border-emerald-300/60 dark:hover:border-emerald-800/50 cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md"
+                    href={buildStockUrl(item.symbol)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onSelectStock(item.symbol);
+                    }}
+                    className="group flex items-center justify-between p-3 rounded-xl bg-slate-50/70 hover:bg-emerald-50/60 dark:bg-slate-900/40 dark:hover:bg-emerald-950/30 border border-slate-100 dark:border-slate-800/70 hover:border-emerald-300/60 dark:hover:border-emerald-800/50 cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md no-underline block"
                   >
                     <div className="flex items-center gap-3 min-w-0 pr-2">
                       <span className="text-xs font-bold text-slate-400 dark:text-slate-500 w-5 text-right flex-shrink-0">
@@ -223,7 +232,7 @@ export const MarketMovers: React.FC<MarketMoversProps> = ({ onSelectStock }) => 
                         <span>+{item.changesPercentage.toFixed(2)}%</span>
                       </div>
                     </div>
-                  </div>
+                  </a>
                 ))}
               </div>
             )}

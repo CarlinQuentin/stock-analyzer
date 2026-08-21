@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { CompetitorData, CompetitorProfile } from "../types";
 import { formatMarketCap } from "../utils/scoring";
+import { buildStockUrl } from "../utils/navigation";
 
 interface CompetitorsSectionProps {
   competitorData: CompetitorData | null;
@@ -134,7 +135,9 @@ const CompetitorCard: React.FC<CompetitorCardProps> = ({
             {competitor.logo && !imageError ? (
               <img
                 src={competitor.logo}
-                alt={competitor.companyName}
+                alt={`${competitor.companyName} logo`}
+                width={40}
+                height={40}
                 onError={() => setImageError(true)}
                 className="w-10 h-10 rounded-xl object-contain p-1 bg-slate-50 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700/50 shadow-xs flex-shrink-0"
               />
@@ -221,13 +224,17 @@ const CompetitorCard: React.FC<CompetitorCardProps> = ({
       {/* Card Actions Footer */}
       <div className="flex items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-700/60">
         {onSelectCompany && (
-          <button
-            onClick={() => onSelectCompany(competitor.symbol)}
-            className="flex-1 py-1.5 px-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+          <a
+            href={buildStockUrl(competitor.symbol)}
+            onClick={(e) => {
+              e.preventDefault();
+              onSelectCompany(competitor.symbol);
+            }}
+            className="flex-1 py-1.5 px-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 no-underline"
           >
             <span>🔍</span>
             <span>View Company</span>
-          </button>
+          </a>
         )}
 
         <button

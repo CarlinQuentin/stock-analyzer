@@ -27,16 +27,13 @@ export const CompanyHeader: React.FC<CompanyHeaderProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-4 sm:p-6 h-full flex flex-col justify-between border border-transparent dark:border-slate-700/50 transition-colors duration-300">
+    <header className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-4 sm:p-6 h-full flex flex-col justify-between border border-transparent dark:border-slate-700/50 transition-colors duration-300">
       <div className="flex items-start justify-between mb-4 gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white truncate">
-              {profile.companyName}
+              {profile.companyName} ({profile.symbol}) Fundamental Analysis
             </h1>
-            <span className="text-xl sm:text-2xl font-bold text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-950/50 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded border border-transparent dark:border-blue-800/40">
-              {profile.symbol}
-            </span>
             {(onToggleSave || onRequireAuth) && (
               <button
                 onClick={handleSaveClick}
@@ -63,11 +60,16 @@ export const CompanyHeader: React.FC<CompanyHeaderProps> = ({
             {profile.sector && profile.industry && <span> • </span>}
             {profile.industry && <span>{profile.industry}</span>}
           </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Review {profile.companyName}'s return on invested capital (ROIC), free cash flow growth, profit margins, balance-sheet strength, valuation multiples, and Investor's Edge quality score.
+          </p>
         </div>
         {profile.image && (
           <img
             src={profile.image}
-            alt={profile.companyName}
+            alt={`${profile.companyName} logo`}
+            width={80}
+            height={80}
             className="w-14 h-14 sm:w-20 sm:h-20 rounded-lg object-contain ml-2 sm:ml-4 bg-white p-1 flex-shrink-0"
           />
         )}
@@ -99,6 +101,6 @@ export const CompanyHeader: React.FC<CompanyHeaderProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </header>
   );
 };

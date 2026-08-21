@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, lazy, Suspense } from "react";
 import { StockSearch } from "./components/StockSearch";
 import { CompanyHeader } from "./components/CompanyHeader";
 import { StockNews } from "./components/StockNews";
@@ -7,20 +7,42 @@ import { StockPriceChart } from "./components/StockPriceChart";
 import { MetricCard } from "./components/MetricCard";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import { ErrorMessage } from "./components/ErrorMessage";
-import { MetricDetailModal } from "./components/MetricDetailModal";
 import { ProfileOnlyPage } from "./components/ProfileOnlyPage";
 import { AuthModal } from "./components/AuthModal";
 import { UserHeader } from "./components/UserHeader";
 import { ThemeToggle } from "./components/ThemeToggle";
-import { SavedStocksPage } from "./components/SavedStocksPage";
-import { LeadershipSection } from "./components/LeadershipSection";
-import { CompetitorsSection } from "./components/CompetitorsSection";
-import { FutureOutlookSection } from "./components/FutureOutlookSection";
 import { LockedFeatureTeaser } from "./components/LockedFeatureTeaser";
-import { RawFinancialsSection } from "./components/RawFinancialsSection";
 import { PeriodSelector } from "./components/PeriodSelector";
 import { StockSearchCompact } from "./components/StockSearchCompact";
+import { PopularStocksDirectory } from "./components/PopularStocksDirectory";
 import { useNavigation, TabType, isTabProtected } from "./utils/navigation";
+import {
+  updateDocumentMetadata,
+  generateStockMetadata,
+  generateDefaultMetadata,
+  generateStockBreadcrumbsJsonLd,
+  PRODUCTION_DOMAIN,
+} from "./utils/seo";
+
+// Lazy-loaded heavy components for code-splitting
+const RawFinancialsSection = lazy(() =>
+  import("./components/RawFinancialsSection").then((m) => ({ default: m.RawFinancialsSection }))
+);
+const FutureOutlookSection = lazy(() =>
+  import("./components/FutureOutlookSection").then((m) => ({ default: m.FutureOutlookSection }))
+);
+const LeadershipSection = lazy(() =>
+  import("./components/LeadershipSection").then((m) => ({ default: m.LeadershipSection }))
+);
+const CompetitorsSection = lazy(() =>
+  import("./components/CompetitorsSection").then((m) => ({ default: m.CompetitorsSection }))
+);
+const MetricDetailModal = lazy(() =>
+  import("./components/MetricDetailModal").then((m) => ({ default: m.MetricDetailModal }))
+);
+const SavedStocksPage = lazy(() =>
+  import("./components/SavedStocksPage").then((m) => ({ default: m.SavedStocksPage }))
+);
 import { authService, UserProfile } from "./services/authService";
 import { fmpService } from "./services/financialModelingPrep";
 import { savedStocksService } from "./services/savedStocksService";
@@ -680,6 +702,47 @@ function App() {
     isLoadingFutureOutlook,
   ]);
 
+  // Dynamic SEO metadata synchronization (Title, Meta Description, Canonical URL, and JSON-LD)
+  useEffect(() => {
+    if (currentView === "saved") {
+      updateDocumentMetadata({
+        title: "Saved Stocks | Investor's Edge",
+        description: "View your personal saved stock analyses and tracked companies on Investor's Edge.",
+        canonicalUrl: `${PRODUCTION_DOMAIN}/saved`,
+        robots: "noindex, nofollow",
+        jsonLd: null,
+      });
+      return;
+    }
+
+    if (currentView === "analyze" && (result || profileOnly || currentTicker)) {
+      const sym = result?.ticker || profileOnly?.ticker || currentTicker || "";
+      const companyName =
+        result?.companyProfile.companyName ||
+        profileOnly?.profile?.companyName ||
+        sym;
+      const meta = generateStockMetadata(sym, companyName);
+      updateDocumentMetadata({
+        title: meta.title,
+        description: meta.description,
+        canonicalUrl: meta.canonicalUrl,
+        robots: "index, follow",
+        jsonLd: generateStockBreadcrumbsJsonLd(sym, companyName),
+      });
+      return;
+    }
+
+    // Default Home/Search view
+    const defaultMeta = generateDefaultMetadata();
+    updateDocumentMetadata({
+      title: defaultMeta.title,
+      description: defaultMeta.description,
+      canonicalUrl: defaultMeta.canonicalUrl,
+      robots: "index, follow",
+      jsonLd: null,
+    });
+  }, [currentView, result, profileOnly, currentTicker]);
+
   // Synchronize data loading with URL route ticker
   useEffect(() => {
     if (currentTicker) {
@@ -779,7 +842,7 @@ function App() {
     }
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-100/90 to-slate-200/70 dark:from-slate-900 dark:to-slate-950 transition-colors duration-300">
+      <div className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-100/90 to-slate-200/70 dark:from-slate-900 dark:to-slate-950 transition-colors duration-300 flex flex-col justify-between">
         <div className="fixed top-4 left-4 z-40">
           <UserHeader
             user={user}
@@ -790,18 +853,22 @@ function App() {
           />
         </div>
         <ThemeToggle />
-        <SavedStocksPage
-          savedStocks={savedStocks}
-          onSelectStock={handleSelectSavedStock}
-          onRemoveStock={handleRemoveSavedStock}
-          onReturnToAnalysis={() => {
-            if (result) {
-              navigateToStock(result.ticker, currentTab);
-            } else {
-              navigateToHome();
-            }
-          }}
-        />
+        <main className="flex-1">
+          <Suspense fallback={<LoadingSpinner message="Loading saved stocks..." />}>
+            <SavedStocksPage
+              savedStocks={savedStocks}
+              onSelectStock={handleSelectSavedStock}
+              onRemoveStock={handleRemoveSavedStock}
+              onReturnToAnalysis={() => {
+                if (result) {
+                  navigateToStock(result.ticker, currentTab);
+                } else {
+                  navigateToHome();
+                }
+              }}
+            />
+          </Suspense>
+        </main>
         {showAuthModal && (
           <AuthModal
             onLoginSuccess={handleAuthSuccess}
@@ -879,7 +946,7 @@ function App() {
 
   if (!result && !profileOnly) {
     return (
-      <>
+      <div className="min-h-screen flex flex-col justify-between">
         <div className="fixed top-4 left-4 z-40">
           <UserHeader
             user={user}
@@ -890,7 +957,12 @@ function App() {
           />
         </div>
         <ThemeToggle />
-        <StockSearch onSearch={handleSearch} isLoading={isLoading} />
+        <main className="flex-1">
+          <StockSearch onSearch={handleSearch} isLoading={isLoading} />
+        </main>
+        <footer className="w-full max-w-7xl mx-auto px-4 pb-8">
+          <PopularStocksDirectory onSelectStock={handleSearch} />
+        </footer>
         {showAuthModal && (
           <AuthModal
             onLoginSuccess={handleAuthSuccess}
@@ -901,7 +973,7 @@ function App() {
             customPrompt={authPromptMessage}
           />
         )}
-      </>
+      </div>
     );
   }
 
@@ -1448,13 +1520,15 @@ function App() {
 
             {/* Biggest Competitors Section */}
             <div className="mb-10">
-              <CompetitorsSection
-                competitorData={competitorData}
-                isLoading={isLoadingCompetitors}
-                targetSymbol={result.companyProfile.symbol || result.ticker}
-                targetCompanyName={result.companyProfile.companyName}
-                onSelectCompany={handleSearch}
-              />
+              <Suspense fallback={<LoadingSpinner message="Loading competitors..." />}>
+                <CompetitorsSection
+                  competitorData={competitorData}
+                  isLoading={isLoadingCompetitors}
+                  targetSymbol={result.companyProfile.symbol || result.ticker}
+                  targetCompanyName={result.companyProfile.companyName}
+                  onSelectCompany={handleSearch}
+                />
+              </Suspense>
             </div>
           </>
         )}
@@ -1569,21 +1643,23 @@ function App() {
 
         {/* Raw Financials Tab Content */}
         {activeTab === "rawFinancials" && rawStatementData && (
-          <RawFinancialsSection
-            incomeStatements={rawStatementData.statementData.incomeStatements}
-            balanceSheets={rawStatementData.statementData.balanceSheets}
-            cashFlowStatements={rawStatementData.statementData.cashFlowStatements}
-            keyMetrics={rawStatementData.statementData.keyMetrics}
-            financialRatios={rawStatementData.statementData.financialRatios}
-            keyMetricsTTM={(rawStatementData.statementData as any).keyMetricsTTM}
-            ratiosTTM={(rawStatementData.statementData as any).ratiosTTM}
-            dividendHistory={rawStatementData.statementData.dividendHistory}
-            dividendMetrics={rawStatementData.statementData.dividendMetrics}
-            symbol={result.companyProfile.symbol || result.ticker}
-            companyName={result.companyProfile.companyName}
-            currentPrice={result.companyProfile.price}
-            marketCap={result.companyProfile.mktCap}
-          />
+          <Suspense fallback={<LoadingSpinner message="Loading financial statements..." />}>
+            <RawFinancialsSection
+              incomeStatements={rawStatementData.statementData.incomeStatements}
+              balanceSheets={rawStatementData.statementData.balanceSheets}
+              cashFlowStatements={rawStatementData.statementData.cashFlowStatements}
+              keyMetrics={rawStatementData.statementData.keyMetrics}
+              financialRatios={rawStatementData.statementData.financialRatios}
+              keyMetricsTTM={(rawStatementData.statementData as any).keyMetricsTTM}
+              ratiosTTM={(rawStatementData.statementData as any).ratiosTTM}
+              dividendHistory={rawStatementData.statementData.dividendHistory}
+              dividendMetrics={rawStatementData.statementData.dividendMetrics}
+              symbol={result.companyProfile.symbol || result.ticker}
+              companyName={result.companyProfile.companyName}
+              currentPrice={result.companyProfile.price}
+              marketCap={result.companyProfile.mktCap}
+            />
+          </Suspense>
         )}
 
         {/* Future Outlook Tab Content */}
@@ -1602,24 +1678,28 @@ function App() {
               }
             />
           ) : (
-            <FutureOutlookSection
-              data={futureOutlookData}
-              loading={isLoadingFutureOutlook}
-            />
+            <Suspense fallback={<LoadingSpinner message="Loading future outlook..." />}>
+              <FutureOutlookSection
+                data={futureOutlookData}
+                loading={isLoadingFutureOutlook}
+              />
+            </Suspense>
           )
         )}
 
         {/* Leadership Tab Content */}
         {activeTab === "leadership" && (
-          <LeadershipSection
-            leadership={leadershipProfile}
-            isLoading={isLoadingLeadership}
-            symbol={result.companyProfile.symbol || result.ticker}
-          />
+          <Suspense fallback={<LoadingSpinner message="Loading leadership profile..." />}>
+            <LeadershipSection
+              leadership={leadershipProfile}
+              isLoading={isLoadingLeadership}
+              symbol={result.companyProfile.symbol || result.ticker}
+            />
+          </Suspense>
         )}
 
         {/* Footer */}
-        <div className="text-center text-slate-600 dark:text-slate-400 text-sm mb-8">
+        <footer className="text-center text-slate-600 dark:text-slate-400 text-sm mb-8">
           <p>
             This analysis is based on financial data from Financial Modeling
             Prep API and is intended for educational purposes. It does not
@@ -1633,15 +1713,19 @@ function App() {
               Analyze another stock
             </button>
           </p>
-        </div>
+
+          <PopularStocksDirectory onSelectStock={handleSearch} />
+        </footer>
 
         {/* Metric Detail Modal */}
         {selectedMetric && result && (
-          <MetricDetailModal
-            metricKey={selectedMetric}
-            result={result}
-            onClose={() => setSelectedMetric(null)}
-          />
+          <Suspense fallback={null}>
+            <MetricDetailModal
+              metricKey={selectedMetric}
+              result={result}
+              onClose={() => setSelectedMetric(null)}
+            />
+          </Suspense>
         )}
 
         {/* Auth Modal for Quota Limits or Manual Login */}

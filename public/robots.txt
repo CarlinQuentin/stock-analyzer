@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Allow: /stock/
+
+Disallow: /api/
+Disallow: /saved
+
+Sitemap: https://stock-analyzer-five-rouge.vercel.app/sitemap.xml
