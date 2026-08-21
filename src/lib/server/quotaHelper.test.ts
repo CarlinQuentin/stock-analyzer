@@ -127,7 +127,7 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
     });
   });
 
-  describe("3. Quota Enforcement & Fail-Closed Behavior (checkAnalysisQuota)", () => {
+  describe("3. Quota Enforcement & Single Source of Truth RPC (checkAnalysisQuota)", () => {
     it("3.1 Returns mock allowed when Supabase is not configured (offline / local dev mode)", async () => {
       delete process.env.SUPABASE_URL;
       delete process.env.VITE_SUPABASE_URL;
@@ -157,27 +157,28 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
       expect(result.error).toBe("CONFIGURATION_ERROR");
     });
 
-    it("3.3 Allows unauthenticated anonymous visitor with valid IP and empty quota tables", async () => {
+    it("3.3 Unauthenticated anonymous visitor passes p_ip_hash to check_and_increment_analysis_limit and is allowed within quota", async () => {
       process.env.IP_HASH_SALT = "test-salt";
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_ANON_KEY = "anon-key-123";
 
-      const mockFrom = vi.fn().mockImplementation((table: string) => {
-        if (table === "ip_analyses") {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                gte: vi.fn().mockResolvedValue({ count: 0, data: [], error: null }),
-              }),
-            }),
-            insert: vi.fn().mockResolvedValue({ error: null }),
-          };
-        }
-        return {};
+      let capturedRpcParams: any = null;
+      const mockRpc = vi.fn().mockImplementation((_name: string, params: any) => {
+        capturedRpcParams = params;
+        return Promise.resolve({
+          data: {
+            status: "ALLOWED",
+            is_anonymous: true,
+            already_analyzed: false,
+            count: 1,
+            limit: 2,
+          },
+          error: null,
+        });
       });
 
       setTestSupabaseClient({
-        from: mockFrom,
+        rpc: mockRpc,
       } as any);
 
       const req = {
@@ -192,40 +193,40 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
       expect(result.isAnonymous).toBe(true);
       expect(result.count).toBe(1);
       expect(result.limit).toBe(2);
+      expect(mockRpc).toHaveBeenCalledWith(
+        "check_and_increment_analysis_limit",
+        expect.objectContaining({
+          p_ticker: "NVDA",
+          p_max_anonymous_limit: 2,
+          p_max_ip_limit: 10,
+          p_ip_window_hours: 24,
+        })
+      );
+      expect(capturedRpcParams.p_ip_hash).toBeDefined();
+      expect(capturedRpcParams.p_ip_hash).toHaveLength(64);
     });
 
-    it("3.3b Denies unauthenticated anonymous visitor when IP has analyzed 2 distinct tickers", async () => {
+    it("3.4 Unauthenticated anonymous visitor receives HTTP 429 when anonymous 2-stock limit is reached", async () => {
       process.env.IP_HASH_SALT = "test-salt";
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_ANON_KEY = "anon-key-123";
 
-      const mockFrom = vi.fn().mockImplementation((table: string) => {
-        if (table === "ip_analyses") {
-          return {
-            select: vi.fn().mockImplementation((_fields: string, opts?: any) => {
-              if (opts?.head) {
-                return {
-                  eq: vi.fn().mockReturnValue({
-                    gte: vi.fn().mockResolvedValue({ count: 2, error: null }),
-                  }),
-                };
-              }
-              return {
-                eq: vi.fn().mockReturnValue({
-                  gte: vi.fn().mockResolvedValue({
-                    data: [{ ticker: "AAPL" }, { ticker: "MSFT" }],
-                    error: null,
-                  }),
-                }),
-              };
-            }),
-          };
-        }
-        return {};
+      const mockRpc = vi.fn().mockResolvedValue({
+        data: {
+          status: "LIMIT_EXCEEDED",
+          code: "LOGIN_REQUIRED",
+          reason: "USER_LIMIT_EXCEEDED",
+          is_anonymous: true,
+          already_analyzed: false,
+          count: 2,
+          limit: 2,
+          message: "You have reached your limit of 2 free anonymous stock analyses. Please sign up or log in to continue.",
+        },
+        error: null,
       });
 
       setTestSupabaseClient({
-        from: mockFrom,
+        rpc: mockRpc,
       } as any);
 
       const req = {
@@ -240,9 +241,51 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
       expect(result.statusCode).toBe(429);
       expect(result.code).toBe("LOGIN_REQUIRED");
       expect(result.reason).toBe("USER_LIMIT_EXCEEDED");
+      expect(result.count).toBe(2);
+      expect(result.limit).toBe(2);
     });
 
-    it("3.4 Calls check_and_increment_analysis_limit with non-null p_ip_hash and allows authenticated user", async () => {
+    it("3.5 Unauthenticated anonymous visitor receives HTTP 429 when rolling 24h IP limit (10) is reached", async () => {
+      process.env.IP_HASH_SALT = "test-salt";
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_ANON_KEY = "anon-key-123";
+
+      const mockRpc = vi.fn().mockResolvedValue({
+        data: {
+          status: "LIMIT_EXCEEDED",
+          code: "LOGIN_REQUIRED",
+          reason: "IP_LIMIT_EXCEEDED",
+          is_anonymous: true,
+          count: 1,
+          limit: 2,
+          ip_count: 10,
+          ip_limit: 10,
+          message: "Analysis limit exceeded for your IP network in the last 24 hours. Please sign up or log in to continue.",
+        },
+        error: null,
+      });
+
+      setTestSupabaseClient({
+        rpc: mockRpc,
+      } as any);
+
+      const req = {
+        headers: {
+          "x-real-ip": "203.0.113.100",
+        },
+      };
+
+      const result = await checkAnalysisQuota(req, "AMZN");
+
+      expect(result.allowed).toBe(false);
+      expect(result.statusCode).toBe(429);
+      expect(result.code).toBe("LOGIN_REQUIRED");
+      expect(result.reason).toBe("IP_LIMIT_EXCEEDED");
+      expect(result.ipCount).toBe(10);
+      expect(result.ipLimit).toBe(10);
+    });
+
+    it("3.6 Authenticated user with JWT calls RPC, passes p_ip_hash, and is allowed unlimited analyses", async () => {
       process.env.IP_HASH_SALT = "test-salt";
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_ANON_KEY = "anon-key-123";
@@ -288,137 +331,16 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
       );
       expect(capturedRpcParams.p_ip_hash).toBeDefined();
       expect(capturedRpcParams.p_ip_hash).toHaveLength(64);
-      expect(capturedRpcParams.p_ip_hash).not.toBeNull();
     });
 
-    it("3.5 Allows anonymous user within quota and passes p_ip_hash", async () => {
-      process.env.IP_HASH_SALT = "test-salt";
-      process.env.SUPABASE_URL = "https://example.supabase.co";
-      process.env.SUPABASE_ANON_KEY = "anon-key-123";
-
-      let capturedParams: any = null;
-      const mockRpc = vi.fn().mockImplementation((_name: string, params: any) => {
-        capturedParams = params;
-        return Promise.resolve({
-          data: {
-            status: "ALLOWED",
-            is_anonymous: true,
-            already_analyzed: false,
-            count: 1,
-            limit: 2,
-          },
-          error: null,
-        });
-      });
-
-      setTestSupabaseClient({
-        rpc: mockRpc,
-      } as any);
-
-      const req = {
-        headers: {
-          authorization: "Bearer anonymous-user-jwt",
-          "x-real-ip": "203.0.113.50",
-        },
-      };
-
-      const result = await checkAnalysisQuota(req, "GOOGL");
-
-      expect(result.allowed).toBe(true);
-      expect(result.isAnonymous).toBe(true);
-      expect(result.count).toBe(1);
-      expect(capturedParams.p_ip_hash).toBeDefined();
-      expect(capturedParams.p_ip_hash).not.toBeNull();
-    });
-
-    it("3.6 Denies request with HTTP 429 when anonymous user limit is exceeded", async () => {
-      process.env.IP_HASH_SALT = "test-salt";
-      process.env.SUPABASE_URL = "https://example.supabase.co";
-      process.env.SUPABASE_ANON_KEY = "anon-key-123";
-
-      const mockRpc = vi.fn().mockResolvedValue({
-        data: {
-          status: "LIMIT_EXCEEDED",
-          code: "LOGIN_REQUIRED",
-          reason: "USER_LIMIT_EXCEEDED",
-          is_anonymous: true,
-          count: 2,
-          limit: 2,
-          message: "You have reached your limit of 2 free anonymous stock analyses. Please sign up or log in to continue.",
-        },
-        error: null,
-      });
-
-      setTestSupabaseClient({
-        rpc: mockRpc,
-      } as any);
-
-      const req = {
-        headers: {
-          authorization: "Bearer anonymous-user-jwt",
-          "x-real-ip": "203.0.113.50",
-        },
-      };
-
-      const result = await checkAnalysisQuota(req, "TSLA");
-
-      expect(result.allowed).toBe(false);
-      expect(result.statusCode).toBe(429);
-      expect(result.code).toBe("LOGIN_REQUIRED");
-      expect(result.reason).toBe("USER_LIMIT_EXCEEDED");
-      expect(result.count).toBe(2);
-      expect(result.limit).toBe(2);
-    });
-
-    it("3.7 Denies request with HTTP 429 when IP limit is exceeded (IP abuse protection)", async () => {
-      process.env.IP_HASH_SALT = "test-salt";
-      process.env.SUPABASE_URL = "https://example.supabase.co";
-      process.env.SUPABASE_ANON_KEY = "anon-key-123";
-
-      const mockRpc = vi.fn().mockResolvedValue({
-        data: {
-          status: "LIMIT_EXCEEDED",
-          code: "LOGIN_REQUIRED",
-          reason: "IP_LIMIT_EXCEEDED",
-          is_anonymous: true,
-          count: 1,
-          limit: 2,
-          ip_count: 10,
-          ip_limit: 10,
-          message: "Analysis limit exceeded for your IP network in the last 24 hours. Please sign up or log in to continue.",
-        },
-        error: null,
-      });
-
-      setTestSupabaseClient({
-        rpc: mockRpc,
-      } as any);
-
-      const req = {
-        headers: {
-          authorization: "Bearer anonymous-user-jwt",
-          "x-real-ip": "203.0.113.50",
-        },
-      };
-
-      const result = await checkAnalysisQuota(req, "AMZN");
-
-      expect(result.allowed).toBe(false);
-      expect(result.statusCode).toBe(429);
-      expect(result.code).toBe("LOGIN_REQUIRED");
-      expect(result.reason).toBe("IP_LIMIT_EXCEEDED");
-      expect(result.ipCount).toBe(10);
-      expect(result.ipLimit).toBe(10);
-    });
-
-    it("3.8 Fails safely on RPC database error (does NOT treat RPC errors as allowed)", async () => {
+    it("3.7 Database/RPC failure fails closed with HTTP 500 (never treats errors as allowed)", async () => {
       process.env.IP_HASH_SALT = "test-salt";
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_ANON_KEY = "anon-key-123";
 
       const mockRpc = vi.fn().mockResolvedValue({
         data: null,
-        error: { message: "connection timeout" },
+        error: { message: "connection timeout", code: "57P01" },
       });
 
       setTestSupabaseClient({
@@ -427,7 +349,6 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
 
       const req = {
         headers: {
-          authorization: "Bearer some-token",
           "x-real-ip": "203.0.113.50",
         },
       };

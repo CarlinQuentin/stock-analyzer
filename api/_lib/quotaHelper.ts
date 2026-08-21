@@ -83,18 +83,6 @@ function sanitizeIp(ip: string): string {
   return ip;
 }
 
-function isRlsPermissionError(error: any): boolean {
-  if (!error) return false;
-  const msg = (error.message || "").toLowerCase();
-  const code = String(error.code || "");
-  return (
-    code === "42501" ||
-    msg.includes("violates row-level security") ||
-    msg.includes("permission denied") ||
-    msg.includes("not authorized")
-  );
-}
-
 /**
  * Standard pure JS SHA-256 implementation with zero external dependencies
  */
@@ -267,8 +255,10 @@ export function createScopedSupabaseClient(token?: string): SupabaseClient | nul
 }
 
 /**
- * Server-side quota helper: enforces anonymous quota (max 2) & IP abuse protection (max 10 / 24h)
- * Handles both authenticated JWT sessions and completely unauthenticated anonymous visitors.
+ * Server-Side Analysis Quota Enforcement:
+ * Single Source of Truth: PostgreSQL SECURITY DEFINER RPC `check_and_increment_analysis_limit`.
+ * Handles both authenticated JWT users and unauthenticated anonymous visitors.
+ * Never fails open on database or configuration errors.
  */
 export async function checkAnalysisQuota(
   req: any,
@@ -295,7 +285,7 @@ export async function checkAnalysisQuota(
     ipHash = hashClientIp(rawIp);
   } catch (err: any) {
     console.error("[Server Quota Configuration Error]: Missing IP_HASH_SALT in production.");
-    // Fail closed if production salt is missing
+    // Fail closed: Never proceed if production salt is missing
     return {
       allowed: false,
       statusCode: 500,
@@ -322,8 +312,13 @@ export async function checkAnalysisQuota(
     url && key && url.startsWith("http") && !url.includes("placeholder")
   );
 
-  // If Supabase is not configured (offline / demo / test environment), allow request
+  // If Supabase is not configured (offline / demo / test environment), allow mock analysis
   if (!isSupabaseConfigured) {
+    return { allowed: true, isMock: true };
+  }
+
+  const supabase = createScopedSupabaseClient(token);
+  if (!supabase) {
     return { allowed: true, isMock: true };
   }
 
@@ -331,209 +326,79 @@ export async function checkAnalysisQuota(
   const maxIpLimit = options.maxIpLimit ?? 10;
   const ipWindowHours = options.ipWindowHours ?? 24;
 
-  // Path A: User has an active JWT session (authenticated user session)
-  if (token) {
-    const supabase = createScopedSupabaseClient(token);
-    if (!supabase) {
-      return { allowed: true, isMock: true };
-    }
-
-    try {
-      const { data: quotaData, error: rpcError } = await supabase.rpc(
-        "check_and_increment_analysis_limit",
-        {
-          p_ticker: cleanTicker,
-          p_ip_hash: ipHash,
-          p_max_anonymous_limit: maxAnonymousLimit,
-          p_max_ip_limit: maxIpLimit,
-          p_ip_window_hours: ipWindowHours,
-        }
-      );
-
-      if (rpcError) {
-        // If the token is expired or unauthorized, fall back to anonymous IP quota check
-        if (
-          rpcError.code === "UNAUTHORIZED" ||
-          rpcError.message?.includes("UNAUTHORIZED") ||
-          rpcError.message?.includes("JWT")
-        ) {
-          // Fall through to Path B
-        } else {
-          console.error("[Server Quota RPC Error]:", rpcError.message);
-          return {
-            allowed: false,
-            statusCode: 500,
-            error: "DATABASE_ERROR",
-            code: "DATABASE_ERROR",
-            message: "Failed to verify analysis quota. Please try again.",
-          };
-        }
-      } else if (quotaData) {
-        // Quota or IP Limit Exceeded
-        if (quotaData.status === "LIMIT_EXCEEDED" || quotaData.code === "LOGIN_REQUIRED") {
-          return {
-            allowed: false,
-            statusCode: 429,
-            code: quotaData.code || "LOGIN_REQUIRED",
-            reason: quotaData.reason || "LIMIT_EXCEEDED",
-            message:
-              quotaData.message ||
-              "You have reached your limit of free stock analyses. Please sign up or log in to continue.",
-            count: quotaData.count,
-            limit: quotaData.limit,
-            ipCount: quotaData.ip_count,
-            ipLimit: quotaData.ip_limit,
-          };
-        }
-
-        // Quota Allowed for session user
-        return {
-          allowed: true,
-          isAnonymous: quotaData.is_anonymous,
-          alreadyAnalyzed: quotaData.already_analyzed,
-          count: quotaData.count,
-          limit: quotaData.limit,
-        };
-      }
-    } catch (err: any) {
-      console.error("[Server Quota Exception]:", err?.message || err);
-      return {
-        allowed: false,
-        statusCode: 500,
-        error: "SERVER_ERROR",
-        code: "SERVER_ERROR",
-        message: "An unexpected error occurred while verifying analysis quota.",
-      };
-    }
-  }
-
-  // Path B: Unauthenticated anonymous visitor (no token / new visitor / logged-out user)
-  // Enforce quota via public.ip_analyses table
-  const serverClient = createScopedSupabaseClient();
-  if (!serverClient) {
-    return { allowed: true, isMock: true };
-  }
-
   try {
-    const windowStart = new Date(Date.now() - ipWindowHours * 60 * 60 * 1000).toISOString();
-
-    // 1. Enforce rolling 24h IP limit (max 10 analyses per IP)
-    const { count: ipTotalCount, error: ipCountErr } = await serverClient
-      .from("ip_analyses")
-      .select("*", { count: "exact", head: true })
-      .eq("ip_hash", ipHash)
-      .gte("created_at", windowStart);
-
-    if (ipCountErr) {
-      if (isRlsPermissionError(ipCountErr)) {
-        console.warn(
-          "[Server Quota RLS Notice]: Direct ip_analyses query restricted by RLS. Set SUPABASE_SERVICE_ROLE_KEY in server environment to enable server-side anonymous rate limiting under RLS."
-        );
-        return {
-          allowed: true,
-          isAnonymous: true,
-          alreadyAnalyzed: false,
-          count: 1,
-          limit: maxAnonymousLimit,
-        };
+    // Single Source of Truth: check_and_increment_analysis_limit (SECURITY DEFINER RPC)
+    const { data: quotaData, error: rpcError } = await supabase.rpc(
+      "check_and_increment_analysis_limit",
+      {
+        p_ticker: cleanTicker,
+        p_ip_hash: ipHash,
+        p_max_anonymous_limit: maxAnonymousLimit,
+        p_max_ip_limit: maxIpLimit,
+        p_ip_window_hours: ipWindowHours,
       }
-      console.error("[Server IP Quota Count Error]:", ipCountErr.message);
-      return {
-        allowed: false,
-        statusCode: 500,
-        error: "DATABASE_ERROR",
-        code: "DATABASE_ERROR",
-        message: "Failed to verify analysis quota. Please try again.",
-      };
-    }
-
-    if (ipTotalCount !== null && ipTotalCount >= maxIpLimit) {
-      return {
-        allowed: false,
-        statusCode: 429,
-        code: "LOGIN_REQUIRED",
-        reason: "IP_LIMIT_EXCEEDED",
-        message: "Analysis limit exceeded for your IP network in the last 24 hours. Please sign up or log in to continue.",
-        ipCount: ipTotalCount,
-        ipLimit: maxIpLimit,
-      };
-    }
-
-    // 2. Enforce anonymous distinct ticker limit (max 2 distinct analyses per IP)
-    const { data: recentAnalyses, error: recentErr } = await serverClient
-      .from("ip_analyses")
-      .select("ticker")
-      .eq("ip_hash", ipHash)
-      .gte("created_at", windowStart);
-
-    if (recentErr) {
-      if (isRlsPermissionError(recentErr)) {
-        console.warn(
-          "[Server Quota RLS Notice]: Direct ip_analyses query restricted by RLS. Set SUPABASE_SERVICE_ROLE_KEY in server environment to enable server-side anonymous rate limiting under RLS."
-        );
-        return {
-          allowed: true,
-          isAnonymous: true,
-          alreadyAnalyzed: false,
-          count: 1,
-          limit: maxAnonymousLimit,
-        };
-      }
-      console.error("[Server IP Quota Query Error]:", recentErr.message);
-      return {
-        allowed: false,
-        statusCode: 500,
-        error: "DATABASE_ERROR",
-        code: "DATABASE_ERROR",
-        message: "Failed to verify analysis quota. Please try again.",
-      };
-    }
-
-    const distinctTickers = new Set(
-      (recentAnalyses || []).map((r: any) => (r.ticker || "").toUpperCase())
     );
-    const alreadyAnalyzed = distinctTickers.has(cleanTicker);
 
-    if (!alreadyAnalyzed && distinctTickers.size >= maxAnonymousLimit) {
+    if (rpcError) {
+      console.error("[Server Quota RPC Error]:", rpcError.message);
+      // Fail closed: Database/RPC errors MUST NEVER allow analysis to proceed
       return {
         allowed: false,
-        statusCode: 429,
-        code: "LOGIN_REQUIRED",
-        reason: "USER_LIMIT_EXCEEDED",
-        message: "You have reached your limit of 2 free anonymous stock analyses. Please sign up or log in to continue.",
-        count: distinctTickers.size,
-        limit: maxAnonymousLimit,
+        statusCode: 500,
+        error: "DATABASE_ERROR",
+        code: "DATABASE_ERROR",
+        message: "Failed to verify analysis quota. Please try again.",
       };
     }
 
-    // 3. Atomically record analysis in public.ip_analyses if not already analyzed
-    if (!alreadyAnalyzed) {
-      const { error: insertErr } = await serverClient.from("ip_analyses").insert({
-        ip_hash: ipHash,
-        ticker: cleanTicker,
-      });
-
-      if (insertErr && !isRlsPermissionError(insertErr)) {
-        console.error("[Server IP Insert Error]:", insertErr.message);
-        return {
-          allowed: false,
-          statusCode: 500,
-          error: "DATABASE_ERROR",
-          code: "DATABASE_ERROR",
-          message: "Failed to record analysis quota.",
-        };
-      }
+    if (!quotaData) {
+      return {
+        allowed: false,
+        statusCode: 500,
+        error: "DATABASE_ERROR",
+        code: "DATABASE_ERROR",
+        message: "Invalid response from quota service.",
+      };
     }
 
+    // Limit Exceeded (either anonymous 2-stock limit or rolling 24h IP limit)
+    if (quotaData.status === "LIMIT_EXCEEDED" || quotaData.code === "LOGIN_REQUIRED") {
+      return {
+        allowed: false,
+        statusCode: 429,
+        code: quotaData.code || "LOGIN_REQUIRED",
+        reason: quotaData.reason || "LIMIT_EXCEEDED",
+        message:
+          quotaData.message ||
+          "You have reached your limit of free stock analyses. Please sign up or log in to continue.",
+        count: quotaData.count,
+        limit: quotaData.limit,
+        ipCount: quotaData.ip_count,
+        ipLimit: quotaData.ip_limit,
+      };
+    }
+
+    // Analysis Allowed
+    if (quotaData.status === "ALLOWED") {
+      return {
+        allowed: true,
+        isAnonymous: quotaData.is_anonymous,
+        alreadyAnalyzed: quotaData.already_analyzed,
+        count: quotaData.count,
+        limit: quotaData.limit,
+      };
+    }
+
+    // Fail closed on any other status
     return {
-      allowed: true,
-      isAnonymous: true,
-      alreadyAnalyzed,
-      count: distinctTickers.size + (alreadyAnalyzed ? 0 : 1),
-      limit: maxAnonymousLimit,
+      allowed: false,
+      statusCode: 500,
+      error: "DATABASE_ERROR",
+      code: quotaData.code || "DATABASE_ERROR",
+      message: quotaData.message || "Unable to verify quota.",
     };
   } catch (err: any) {
-    console.error("[Server IP Quota Exception]:", err?.message || err);
+    console.error("[Server Quota Exception]:", err?.message || err);
     return {
       allowed: false,
       statusCode: 500,

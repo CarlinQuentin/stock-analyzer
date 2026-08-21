@@ -42,7 +42,7 @@ ALTER TABLE public.ip_analyses ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_ip_analyses_hash_created 
   ON public.ip_analyses(ip_hash, created_at);
 
--- 3. Atomic Postgres RPC Function for Dual Quota & IP Abuse Protection
+-- 3. Atomic Postgres RPC Function for Dual Quota & IP Abuse Protection (SECURITY DEFINER)
 CREATE OR REPLACE FUNCTION public.check_and_increment_analysis_limit(
   p_ticker TEXT,
   p_ip_hash TEXT DEFAULT NULL,
@@ -62,17 +62,110 @@ DECLARE
   v_ip_count INT;
   v_already_analyzed BOOLEAN;
 BEGIN
-  -- Get current user ID from JWT context
-  v_user_id := auth.uid();
-  IF v_user_id IS NULL THEN
+  -- Clean ticker symbol
+  p_ticker := UPPER(TRIM(p_ticker));
+  IF p_ticker IS NULL OR p_ticker = '' THEN
     RETURN jsonb_build_object(
       'status', 'ERROR',
-      'code', 'UNAUTHORIZED',
-      'message', 'Authentication required. Anonymous session must be initialized.'
+      'code', 'BAD_REQUEST',
+      'message', 'Stock ticker is required.'
     );
   END IF;
 
-  -- Determine if user is anonymous (check JWT is_anonymous or email presence in auth.users)
+  -- Get current user ID from JWT context (if present)
+  v_user_id := auth.uid();
+
+  -- =========================================================================
+  -- BRANCH 1: ANONYMOUS USER (No authenticated user ID / guest visitor)
+  -- Enforces quota & abuse protection entirely via public.ip_analyses
+  -- =========================================================================
+  IF v_user_id IS NULL THEN
+    IF p_ip_hash IS NULL OR TRIM(p_ip_hash) = '' THEN
+      RETURN jsonb_build_object(
+        'status', 'ERROR',
+        'code', 'BAD_REQUEST',
+        'message', 'IP hash is required for anonymous quota tracking.'
+      );
+    END IF;
+
+    -- 1. Check IP rolling window count (max 10 analyses per IP in 24h)
+    SELECT COUNT(*)
+    INTO v_ip_count
+    FROM public.ip_analyses
+    WHERE ip_hash = p_ip_hash 
+      AND created_at > (now() - (p_ip_window_hours || ' hours')::interval);
+
+    IF v_ip_count >= p_max_ip_limit THEN
+      RETURN jsonb_build_object(
+        'status', 'LIMIT_EXCEEDED',
+        'code', 'LOGIN_REQUIRED',
+        'reason', 'IP_LIMIT_EXCEEDED',
+        'is_anonymous', TRUE,
+        'already_analyzed', FALSE,
+        'count', v_ip_count,
+        'limit', p_max_anonymous_limit,
+        'ip_count', v_ip_count,
+        'ip_limit', p_max_ip_limit,
+        'message', 'Analysis limit exceeded for your IP network in the last 24 hours. Please sign up or log in to continue.'
+      );
+    END IF;
+
+    -- 2. Check if this IP has already analyzed this ticker within the rolling window
+    SELECT EXISTS (
+      SELECT 1 FROM public.ip_analyses
+      WHERE ip_hash = p_ip_hash 
+        AND UPPER(ticker) = p_ticker
+        AND created_at > (now() - (p_ip_window_hours || ' hours')::interval)
+    ) INTO v_already_analyzed;
+
+    -- 3. Count distinct tickers analyzed by this IP in the window
+    SELECT COUNT(DISTINCT UPPER(ticker))
+    INTO v_distinct_count
+    FROM public.ip_analyses
+    WHERE ip_hash = p_ip_hash 
+      AND created_at > (now() - (p_ip_window_hours || ' hours')::interval);
+
+    -- If already analyzed this ticker, allow without consuming a new quota slot
+    IF v_already_analyzed THEN
+      RETURN jsonb_build_object(
+        'status', 'ALLOWED',
+        'is_anonymous', TRUE,
+        'already_analyzed', TRUE,
+        'count', v_distinct_count,
+        'limit', p_max_anonymous_limit
+      );
+    END IF;
+
+    -- If distinct tickers reach or exceed limit (e.g. 2), block with 429
+    IF v_distinct_count >= p_max_anonymous_limit THEN
+      RETURN jsonb_build_object(
+        'status', 'LIMIT_EXCEEDED',
+        'code', 'LOGIN_REQUIRED',
+        'reason', 'USER_LIMIT_EXCEEDED',
+        'is_anonymous', TRUE,
+        'already_analyzed', FALSE,
+        'count', v_distinct_count,
+        'limit', p_max_anonymous_limit,
+        'message', 'You have reached your limit of 2 free anonymous stock analyses. Please sign up or log in to continue.'
+      );
+    END IF;
+
+    -- Record new analysis in public.ip_analyses
+    INSERT INTO public.ip_analyses (ip_hash, ticker) VALUES (p_ip_hash, p_ticker);
+
+    RETURN jsonb_build_object(
+      'status', 'ALLOWED',
+      'is_anonymous', TRUE,
+      'already_analyzed', FALSE,
+      'count', v_distinct_count + 1,
+      'limit', p_max_anonymous_limit
+    );
+  END IF;
+
+  -- =========================================================================
+  -- BRANCH 2: AUTHENTICATED USER (JWT user ID present)
+  -- =========================================================================
+  -- Check if user is anonymous (legacy Supabase anonymous auth user) or registered
   SELECT 
     COALESCE((auth.jwt() ->> 'is_anonymous')::boolean, FALSE) OR (email IS NULL OR email = '')
   INTO v_is_anonymous
@@ -80,11 +173,8 @@ BEGIN
   WHERE id = v_user_id;
 
   IF v_is_anonymous IS NULL THEN
-    v_is_anonymous := TRUE;
+    v_is_anonymous := FALSE;
   END IF;
-
-  -- Clean ticker symbol
-  p_ticker := UPPER(TRIM(p_ticker));
 
   -- Check if this user has already analyzed this specific ticker
   SELECT EXISTS (
@@ -116,8 +206,7 @@ BEGIN
     );
   END IF;
 
-  -- Anonymous User Rule 1:
-  -- If user already analyzed this ticker previously, allow without consuming new quota slot
+  -- Legacy Anonymous session user rules:
   IF v_already_analyzed THEN
     RETURN jsonb_build_object(
       'status', 'ALLOWED',
@@ -128,7 +217,6 @@ BEGIN
     );
   END IF;
 
-  -- Anonymous User Rule 2: Enforce lifetime limit of max 2 analyses per anonymous user
   IF v_distinct_count >= p_max_anonymous_limit THEN
     RETURN jsonb_build_object(
       'status', 'LIMIT_EXCEEDED',
@@ -180,3 +268,6 @@ BEGIN
   );
 END;
 $$;
+
+-- Grant execution permissions on the RPC to both authenticated and anon roles
+GRANT EXECUTE ON FUNCTION public.check_and_increment_analysis_limit TO authenticated, anon;
