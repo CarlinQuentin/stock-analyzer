@@ -205,6 +205,74 @@ describe("authService (Supabase Authentication & Google OAuth)", () => {
     });
   });
 
+  describe("register", () => {
+    it("should perform clean sign up when no session exists", async () => {
+      vi.spyOn(supabase.auth, "getSession").mockResolvedValue({
+        data: { session: null },
+        error: null,
+      } as any);
+
+      const signUpSpy = vi.spyOn(supabase.auth, "signUp").mockResolvedValue({
+        data: {
+          user: {
+            id: "new-user-1",
+            email: "newinvestor@example.com",
+            created_at: "2026-08-21T12:00:00Z",
+            user_metadata: { name: "New Investor" },
+          },
+          session: {} as any,
+        },
+        error: null,
+      } as any);
+
+      const res = await authService.register("New Investor", "newinvestor@example.com", "SecurePass123!");
+
+      expect(signUpSpy).toHaveBeenCalledWith({
+        email: "newinvestor@example.com",
+        password: "SecurePass123!",
+        options: { data: { name: "New Investor" } },
+      });
+      expect(res.user.email).toBe("newinvestor@example.com");
+      expect(res.user.name).toBe("New Investor");
+    });
+
+    it("should clear local session and fallback to clean sign up if anonymous update fails", async () => {
+      vi.spyOn(supabase.auth, "getSession").mockResolvedValue({
+        data: {
+          session: {
+            user: { id: "anon-old", is_anonymous: true, email: "" },
+          } as any,
+        },
+        error: null,
+      });
+
+      vi.spyOn(supabase.auth, "updateUser").mockResolvedValue({
+        data: { user: null },
+        error: { message: "Anonymous provider not enabled", status: 422 } as any,
+      });
+
+      const signOutSpy = vi.spyOn(supabase.auth, "signOut").mockResolvedValue({ error: null } as any);
+      const signUpSpy = vi.spyOn(supabase.auth, "signUp").mockResolvedValue({
+        data: {
+          user: {
+            id: "registered-user-99",
+            email: "fallback@example.com",
+            created_at: "2026-08-21T12:00:00Z",
+            user_metadata: { name: "Fallback User" },
+          },
+          session: {} as any,
+        },
+        error: null,
+      } as any);
+
+      const res = await authService.register("Fallback User", "fallback@example.com", "Pass123!");
+
+      expect(signOutSpy).toHaveBeenCalled();
+      expect(signUpSpy).toHaveBeenCalled();
+      expect(res.user.id).toBe("registered-user-99");
+    });
+  });
+
   describe("logout", () => {
     it("should call supabase.auth.signOut", async () => {
       const signOutSpy = vi.spyOn(supabase.auth, "signOut").mockResolvedValue({

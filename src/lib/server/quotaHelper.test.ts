@@ -157,18 +157,89 @@ describe("Server-Side Analysis Quota Helper (quotaHelper.ts)", () => {
       expect(result.error).toBe("CONFIGURATION_ERROR");
     });
 
-    it("3.3 Rejects with 401 UNAUTHORIZED if Supabase is configured but no Authorization header exists", async () => {
+    it("3.3 Allows unauthenticated anonymous visitor with valid IP and empty quota tables", async () => {
       process.env.IP_HASH_SALT = "test-salt";
       process.env.SUPABASE_URL = "https://example.supabase.co";
       process.env.SUPABASE_ANON_KEY = "anon-key-123";
 
-      const req = { headers: {} };
-      const result = await checkAnalysisQuota(req, "AAPL");
+      const mockFrom = vi.fn().mockImplementation((table: string) => {
+        if (table === "ip_analyses") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                gte: vi.fn().mockResolvedValue({ count: 0, data: [], error: null }),
+              }),
+            }),
+            insert: vi.fn().mockResolvedValue({ error: null }),
+          };
+        }
+        return {};
+      });
+
+      setTestSupabaseClient({
+        from: mockFrom,
+      } as any);
+
+      const req = {
+        headers: {
+          "x-real-ip": "203.0.113.100",
+        },
+      };
+
+      const result = await checkAnalysisQuota(req, "NVDA");
+
+      expect(result.allowed).toBe(true);
+      expect(result.isAnonymous).toBe(true);
+      expect(result.count).toBe(1);
+      expect(result.limit).toBe(2);
+    });
+
+    it("3.3b Denies unauthenticated anonymous visitor when IP has analyzed 2 distinct tickers", async () => {
+      process.env.IP_HASH_SALT = "test-salt";
+      process.env.SUPABASE_URL = "https://example.supabase.co";
+      process.env.SUPABASE_ANON_KEY = "anon-key-123";
+
+      const mockFrom = vi.fn().mockImplementation((table: string) => {
+        if (table === "ip_analyses") {
+          return {
+            select: vi.fn().mockImplementation((_fields: string, opts?: any) => {
+              if (opts?.head) {
+                return {
+                  eq: vi.fn().mockReturnValue({
+                    gte: vi.fn().mockResolvedValue({ count: 2, error: null }),
+                  }),
+                };
+              }
+              return {
+                eq: vi.fn().mockReturnValue({
+                  gte: vi.fn().mockResolvedValue({
+                    data: [{ ticker: "AAPL" }, { ticker: "MSFT" }],
+                    error: null,
+                  }),
+                }),
+              };
+            }),
+          };
+        }
+        return {};
+      });
+
+      setTestSupabaseClient({
+        from: mockFrom,
+      } as any);
+
+      const req = {
+        headers: {
+          "x-real-ip": "203.0.113.100",
+        },
+      };
+
+      const result = await checkAnalysisQuota(req, "GOOGL");
 
       expect(result.allowed).toBe(false);
-      expect(result.statusCode).toBe(401);
+      expect(result.statusCode).toBe(429);
       expect(result.code).toBe("LOGIN_REQUIRED");
-      expect(result.reason).toBe("UNAUTHORIZED");
+      expect(result.reason).toBe("USER_LIMIT_EXCEEDED");
     });
 
     it("3.4 Calls check_and_increment_analysis_limit with non-null p_ip_hash and allows authenticated user", async () => {

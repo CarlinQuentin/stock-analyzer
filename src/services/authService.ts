@@ -87,32 +87,35 @@ class AuthService {
     let resUser: any = null;
 
     if (isAnonymousUser) {
-      // Convert/link anonymous user to permanent account, preserving user.id & user_analyses records
-      const { data, error } = await supabase.auth.updateUser({
-        email: cleanEmail,
-        password,
-        data: { name: cleanName },
-      });
-
-      if (error) {
-        // Fallback to standard signup if link fails
-        const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+      try {
+        const { data, error } = await supabase.auth.updateUser({
           email: cleanEmail,
           password,
-          options: { data: { name: cleanName } },
+          data: { name: cleanName },
         });
-        if (signUpErr) throw new Error(signUpErr.message);
-        resUser = signUpData.user;
-      } else {
-        resUser = data.user;
+
+        if (!error && data?.user) {
+          resUser = data.user;
+        }
+      } catch {
+        // Fall through to clean standard sign up
       }
-    } else {
-      // Standard sign up
+    }
+
+    if (!resUser) {
+      // Clear any anonymous or stale session locally so Supabase Auth does not reject signup with 422
+      try {
+        await supabase.auth.signOut({ scope: "local" });
+      } catch {
+        // Ignore signOut error
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
         password,
         options: { data: { name: cleanName } },
       });
+
       if (error) throw new Error(error.message);
       resUser = data.user;
     }
