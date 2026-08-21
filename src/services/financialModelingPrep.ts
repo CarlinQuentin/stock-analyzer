@@ -12,7 +12,7 @@ import {
   AnalystGradeItem,
   FutureOutlookData,
 } from "../types";
-import { supabase, isSupabaseConfigured, initAnonymousAuth } from "./supabaseClient";
+import { supabase, isSupabaseConfigured } from "./supabaseClient";
 
 export interface FmpNormalizedQuote {
   symbol: string;
@@ -31,16 +31,11 @@ class FinancialModelingPrepService {
       timeout: 15000,
     });
 
-    // Automatically attach Supabase Auth token (anonymous or registered) to all server requests
+    // Attach Supabase Auth token to server requests if active session exists
     this.client.interceptors.request.use(async (config) => {
       if (isSupabaseConfigured) {
         try {
-          let { data } = await supabase.auth.getSession();
-          if (!data?.session) {
-            await initAnonymousAuth();
-            const res = await supabase.auth.getSession();
-            data = res.data;
-          }
+          const { data } = await supabase.auth.getSession();
           if (data?.session?.access_token) {
             config.headers = config.headers || {};
             config.headers["Authorization"] = `Bearer ${data.session.access_token}`;

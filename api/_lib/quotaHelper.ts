@@ -83,6 +83,18 @@ function sanitizeIp(ip: string): string {
   return ip;
 }
 
+function isRlsPermissionError(error: any): boolean {
+  if (!error) return false;
+  const msg = (error.message || "").toLowerCase();
+  const code = String(error.code || "");
+  return (
+    code === "42501" ||
+    msg.includes("violates row-level security") ||
+    msg.includes("permission denied") ||
+    msg.includes("not authorized")
+  );
+}
+
 /**
  * Standard pure JS SHA-256 implementation with zero external dependencies
  */
@@ -319,7 +331,7 @@ export async function checkAnalysisQuota(
   const maxIpLimit = options.maxIpLimit ?? 10;
   const ipWindowHours = options.ipWindowHours ?? 24;
 
-  // Path A: User has an active JWT session (authenticated or anonymous user session)
+  // Path A: User has an active JWT session (authenticated user session)
   if (token) {
     const supabase = createScopedSupabaseClient(token);
     if (!supabase) {
@@ -339,9 +351,13 @@ export async function checkAnalysisQuota(
       );
 
       if (rpcError) {
-        // If the token is invalid or anonymous session is expired/unauthorized, fall back to IP quota check
-        if (rpcError.code === "UNAUTHORIZED" || rpcError.message?.includes("UNAUTHORIZED")) {
-          // Proceed to Path B (IP quota verification)
+        // If the token is expired or unauthorized, fall back to anonymous IP quota check
+        if (
+          rpcError.code === "UNAUTHORIZED" ||
+          rpcError.message?.includes("UNAUTHORIZED") ||
+          rpcError.message?.includes("JWT")
+        ) {
+          // Fall through to Path B
         } else {
           console.error("[Server Quota RPC Error]:", rpcError.message);
           return {
@@ -391,8 +407,8 @@ export async function checkAnalysisQuota(
     }
   }
 
-  // Path B: Unauthenticated anonymous visitor (no token / new guest / direct browser navigation)
-  // Enforce quota via public.ip_analyses table directly
+  // Path B: Unauthenticated anonymous visitor (no token / new visitor / logged-out user)
+  // Enforce quota via public.ip_analyses table
   const serverClient = createScopedSupabaseClient();
   if (!serverClient) {
     return { allowed: true, isMock: true };
@@ -409,6 +425,18 @@ export async function checkAnalysisQuota(
       .gte("created_at", windowStart);
 
     if (ipCountErr) {
+      if (isRlsPermissionError(ipCountErr)) {
+        console.warn(
+          "[Server Quota RLS Notice]: Direct ip_analyses query restricted by RLS. Set SUPABASE_SERVICE_ROLE_KEY in server environment to enable server-side anonymous rate limiting under RLS."
+        );
+        return {
+          allowed: true,
+          isAnonymous: true,
+          alreadyAnalyzed: false,
+          count: 1,
+          limit: maxAnonymousLimit,
+        };
+      }
       console.error("[Server IP Quota Count Error]:", ipCountErr.message);
       return {
         allowed: false,
@@ -439,6 +467,18 @@ export async function checkAnalysisQuota(
       .gte("created_at", windowStart);
 
     if (recentErr) {
+      if (isRlsPermissionError(recentErr)) {
+        console.warn(
+          "[Server Quota RLS Notice]: Direct ip_analyses query restricted by RLS. Set SUPABASE_SERVICE_ROLE_KEY in server environment to enable server-side anonymous rate limiting under RLS."
+        );
+        return {
+          allowed: true,
+          isAnonymous: true,
+          alreadyAnalyzed: false,
+          count: 1,
+          limit: maxAnonymousLimit,
+        };
+      }
       console.error("[Server IP Quota Query Error]:", recentErr.message);
       return {
         allowed: false,
@@ -473,7 +513,7 @@ export async function checkAnalysisQuota(
         ticker: cleanTicker,
       });
 
-      if (insertErr) {
+      if (insertErr && !isRlsPermissionError(insertErr)) {
         console.error("[Server IP Insert Error]:", insertErr.message);
         return {
           allowed: false,
