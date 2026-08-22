@@ -1,4 +1,4 @@
-export const PRODUCTION_DOMAIN = "https://stock-analyzer-five-rouge.vercel.app";
+export const PRODUCTION_DOMAIN = "https://www.investorsedge.tech";
 export const DEFAULT_TITLE = "Investor's Edge | Fundamental Stock Analysis";
 export const DEFAULT_DESCRIPTION =
   "Analyze stocks with fundamental metrics, ROIC, free cash flow, valuation data, growth trends, and quality scoring with Investor's Edge.";

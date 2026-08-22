@@ -5,4 +5,4 @@ Allow: /stock/
 Disallow: /api/
 Disallow: /saved
 
-Sitemap: https://stock-analyzer-five-rouge.vercel.app/sitemap.xml
+Sitemap: https://www.investorsedge.tech/sitemap.xml

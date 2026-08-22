@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 
-const PRODUCTION_DOMAIN = "https://stock-analyzer-five-rouge.vercel.app";
+const PRODUCTION_DOMAIN = "https://www.investorsedge.tech";
 
 // Import stock universe from src/data/stockUniverse.ts
 const stockUniverseFile = fs.readFileSync(

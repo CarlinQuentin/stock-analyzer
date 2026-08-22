@@ -82,7 +82,7 @@ describe("authService (Supabase Authentication & Google OAuth)", () => {
 
       (globalThis as any).window = {
         location: {
-          origin: "https://stock-analyzer-five-rouge.vercel.app",
+          origin: "https://www.investorsedge.tech",
           pathname: "/",
         },
       };
@@ -93,7 +93,7 @@ describe("authService (Supabase Authentication & Google OAuth)", () => {
         expect(signInSpy).toHaveBeenCalledTimes(1);
         const callArg = signInSpy.mock.calls[0][0];
         expect(callArg.provider).toBe("google");
-        expect(callArg.options?.redirectTo).toBe("https://stock-analyzer-five-rouge.vercel.app/");
+        expect(callArg.options?.redirectTo).toBe("https://www.investorsedge.tech/");
         expect(callArg.options?.queryParams).toEqual({
           access_type: "offline",
           prompt: "consent",
