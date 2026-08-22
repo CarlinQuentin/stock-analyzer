@@ -562,12 +562,18 @@ function App() {
       setIsLoadingFutureOutlook(true);
       setFutureOutlookData(null);
 
-      // Fetch Senior Leadership asynchronously
-      leadershipService
-        .fetchLeadershipProfile(ticker, profile.companyName)
-        .then((leadProfile) => setLeadershipProfile(leadProfile))
-        .catch((err) => console.warn("Leadership fetch failed:", err))
-        .finally(() => setIsLoadingLeadership(false));
+      // Fetch Senior Leadership asynchronously (authenticated users only)
+      if (isAuthenticated) {
+        setIsLoadingLeadership(true);
+        leadershipService
+          .fetchLeadershipProfile(ticker, profile.companyName)
+          .then((leadProfile) => setLeadershipProfile(leadProfile))
+          .catch((err) => console.warn("Leadership fetch failed:", err))
+          .finally(() => setIsLoadingLeadership(false));
+      } else {
+        setIsLoadingLeadership(false);
+        setLeadershipProfile(null);
+      }
 
       // Fetch Biggest Competitors asynchronously
       competitorService
@@ -712,6 +718,31 @@ function App() {
     isLoadingFutureOutlook,
   ]);
 
+  // Fetch Senior Leadership data when user authenticates while viewing an already loaded stock
+  useEffect(() => {
+    if (
+      !isCheckingAuth &&
+      isAuthenticated &&
+      result &&
+      !leadershipProfile &&
+      !isLoadingLeadership &&
+      result.companyProfile
+    ) {
+      setIsLoadingLeadership(true);
+      leadershipService
+        .fetchLeadershipProfile(result.ticker, result.companyProfile.companyName)
+        .then((leadProfile) => setLeadershipProfile(leadProfile))
+        .catch((err) => console.warn("Leadership fetch failed:", err))
+        .finally(() => setIsLoadingLeadership(false));
+    }
+  }, [
+    isCheckingAuth,
+    isAuthenticated,
+    result,
+    leadershipProfile,
+    isLoadingLeadership,
+  ]);
+
   // Dynamic SEO metadata synchronization (Title, Meta Description, Canonical URL, and JSON-LD)
   useEffect(() => {
     if (currentView === "saved") {
@@ -817,6 +848,7 @@ function App() {
     setUser(null);
     setSavedStocks([]);
     setFutureOutlookData(null);
+    setLeadershipProfile(null);
     setResult(null);
     setProfileOnly(null);
     navigateToHome(true);
@@ -1231,7 +1263,16 @@ function App() {
               )}
             </button>
             <button
-              onClick={() => navigateToTab("leadership")}
+              onClick={() => {
+                if (isTabProtected("leadership") && !isAuthenticated) {
+                  handleRequireAuth(
+                    "Sign in or create a free account to unlock Senior Leadership profiles and executive career histories.",
+                    "leadership",
+                  );
+                  return;
+                }
+                navigateToTab("leadership");
+              }}
               className={`py-2.5 sm:py-3 px-3 sm:px-6 font-semibold transition-all duration-200 border-b-2 -mb-[2px] whitespace-nowrap flex items-center gap-1.5 ${
                 activeTab === "leadership"
                   ? "border-blue-650 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold"
@@ -1240,6 +1281,12 @@ function App() {
             >
               <span>👔</span>
               <span>Senior Leadership</span>
+              {isTabProtected("leadership") && !isAuthenticated && (
+                <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 flex items-center gap-1">
+                  <span>🔒</span>
+                  <span>Free Account</span>
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -1723,13 +1770,28 @@ function App() {
 
         {/* Leadership Tab Content */}
         {activeTab === "leadership" && (
-          <Suspense fallback={<LoadingSpinner message="Loading leadership profile..." />}>
-            <LeadershipSection
-              leadership={leadershipProfile}
-              isLoading={isLoadingLeadership}
-              symbol={result.companyProfile.symbol || result.ticker}
+          isTabProtected("leadership") && !isAuthenticated ? (
+            <LockedFeatureTeaser
+              title="Member-Only Feature"
+              description="Sign in or create a free account to unlock senior executive leadership team profiles, background biographies, and verified career history timelines."
+              badge="Free Account"
+              ctaText="Sign In / Create Account"
+              onUnlock={() =>
+                handleRequireAuth(
+                  "Sign in or create a free account to unlock Senior Leadership profiles and executive career histories.",
+                  "leadership",
+                )
+              }
             />
-          </Suspense>
+          ) : (
+            <Suspense fallback={<LoadingSpinner message="Loading leadership profile..." />}>
+              <LeadershipSection
+                leadership={leadershipProfile}
+                isLoading={isLoadingLeadership}
+                symbol={result.companyProfile.symbol || result.ticker}
+              />
+            </Suspense>
+          )
         )}
 
         {/* Footer */}

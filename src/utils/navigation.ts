@@ -24,7 +24,7 @@ export const ALL_TABS: TabType[] = [
   "leadership",
 ];
 
-export const PROTECTED_TABS: TabType[] = ["futureOutlook"];
+export const PROTECTED_TABS: TabType[] = ["futureOutlook", "leadership"];
 
 export function isTabProtected(tab: TabType): boolean {
   return PROTECTED_TABS.includes(tab);

@@ -267,14 +267,15 @@ describe("Navigation & URL Routing Utility", () => {
   describe("Protected Tabs Configuration", () => {
     it("identifies protected tabs correctly", () => {
       expect(isTabProtected("futureOutlook")).toBe(true);
+      expect(isTabProtected("leadership")).toBe(true);
       expect(PROTECTED_TABS).toContain("futureOutlook");
+      expect(PROTECTED_TABS).toContain("leadership");
     });
 
     it("identifies public unrestricted tabs correctly", () => {
       expect(isTabProtected("fundamentals")).toBe(false);
       expect(isTabProtected("valuation")).toBe(false);
       expect(isTabProtected("rawFinancials")).toBe(false);
-      expect(isTabProtected("leadership")).toBe(false);
     });
   });
 });
