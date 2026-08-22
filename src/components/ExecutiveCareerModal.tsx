@@ -74,6 +74,16 @@ export const ExecutiveCareerModal: React.FC<ExecutiveCareerModalProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
+  // Lock body scroll when modal is open so only the modal scrolls
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen]);
+
   if (!isOpen || !executive) return null;
 
   const getInitials = (name: string): string => {
@@ -125,12 +135,12 @@ export const ExecutiveCareerModal: React.FC<ExecutiveCareerModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-executive-name"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200 overflow-hidden overscroll-contain"
       onClick={handleBackdropClick}
     >
       <div className="relative w-full max-w-2xl max-h-[90vh] bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
         {/* Header Bar */}
-        <div className="p-5 sm:p-6 bg-gradient-to-r from-blue-50/80 via-slate-50 to-indigo-50/60 dark:from-slate-800/90 dark:via-slate-800 dark:to-indigo-950/30 border-b border-slate-200 dark:border-slate-700/80 flex items-start justify-between gap-4">
+        <div className="p-5 sm:p-6 bg-gradient-to-r from-blue-50/80 via-slate-50 to-indigo-50/60 dark:from-slate-800/90 dark:via-slate-800 dark:to-indigo-950/30 border-b border-slate-200 dark:border-slate-700/80 flex items-start justify-between gap-4 flex-shrink-0">
           <div className="flex items-start gap-4 min-w-0">
             {profile?.photoUrl ? (
               <img
@@ -188,7 +198,7 @@ export const ExecutiveCareerModal: React.FC<ExecutiveCareerModalProps> = ({
         </div>
 
         {/* Modal Body: Scrollable */}
-        <div className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
+        <div className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar overscroll-contain">
           {loading ? (
             <div className="space-y-4 py-4 animate-pulse">
               <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/3 mb-6" />
