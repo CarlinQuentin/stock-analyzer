@@ -18,6 +18,7 @@ export const UserHeader: React.FC<UserHeaderProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const isSignedIn = Boolean(user && user.email && user.email.includes("@"));
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -40,10 +41,10 @@ export const UserHeader: React.FC<UserHeaderProps> = ({
         aria-expanded={isOpen}
       >
         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs uppercase shadow-sm flex-shrink-0">
-          {user?.name ? user.name.charAt(0) : "👤"}
+          {isSignedIn && user?.name ? user.name.charAt(0) : "👤"}
         </div>
         <span className="font-semibold max-w-[120px] truncate">
-          {user?.name || "My Account"}
+          {isSignedIn && user?.name ? user.name : "My Account"}
         </span>
         <svg
           className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
@@ -63,9 +64,9 @@ export const UserHeader: React.FC<UserHeaderProps> = ({
           {/* User Info Header */}
           <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700/60">
             <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
-              {user?.name || "Guest Account"}
+              {isSignedIn && user?.name ? user.name : "Guest Account"}
             </p>
-            {user?.email && (
+            {isSignedIn && user?.email && (
               <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
                 {user.email}
               </p>
@@ -74,34 +75,31 @@ export const UserHeader: React.FC<UserHeaderProps> = ({
 
           {/* Profile Menu Items */}
           <div className="py-1">
-            {/* Saved Stocks Option */}
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                const isAuthenticated = Boolean(user && user.email && user.email.includes("@"));
-                if (isAuthenticated) {
-                  if (onOpenSavedStocks) onOpenSavedStocks();
-                } else {
-                  if (onLoginRequest) onLoginRequest();
-                }
-              }}
-              className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
-            >
-              <div className="flex items-center gap-2.5">
-                <span className="text-sm">⭐</span>
-                <span>Saved Stocks</span>
-              </div>
-              {Boolean(user && user.email) && (
-                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
-                  {savedCount}
-                </span>
-              )}
-            </button>
+            {/* Saved Stocks Option - Only shown when user is signed in */}
+            {isSignedIn && (
+              <>
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    if (onOpenSavedStocks) onOpenSavedStocks();
+                  }}
+                  className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-sm">⭐</span>
+                    <span>Saved Stocks</span>
+                  </div>
+                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                    {savedCount}
+                  </span>
+                </button>
 
-            <div className="my-1 border-t border-slate-100 dark:border-slate-700/60" />
+                <div className="my-1 border-t border-slate-100 dark:border-slate-700/60" />
+              </>
+            )}
 
             {/* Logout / Sign In Option */}
-            {user ? (
+            {isSignedIn ? (
               <button
                 onClick={() => {
                   setIsOpen(false);

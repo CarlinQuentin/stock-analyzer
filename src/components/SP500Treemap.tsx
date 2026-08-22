@@ -264,7 +264,7 @@ export function squarify<T>(items: TreemapItem<T>[], bounds: Rect): PlacedNode<T
 }
 
 /**
- * Finviz-style performance color mapping function based strictly on empirical FMP percentage
+ * Performance color mapping function based strictly on empirical FMP percentage
  */
 function getPerformanceColor(pct: number | null): { bg: string; text: string; border: string } {
   if (pct === null || pct === undefined || isNaN(pct)) {
@@ -300,7 +300,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
   const [mouseClientPos, setMouseClientPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [selectedSectorFilter, setSelectedSectorFilter] = useState<string | "ALL">("ALL");
 
-  // Finviz Interactive Map Zoom & Pan State
+  // Interactive Map Zoom & Pan State
   const [zoom, setZoom] = useState<number>(1.0);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -469,7 +469,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
     };
   }, []);
 
-  // Finviz Interactive Map: Drag-to-Pan (active when zoomed > 1.0)
+  // Interactive Map: Drag-to-Pan (active when zoomed > 1.0)
   const handleMouseDown = (e: React.MouseEvent) => {
     if (zoom <= 1.001) return;
     setIsDragging(true);
@@ -758,7 +758,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
               </div>
             </div>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
-              Finviz-style Market Map • Area weighted by Market Cap • Heatmap colored by Performance
+              Market Map • Area weighted by Market Cap • Heatmap colored by Performance
             </p>
           </div>
 
@@ -831,7 +831,7 @@ export const Top500Treemap: React.FC<Top500TreemapProps> = ({ onSelectStock }) =
         </div>
       </div>
 
-      {/* Main Interactive Finviz Treemap Canvas Container */}
+      {/* Main Interactive Market Map Canvas Container */}
       <div
         ref={setContainerRef}
         onMouseDown={handleMouseDown}
