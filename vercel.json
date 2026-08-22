@@ -37,6 +37,10 @@
       "destination": "/api/search?operation=resolve"
     },
     {
+      "source": "/api/executive-profile",
+      "destination": "/api/executives"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

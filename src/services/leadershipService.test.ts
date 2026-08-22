@@ -112,4 +112,71 @@ describe("LeadershipService Unit Tests", () => {
       expect(profile.leadershipScoreSupport?.executiveExperienceScore).toBeNull();
     });
   });
+
+  describe("fetchExecutiveCareerHistory", () => {
+    it("7. Fetches executive career history from API and caches result in memory", async () => {
+      const mockApiResponse = {
+        name: "Tim Cook",
+        normalizedName: "tim cook",
+        currentCompany: "Apple Inc.",
+        currentTitle: "Chief Executive Officer",
+        roles: [
+          {
+            company: "Apple Inc.",
+            title: "Chief Executive Officer",
+            startDate: "Aug 2011",
+            endDate: "Present",
+            isCurrent: true,
+          },
+        ],
+        education: [
+          {
+            school: "Duke University",
+            degrees: ["MBA"],
+          },
+        ],
+        source: "pdl",
+        fetchedAt: new Date().toISOString(),
+      };
+
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockApiResponse,
+      } as any);
+
+      const history1 = await leadershipService.fetchExecutiveCareerHistory(
+        "Tim Cook",
+        "Apple Inc.",
+        "AAPL",
+        "Chief Executive Officer"
+      );
+
+      expect(history1.name).toBe("Tim Cook");
+      expect(history1.roles.length).toBe(1);
+      expect(history1.source).toBe("pdl");
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      // Second call: Memory cache should prevent another fetch
+      const history2 = await leadershipService.fetchExecutiveCareerHistory(
+        "Tim Cook",
+        "Apple Inc."
+      );
+      expect(history2.name).toBe("Tim Cook");
+      expect(fetchSpy).toHaveBeenCalledTimes(1); // Still 1 call!
+    });
+
+    it("8. Handles client fetch errors with graceful empty fallback without throwing", async () => {
+      vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("Fetch Failed"));
+
+      const fallback = await leadershipService.fetchExecutiveCareerHistory(
+        "Unknown Person",
+        "Unknown Company"
+      );
+
+      expect(fallback.name).toBe("Unknown Person");
+      expect(fallback.roles).toEqual([]);
+      expect(fallback.source).toBe("none");
+    });
+  });
 });

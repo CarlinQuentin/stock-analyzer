@@ -385,6 +385,45 @@ export interface PreviousRole {
   endYear?: number | string;
 }
 
+export interface ExecutiveCareerRole {
+  company: string;
+  title: string;
+  startDate?: string;
+  endDate?: string;
+  startYear?: number | string;
+  endYear?: number | string;
+  isCurrent?: boolean;
+  description?: string;
+  location?: string;
+}
+
+export interface ExecutiveEducation {
+  school: string;
+  degrees?: string[];
+  majors?: string[];
+  startYear?: number | string;
+  endYear?: number | string;
+}
+
+export interface ExecutiveCareerHistoryDetail {
+  id?: string;
+  name: string;
+  normalizedName: string;
+  currentCompany: string;
+  currentSymbol?: string;
+  currentTitle?: string;
+  photoUrl?: string;
+  linkedinUrl?: string;
+  summary?: string;
+  roles: ExecutiveCareerRole[];
+  education?: ExecutiveEducation[];
+  source: "pdl" | "wikidata" | "fmp" | "none";
+  sourcePersonId?: string;
+  matchConfidence?: number;
+  fetchedAt: string;
+  cached?: boolean;
+}
+
 export interface ExecutiveProfile {
   id: string;
   name: string;
@@ -398,6 +437,7 @@ export interface ExecutiveProfile {
   previousRoles: PreviousRole[];
   education?: string[];
   isKeyOfficer: boolean;
+  careerHistoryDetail?: ExecutiveCareerHistoryDetail;
 }
 
 export interface LeadershipQualityScoreSupport {

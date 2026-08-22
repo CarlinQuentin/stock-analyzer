@@ -4,6 +4,7 @@ import { fetchGoogleStockNews } from "./src/services/newsEngine";
 import { fmpServerService } from "./src/lib/server/fmpServerService";
 import { verifyServerAuth } from "./src/lib/server/authHelper";
 import { checkAnalysisQuota } from "./src/lib/server/quotaHelper";
+import { getExecutiveCareerProfile } from "./src/lib/server/executiveEngine";
 
 async function readBody(req: any): Promise<any> {
   return new Promise((resolve) => {
@@ -22,18 +23,27 @@ async function readBody(req: any): Promise<any> {
 }
 
 function apiMiddlewarePlugin(env: Record<string, string>): Plugin {
-  // Ensure FMP_API_KEY and Supabase env vars from .env / .env.local are populated in process.env
+  // Ensure FMP_API_KEY, PDL_API_KEY, and Supabase env vars from .env / .env.local are populated in process.env
   if (env.FMP_API_KEY && !process.env.FMP_API_KEY) {
     process.env.FMP_API_KEY = env.FMP_API_KEY;
   }
   if (env.VITE_FMP_API_KEY && !process.env.FMP_API_KEY) {
     process.env.FMP_API_KEY = env.VITE_FMP_API_KEY;
   }
+  if (env.PDL_API_KEY && !process.env.PDL_API_KEY) {
+    process.env.PDL_API_KEY = env.PDL_API_KEY;
+  }
+  if (env.VITE_PDL_API_KEY && !process.env.PDL_API_KEY) {
+    process.env.PDL_API_KEY = env.VITE_PDL_API_KEY;
+  }
   if (env.VITE_SUPABASE_URL && !process.env.VITE_SUPABASE_URL) {
     process.env.VITE_SUPABASE_URL = env.VITE_SUPABASE_URL;
   }
   if (env.VITE_SUPABASE_ANON_KEY && !process.env.VITE_SUPABASE_ANON_KEY) {
     process.env.VITE_SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY;
+  }
+  if (env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    process.env.SUPABASE_SERVICE_ROLE_KEY = env.SUPABASE_SERVICE_ROLE_KEY;
   }
 
   return {
@@ -74,6 +84,31 @@ function apiMiddlewarePlugin(env: Record<string, string>): Plugin {
             const refresh = searchParams.get("refresh") === "true";
             const limit = parseInt(searchParams.get("limit") || "8", 10);
             const result = await fetchGoogleStockNews(ticker, companyName, refresh, limit);
+            return sendResponse(200, result);
+          }
+
+          // Route: /api/executives or /api/executive-profile
+          if (pathname === "/api/executives" || pathname === "/api/executive-profile") {
+            const name = searchParams.get("name");
+            const company = searchParams.get("company") || searchParams.get("companyName");
+            const symbol = searchParams.get("symbol") || searchParams.get("ticker");
+            const title = searchParams.get("title");
+            const refresh = searchParams.get("refresh") === "true";
+
+            if (!name || typeof name !== "string" || name.trim().length === 0) {
+              return sendResponse(400, { message: "Executive name is required" });
+            }
+            if (!company || typeof company !== "string" || company.trim().length === 0) {
+              return sendResponse(400, { message: "Company name is required" });
+            }
+
+            const result = await getExecutiveCareerProfile(
+              name.trim(),
+              company.trim(),
+              symbol ? symbol.trim().toUpperCase() : undefined,
+              title ? title.trim() : undefined,
+              refresh
+            );
             return sendResponse(200, result);
           }
 

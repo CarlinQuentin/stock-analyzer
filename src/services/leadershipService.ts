@@ -3,11 +3,13 @@ import {
   ExecutiveProfile,
   PreviousRole,
   LeadershipQualityScoreSupport,
+  ExecutiveCareerHistoryDetail,
 } from "../types";
 import { fmpService } from "./financialModelingPrep";
 
 class LeadershipService {
   private cache = new Map<string, LeadershipProfile>();
+  private careerCache = new Map<string, ExecutiveCareerHistoryDetail>();
 
   /**
    * Helper to check if a title represents a key officer position (CEO, CFO, COO, CTO, President, Chair)
@@ -264,6 +266,68 @@ class LeadershipService {
 
     this.cache.set(symbol, profile);
     return profile;
+  }
+
+  /**
+   * Fetches enriched career history profile for a specific executive
+   * Uses in-memory memoization to prevent repeated API calls
+   */
+  async fetchExecutiveCareerHistory(
+    name: string,
+    company: string,
+    symbol?: string,
+    title?: string,
+    forceRefresh = false,
+  ): Promise<ExecutiveCareerHistoryDetail> {
+    const cleanName = (name || "").trim();
+    const cleanCompany = (company || "").trim();
+    const cleanSymbol = (symbol || "").trim().toUpperCase();
+    const cleanTitle = (title || "").trim();
+
+    const cacheKey = `${cleanName.toLowerCase()}::${cleanCompany.toLowerCase()}`;
+    if (!forceRefresh && this.careerCache.has(cacheKey)) {
+      return this.careerCache.get(cacheKey)!;
+    }
+
+    try {
+      const baseUrl =
+        typeof window !== "undefined" && window.location?.origin
+          ? window.location.origin
+          : "http://localhost:5173";
+      const url = new URL("/api/executives", baseUrl);
+      url.searchParams.set("name", cleanName);
+      url.searchParams.set("company", cleanCompany);
+      if (cleanSymbol) url.searchParams.set("symbol", cleanSymbol);
+      if (cleanTitle) url.searchParams.set("title", cleanTitle);
+      if (forceRefresh) url.searchParams.set("refresh", "true");
+
+      const res = await fetch(url.toString(), {
+        headers: { Accept: "application/json" },
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch executive profile (HTTP ${res.status})`);
+      }
+
+      const data: ExecutiveCareerHistoryDetail = await res.json();
+      this.careerCache.set(cacheKey, data);
+      return data;
+    } catch (err: any) {
+      console.warn(`[LeadershipService] Failed to fetch career history for ${name}:`, err);
+      const fallback: ExecutiveCareerHistoryDetail = {
+        name: cleanName,
+        normalizedName: cleanName.toLowerCase(),
+        currentCompany: cleanCompany,
+        currentSymbol: cleanSymbol || undefined,
+        currentTitle: cleanTitle || undefined,
+        roles: [],
+        source: "none",
+        fetchedAt: new Date().toISOString(),
+        cached: false,
+      };
+      this.careerCache.set(cacheKey, fallback);
+      return fallback;
+    }
   }
 }
 

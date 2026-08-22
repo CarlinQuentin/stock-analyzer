@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { LeadershipProfile, ExecutiveProfile } from "../types";
+import { ExecutiveCareerModal } from "./ExecutiveCareerModal";
 
 interface LeadershipSectionProps {
   leadership: LeadershipProfile | null;
@@ -12,6 +13,8 @@ export const LeadershipSection: React.FC<LeadershipSectionProps> = ({
   isLoading = false,
   symbol,
 }) => {
+  const [selectedExecutive, setSelectedExecutive] = useState<ExecutiveProfile | null>(null);
+
   if (isLoading) {
     return (
       <div className="p-8 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm animate-pulse text-center">
@@ -55,7 +58,7 @@ export const LeadershipSection: React.FC<LeadershipSectionProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-              Senior executive team, executive titles, background biographies, and career experience for {leadership.companyName} ({leadership.symbol}).
+              Senior executive team, titles, corporate backgrounds, and career histories for {leadership.companyName} ({leadership.symbol}). Click any officer to explore their career timeline.
             </p>
           </div>
         </div>
@@ -96,13 +99,17 @@ export const LeadershipSection: React.FC<LeadershipSectionProps> = ({
             <span>Key Executive Officers</span>
           </h3>
           <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            {keyOfficers.length} Key Leaders
+            {keyOfficers.length} Key Leaders • Click to View Career
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {keyOfficers.map((exec) => (
-            <ExecutiveCard key={exec.id} executive={exec} />
+            <ExecutiveCard
+              key={exec.id}
+              executive={exec}
+              onSelect={() => setSelectedExecutive(exec)}
+            />
           ))}
         </div>
       </div>
@@ -116,26 +123,40 @@ export const LeadershipSection: React.FC<LeadershipSectionProps> = ({
               <span>Senior Management & Officers</span>
             </h3>
             <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              {otherOfficers.length} Officers
+              {otherOfficers.length} Officers • Click to View Career
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {otherOfficers.map((exec) => (
-              <ExecutiveCard key={exec.id} executive={exec} />
+              <ExecutiveCard
+                key={exec.id}
+                executive={exec}
+                onSelect={() => setSelectedExecutive(exec)}
+              />
             ))}
           </div>
         </div>
       )}
+
+      {/* Executive Career History Modal */}
+      <ExecutiveCareerModal
+        executive={selectedExecutive}
+        companyName={leadership.companyName}
+        symbol={leadership.symbol}
+        isOpen={Boolean(selectedExecutive)}
+        onClose={() => setSelectedExecutive(null)}
+      />
     </div>
   );
 };
 
 interface ExecutiveCardProps {
   executive: ExecutiveProfile;
+  onSelect?: () => void;
 }
 
-const ExecutiveCard: React.FC<ExecutiveCardProps> = ({ executive }) => {
+const ExecutiveCard: React.FC<ExecutiveCardProps> = ({ executive, onSelect }) => {
   const formatPay = (pay?: number, currency = "USD"): string | null => {
     if (!pay || pay <= 0) return null;
     if (pay >= 1e6) {
@@ -156,8 +177,22 @@ const ExecutiveCard: React.FC<ExecutiveCardProps> = ({ executive }) => {
 
   const payFormatted = formatPay(executive.pay, executive.currencyPay);
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onSelect?.();
+    }
+  };
+
   return (
-    <div className="p-4 sm:p-5 bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between group">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={handleKeyDown}
+      aria-label={`View career history for ${executive.name}, ${executive.title}`}
+      className="p-4 sm:p-5 bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 shadow-xs hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500/80 transition-all duration-200 flex flex-col justify-between group cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+    >
       <div>
         {/* Executive Header info */}
         <div className="flex items-start gap-3.5 mb-3.5">
@@ -166,7 +201,7 @@ const ExecutiveCard: React.FC<ExecutiveCardProps> = ({ executive }) => {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-1">
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                 {executive.name}
               </h4>
               {executive.isKeyOfficer && (
@@ -210,29 +245,17 @@ const ExecutiveCard: React.FC<ExecutiveCardProps> = ({ executive }) => {
         )}
       </div>
 
-      {/* Previous Roles & Experience Timeline */}
-      {executive.previousRoles && executive.previousRoles.length > 0 && (
-        <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60 mt-2">
-          <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-wider block mb-1.5">
-            Previous Experience
-          </span>
-          <div className="space-y-1">
-            {executive.previousRoles.map((role, idx) => (
-              <div
-                key={idx}
-                className="text-[11px] flex items-center justify-between text-slate-700 dark:text-slate-300"
-              >
-                <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[65%]">
-                  {role.company}
-                </span>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[35%] text-right italic">
-                  {role.title}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Footer / Career Call to Action */}
+      <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60 mt-2 flex items-center justify-between">
+        <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 group-hover:underline flex items-center gap-1">
+          <span>View Career History</span>
+          <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+        </span>
+        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+          Executive Profile
+        </span>
+      </div>
     </div>
   );
 };
+
